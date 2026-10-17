@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Layers, Globe2, CandlestickChart, Share2 } from "lucide-react";
-import { Dock } from "./Dock";
+import { RightRail } from "./RightRail";
 import { TopBar } from "./TopBar";
 import { Ticker } from "./Ticker";
 import { useStore, useT } from "@/lib/store";
@@ -16,8 +16,8 @@ function usePrefs() {
     try {
       const raw = localStorage.getItem("gd-prefs");
       const p = JSON.parse(raw || "{}");
-      useStore.getState().hydrate({ theme: p.theme ?? "dark", lang: p.lang ?? "en", scale: p.scale ?? 1, desk: p.desk ?? null, onboarded: !!p.onboarded, layers: { capitals: true, labels: true, borders: true, ticker: true, ...p.layers } });
-    } catch { useStore.getState().hydrate({ onboarded: false }); }
+      useStore.getState().hydrate({ theme: p.theme ?? "dark", lang: p.lang ?? "en", scale: p.scale ?? 1, desk: p.desk ?? null, onboarded: !!p.onboarded, layers: { capitals: true, labels: true, borders: true, ticker: true, ...p.layers }, filters: p.filters ?? {}, timeWindow: p.timeWindow ?? "all", projection: p.projection ?? "globe", basemap: p.basemap ?? "dark", terminator: !!p.terminator, ready: true });
+    } catch { useStore.getState().hydrate({ onboarded: false, ready: true }); }
   }, []);
   useEffect(() => { const d = document.documentElement; d.dataset.theme = theme; d.lang = lang; d.dir = lang === "ar" ? "rtl" : "ltr"; d.style.setProperty("--text-scale", String(scale)); d.style.setProperty("--dir", lang === "ar" ? "-1" : "1"); }, [theme, lang, scale]);
 }
@@ -38,7 +38,7 @@ function MobileNav() {
   const cls = (on: boolean) => `flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] ${on ? "text-accent" : "text-t1"}`;
   return (
     <>
-      <nav aria-label="Main" className="absolute inset-x-0 bottom-0 z-30 flex h-14 items-stretch border-t border-line bg-bg1 sm:hidden">
+      <nav aria-label="Main" className="glass absolute inset-x-2 bottom-2 z-30 flex h-14 items-stretch rounded-[14px] sm:hidden">
         <Link href="/" onClick={() => { setMenu(false); select(null); }} className={cls(path === "/" && !menuOpen)}><Globe2 size={19} />{t("nav_world")}</Link>
         <Link href="/markets" className={cls(path.startsWith("/markets"))}><CandlestickChart size={19} />{t("nav_markets")}</Link>
         {path === "/" && <button onClick={() => setMenu(!menuOpen)} className={cls(menuOpen)}><Layers size={19} />{t("layers")}</button>}
@@ -53,9 +53,9 @@ export function Shell({ children }: { children: ReactNode }) {
   usePrefs(); const feed = useHeadlines();
   return (
     <div className="fixed inset-0 overflow-hidden bg-bg0 text-t0">
-      <Dock />
-      <TopBar feed={feed} />
       {children}
+      <TopBar feed={feed} />
+      <RightRail />
       <Ticker items={feed.items} />
       <MobileNav />
     </div>

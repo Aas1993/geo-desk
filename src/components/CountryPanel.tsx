@@ -47,7 +47,7 @@ export function CountryPanel() {
   };
   return (
     <section aria-label={displayName(c, lang)} key={c.iso3}
-      className={`glass anim-slide fixed inset-x-0 bottom-14 z-30 flex flex-col rounded-t-[10px] ${sheetH} sm:absolute sm:inset-x-auto sm:bottom-9 sm:start-14 sm:top-14 sm:h-auto sm:w-[420px] sm:rounded-none sm:border-y-0 sm:border-s-0`}>
+      className={`glass anim-slide fixed inset-x-2 bottom-[72px] z-30 flex flex-col rounded-t-[16px] ${sheetH} sm:absolute sm:inset-x-auto sm:bottom-16 sm:start-3 sm:top-[76px] sm:h-auto sm:w-[420px] sm:rounded-[16px]`}>
       <button aria-label="Resize" onClick={() => setSheet(sheet === "half" ? "full" : sheet === "full" ? "peek" : "half")} className="grid h-5 shrink-0 place-items-center sm:hidden"><i className="h-1 w-10 rounded-full bg-line" /></button>
       <header className="flex items-start gap-3 px-4 pb-2 pt-1 sm:pt-4">
         <span className="text-[34px] leading-none" aria-hidden>{c.flag}</span>

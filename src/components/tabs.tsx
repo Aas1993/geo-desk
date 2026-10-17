@@ -4,6 +4,8 @@ import { useStore, useT } from "@/lib/store";
 import { Card, Row, StatTile, Skeleton, EmptyState, Source, Sparkline, ShareBar } from "./ui";
 import { ago, compact, int, last, pct, usd, wmoLabel } from "@/lib/format";
 import { useCountries } from "./SearchBox";
+import { useOrgs } from "@/lib/layers/orgs-client";
+import { LAYERS } from "@/lib/layers/registry";
 import { BilateralCard } from "./tabs2";
 import type { Country, CountryDetail, Headline, Series } from "@/lib/types";
 
@@ -25,6 +27,20 @@ function LocalTime({ tz }: { tz: string | null }) {
   return <span className="num font-mono text-[13px] text-t1">{f}</span>;
 }
 
+/** Organisations this country belongs to, from the same lists the map layers use. */
+function MembershipsCard({ iso3 }: { iso3: string }) {
+  const { t, lang } = useT(); const orgs = useOrgs(); const toggle = useStore((s) => s.toggleLayer); const on = useStore((s) => s.layers);
+  if (!orgs) return null;
+  const mine = LAYERS.filter((l) => l.kind === "members" && l.members && orgs.orgs[l.members]?.includes(iso3));
+  if (!mine.length) return null;
+  return (
+    <Card title={t("memberships")} icon="🤝">
+      <div className="flex flex-wrap gap-1.5">{mine.map((l) => (
+        <button key={l.id} onClick={() => toggle(l.id)} aria-pressed={!!on[l.id]} title={lang === "ar" ? l.ar : l.en} className={`rounded-full border px-2.5 py-1 text-[12px] transition-colors ${on[l.id] ? "border-accent bg-accent/15 text-accent" : "border-line bg-bg2 text-t1 hover:border-accent"}`}>{(lang === "ar" ? l.ar : l.en).split(" · ")[0].replace(/ —.*/, "")}</button>))}</div>
+      <p className="mt-2 text-[11px] text-t2">{t("membershipsHint")}</p>
+    </Card>
+  );
+}
 export function OverviewTab({ c, detail }: { c: Country; detail: D }) {
   const { t, lang } = useT(); const select = useStore((s) => s.select); const cs = useCountries();
   const w = detail.data?.weather; const wx = wmoLabel(w?.code ?? null);
@@ -60,6 +76,7 @@ export function OverviewTab({ c, detail }: { c: Country; detail: D }) {
         ) : <p className="text-[12px] text-t2">{t("noData")}</p>}
         <Source name={t("wikidata")} url="https://www.wikidata.org" />
       </Card>
+      <MembershipsCard iso3={c.iso3} />
       <Card title={t("region")} icon="🏛">
         <Row k={t("region")} v={c.region} />
         <Row k={t("languagesL")} v={c.languages.join(", ") || "—"} />

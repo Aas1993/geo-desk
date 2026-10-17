@@ -31,7 +31,11 @@ export const GROUPS: { id: GroupId; en: string; ar: string; open?: boolean; pare
 ];
 
 const L = (id: string, group: GroupId, en: string, ar: string, color: string, kind: Kind, status: Status, extra: Partial<LayerDef> = {}): LayerDef => ({ id, group, en, ar, color, kind, status, ...extra });
-const org = (id: string, group: GroupId, en: string, ar: string, members: string): LayerDef => L(`m:${id}`, group, en, ar, "#3ddcff", "members", "soon", { members });
+/** Member lists that exist in public/data/orgs.json (built by scripts/build-orgs.mjs). Others stay "soon" until a trustworthy source is found. */
+export const MEMBER_DATA = new Set(["unga", "who", "itu", "wto", "opcw", "au", "arableague", "caricom", "cis", "coe", "ecowas", "oic", "oas", "osce", "commonwealth", "g7", "fiveeyes", "aukus", "quad", "gcc", "opec", "opecplus", "brics", "g20", "eurozone", "eaeu", "csto", "ots", "arctic", "schengen", "eu", "nato", "sco", "asean", "oecd", "mercosur", "unsc"]);
+const HUES = ["#3ddcff", "#2de39a", "#ffb547", "#b693ff", "#ff5d73", "#5aa9ff", "#ffc247", "#ff8a4c", "#f27fcb", "#67e8f9", "#9be15d", "#e0a3ff"];
+let orgN = 0;
+const org = (id: string, group: GroupId, en: string, ar: string, members: string): LayerDef => L(`m:${id}`, group, en, ar, HUES[orgN++ % HUES.length], "members", MEMBER_DATA.has(members) ? "live" : "soon", { members });
 
 export const LAYERS: LayerDef[] = [
   L("labels", "map", "Country names", "أسماء الدول", "#9db0cf", "base", "live"),
@@ -91,7 +95,7 @@ export const LAYERS: LayerDef[] = [
   L("pipelines", "infra", "Strategic pipelines", "خطوط الأنابيب الاستراتيجية", "#ffb547", "lines", "soon"),
   L("straits", "infra", "Straits & chokepoints", "المضائق ونقاط الاختناق", "#ff5d73", "points", "soon"),
   // ───────────── Memberships · UN ─────────────
-  L("m:unsc", "un", "Security Council — paint current members", "مجلس الأمن — تلوين الأعضاء الحاليين", "#3ddcff", "members", "soon", { members: "unsc" }),
+  L("m:unsc", "un", "Security Council — paint current members", "مجلس الأمن — تلوين الأعضاء الحاليين", "#3ddcff", "members", "live", { members: "unsc" }),
   L("m:nsgt", "un", "Non-Self-Governing Territories", "الأقاليم غير المتمتعة بالحكم الذاتي", "#ffb547", "members", "soon", { members: "nsgt" }),
   ...([["unga", "UNGA · General Assembly", "الجمعية العامة"], ["ecosoc", "ECOSOC · Economic and Social Council", "المجلس الاقتصادي والاجتماعي"], ["icj", "ICJ · International Court of Justice", "محكمة العدل الدولية"], ["who", "WHO · World Health Organization", "منظمة الصحة العالمية"], ["unesco", "UNESCO · UNESCO", "اليونسكو"], ["fao", "FAO · Food and Agriculture Organization", "الفاو"], ["ilo", "ILO · International Labour Organization", "منظمة العمل الدولية"], ["imo", "IMO · International Maritime Organization", "المنظمة البحرية الدولية"], ["icao", "ICAO · International Civil Aviation Organization", "منظمة الطيران المدني الدولي"], ["itu", "ITU · International Telecommunication Union", "الاتحاد الدولي للاتصالات"], ["wipo", "WIPO · World Intellectual Property Organization", "الويبو"], ["imf", "IMF · International Monetary Fund", "صندوق النقد الدولي"], ["wbg", "WBG · World Bank Group", "مجموعة البنك الدولي"], ["wfp", "WFP · World Food Programme", "برنامج الأغذية العالمي"], ["unicef", "UNICEF · UNICEF", "اليونيسف"], ["unhcr", "UNHCR · UN Refugee Agency", "مفوضية اللاجئين"], ["undp", "UNDP · UN Development Programme", "برنامج الأمم المتحدة الإنمائي"], ["unep", "UNEP · UN Environment Programme", "برنامج الأمم المتحدة للبيئة"], ["iaea", "IAEA · International Atomic Energy Agency", "الوكالة الدولية للطاقة الذرية"], ["wto", "WTO · World Trade Organization", "منظمة التجارة العالمية"], ["opcw", "OPCW · Organisation for the Prohibition of Chemical Weapons", "منظمة حظر الأسلحة الكيميائية"], ["irena", "IRENA · International Renewable Energy Agency", "الوكالة الدولية للطاقة المتجددة"], ["itlos", "ITLOS · International Tribunal for the Law of the Sea", "المحكمة الدولية لقانون البحار"], ["isa", "ISA · International Seabed Authority", "السلطة الدولية لقاع البحار"]] as [string, string, string][]).map(([id, en, ar]) => org(id, "un", en, ar, id)),
   // ───────────── Organisations ─────────────

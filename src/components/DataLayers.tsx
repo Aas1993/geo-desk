@@ -7,7 +7,7 @@ import { useStore, WINDOW_MS } from "@/lib/store";
 import { useLayerStats } from "@/lib/layers/stats";
 import { positions, prepare, type SatPayload } from "@/lib/layers/satellite-client";
 import { RasterLayers } from "./RasterLayers";
-import { ChoroplethLayer } from "./ChoroplethLayers";
+import { ChoroplethLayer, MembershipLayer } from "./ChoroplethLayers";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const ago = (t?: number) => { if (!t) return ""; const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
@@ -118,5 +118,5 @@ export function DataLayers() {
   const on = useStore((s) => s.layers); const [map, setM] = useState<MLMap | null>(null); const alive = useRef(true);
   useEffect(() => { alive.current = true; const off = onMap((m) => alive.current && setM(m)); return () => { alive.current = false; off(); }; }, []);
   if (!map) return null;
-  return <><RasterLayers map={map} />{LAYERS.filter((l) => isData(l) && on[l.id] && (l.kind === "points" || l.kind === "viewport" || l.kind === "moving" || l.kind === "client" || l.kind === "polygons" || l.id === "weather")).map((l) => <DataLayer key={l.id} def={l} map={map} />)}{LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "choropleth").map((l) => <ChoroplethLayer key={l.id} def={l} map={map} />)}</>;
+  return <><RasterLayers map={map} />{LAYERS.filter((l) => isData(l) && on[l.id] && (l.kind === "points" || l.kind === "viewport" || l.kind === "moving" || l.kind === "client" || l.kind === "polygons" || l.id === "weather")).map((l) => <DataLayer key={l.id} def={l} map={map} />)}{LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "choropleth").map((l) => <ChoroplethLayer key={l.id} def={l} map={map} />)}{LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "members").map((l) => <MembershipLayer key={l.id} def={l} map={map} />)}</>;
 }

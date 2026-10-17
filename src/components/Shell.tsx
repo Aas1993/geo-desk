@@ -6,6 +6,7 @@ import { Layers, Globe2, CandlestickChart, Share2 } from "lucide-react";
 import { RightRail } from "./RightRail";
 import { TopBar } from "./TopBar";
 import { Ticker } from "./Ticker";
+import { AlertsPanel } from "./AlertsPanel";
 import { useStore, useT } from "@/lib/store";
 import type { Headline } from "@/lib/types";
 
@@ -56,6 +57,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {children}
       <TopBar feed={feed} />
       <RightRail />
+      <AlertsPanel />
       <Ticker items={feed.items} />
       <MobileNav />
     </div>

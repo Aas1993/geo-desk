@@ -14,6 +14,8 @@ npm run dev                        # copies the MapLibre worker to /public, then
 ## What Phase 0–1 ships
 - MapLibre globe, Natural Earth boundaries, country select/hover/outline, capitals, deep links (`?sel=ARE&tab=economy#zoom/lat/lng`).
 - Country panel: Overview (capital, local time, weather, AQI, leaders, borders), Economy, Trade, Military (SIPRI via World Bank), Society, News.
+- **Live layers** (layers drawer; URL-shareable): flights incl. military, natural hazards, outbreaks, weather and radar, NASA true-colour imagery, fires, satellites, launches, GDELT events, GPS interference, sanctions by country, and 37 membership layers (UN, EU, NATO, GCC, OPEC, BRICS…). Every layer shows an honest status; sources and caveats are in `src/lib/layers/registry.ts`.
+- **Alerts bell**: one merged feed (hazards, WHO, GDELT, headlines) with UAE radar / everywhere / flagged / security tabs.
 - Search (`/` or ⌘K), layers drawer, live headline ticker (RSS), EN/AR with RTL, light/dark, text size, mobile bottom sheet.
 - Every figure shows its year and source; unavailable data shows an honest empty state.
 
@@ -62,7 +64,7 @@ An AI analyst briefed as a senior GCC banker writes an initiation-style note on 
 Graphite surfaces, warm ivory ink, one gold accent; Fraunces (display), Instrument Sans (UI), IBM Plex Mono (numbers); flat hairline panels docked beside a left rail; light "paper" theme; gains/losses in dedicated green/red tokens.
 
 ## Not built yet (see plan §9)
-Visits, briefs, live flight/vessel/event layers, per-resolution UN votes by issue. Their layers appear greyed with a "Soon" tag.
+Visits, per-resolution UN votes by issue, vessels (needs a free aisstream key), ports/power/cables, regions, UNESCO sites, the dashboard, watchlist and one-page export. Their layers appear greyed with a "Soon" tag.
 
 ## Notes
 - REST Countries' public API is deprecated, so country basics come from World Bank + Wikidata at build time.

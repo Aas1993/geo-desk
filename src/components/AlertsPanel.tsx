@@ -19,7 +19,7 @@ const rel = (now: number, t: number) => { const m = Math.max(0, Math.round((now 
 export function AlertsPanel() {
   const { t } = useT(); const open = useStore((s) => s.alertsOpen); const setOpen = useStore((s) => s.setAlertsOpen);
   const { items, error, markSeen } = useAlerts(); const [tab, setTab] = useState<Tab>("uae"); const [now, setNow] = useState(0);
-  useEffect(() => { if (!open) return; markSeen(); setNow(Date.now()); const i = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(i); }, [open, markSeen]);
+  useEffect(() => { if (!open) return; markSeen(); const tick = () => setNow(Date.now()); const first = setTimeout(tick, 0); const i = setInterval(tick, 30_000); return () => { clearTimeout(first); clearInterval(i); }; }, [open, markSeen]);
   useEffect(() => { if (!open) return; const k = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [open, setOpen]);
   const counts = useMemo(() => Object.fromEntries(TABS.map((x) => [x.id, items.filter(x.test).length])) as Record<Tab, number>, [items]);
   const list = useMemo(() => items.filter(TABS.find((x) => x.id === tab)!.test).slice(0, 80), [items, tab]);

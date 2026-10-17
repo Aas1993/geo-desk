@@ -41,6 +41,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 public/maplibre-gl-worker.mjs
-public/maplibre-gl-worker.mjs
 .env.local
 public/data/vendor-report.json

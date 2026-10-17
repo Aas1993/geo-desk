@@ -16,14 +16,16 @@ jobs:
         with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: node scripts/build-agreements.mjs
+      - run: node scripts/build-flights.mjs
+      - run: node scripts/build-investment.mjs
       - name: Open a PR if the data changed
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
-          # "built" changes every run, so compare everything else
-          git diff --quiet -I'"built":"[^"]*"' public/data/agreements.json && { echo "No data changes"; exit 0; }
-          branch="data/agreements-$(date -u +%Y%m%d)"
+          # the "built" timestamp changes every run, so compare everything else
+          node scripts/data-changed.mjs public/data/agreements.json public/data/flights.json public/data/investment.json || { echo "No data changes"; exit 0; }
+          branch="data/refresh-$(date -u +%Y%m%d)"
           git config user.name "geo-desk-bot"; git config user.email "geo-desk-bot@users.noreply.github.com"
-          git checkout -b "$branch"; git add public/data/agreements.json
-          git commit -m "Refresh UAE agreements data ($(date -u +%F))"
+          git checkout -b "$branch"; git add public/data/agreements.json public/data/flights.json public/data/investment.json
+          git commit -m "Refresh UAE agreements, flights and investment data ($(date -u +%F))"
           git push origin "$branch"
-          gh pr create --base main --head "$branch" --title "Refresh UAE agreements data ($(date -u +%F))" --body "Automated daily rebuild from MOFA and the Ministry of Foreign Trade. Review the diff for new or removed agreements, especially CEPAs. Sources are listed in \`scripts/build-agreements.mjs\`."
+          gh pr create --base main --head "$branch" --title "Refresh UAE agreements, flights and investment data ($(date -u +%F))" --body "Automated daily rebuild: agreements from MOFA and the Ministry of Foreign Trade, flights from Wikipedia airport tables via Wikidata. Review the diff for new or removed agreements (especially CEPAs) and routes. Sources are listed in \`scripts/build-agreements.mjs\` and \`scripts/build-flights.mjs\`."

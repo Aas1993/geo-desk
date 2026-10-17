@@ -5,6 +5,8 @@ import type { LayerDef } from "@/lib/layers/registry";
 import { useLayerStats } from "@/lib/layers/stats";
 import { loadOrgs } from "@/lib/layers/orgs-client";
 import { allAgreements, has, loadAgreements } from "@/lib/agreements-client";
+import { liveCount, loadFlights } from "@/lib/flights-client";
+import { loadInvestment } from "@/lib/investment-client";
 export type { Orgs } from "@/lib/layers/orgs-client";
 
 type Sanctions = { built: string; countries: Record<string, { ofac: number; un: number }> };
@@ -16,6 +18,8 @@ const SOURCES: Record<string, (def: LayerDef) => Promise<Painted>> = {
   sanctions: async () => { const j = (await (await fetch("/data/sanctions.json")).json()) as Sanctions; return { built: j.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, v]) => [k, v.ofac + v.un])) }; },
   agreements: async () => { const j = await loadAgreements(); return { built: j.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, c]) => [k, allAgreements(c).length] as [string, number]).filter(([, n]) => n > 0)) }; },
   cepa: async () => { const j = await loadAgreements(); return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, c]) => c.cepa).map(([k, c]) => [k, CEPA_COLOR[c.cepa!.status]])) }; },
+  uaeflights: async () => { const j = await loadFlights(); return { built: j.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, c]) => [k, liveCount(c)] as [string, number]).filter(([, n]) => n > 0)) }; },
+  uaeinvestment: async () => { const j = await loadInvestment(); return { built: j.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, c]) => [k, c.outward?.usd ?? 0] as [string, number]).filter(([, n]) => n > 0)) }; },
   dta: (def) => flag(def, "tax"), airagreements: (def) => flag(def, "air"),
   jec: async (def) => { const j = await loadAgreements(); return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, c]) => c.committees.length).map(([k]) => [k, def.color])) }; },
 };

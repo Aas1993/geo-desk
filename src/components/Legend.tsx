@@ -21,7 +21,7 @@ export function Legend() {
           <div className="mb-1 text-[11.5px] font-semibold text-t1">{lang === "ar" ? l.ar : l.en}</div>
           {l.legend ? <ul className="space-y-1">{l.legend.map((x) => <li key={x.label} className="flex items-center gap-2 text-[12px] text-t0"><i className="size-2.5 rounded-sm" style={{ background: x.color, opacity: 0.85 }} /><span className="flex-1 truncate">{lang === "ar" ? x.ar : x.label}</span></li>)}</ul> : <>
             <div className="h-2 rounded-full" style={{ background: `linear-gradient(90deg, ${l.color}0f, ${l.color}a0)` }} />
-            <div className="num mt-1 flex justify-between text-[11px] text-t2"><span>1</span><span>{stats[l.id]?.byKey.max?.toLocaleString() ?? "…"}</span></div></>}
+            <div className="num mt-1 flex justify-between text-[11px] text-t2"><span>1</span><span>{stats[l.id]?.byKey.max != null ? new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(stats[l.id].byKey.max) : "…"}</span></div></>}
         </div>))}
       {!!members.length && <div className="mb-2"><ul className="space-y-1">{members.map((l) => (
         <li key={l.id} className="flex items-center gap-2 text-[12px] text-t0"><i className="size-2.5 rounded-sm" style={{ background: l.color, opacity: 0.8 }} /><span className="flex-1 truncate">{lang === "ar" ? l.ar : l.en}</span>{stats[l.id]?.total ? <span className="num text-[11px] text-t2">{stats[l.id].total}</span> : null}{stats[l.id]?.byKey.wd ? <span title="List from Wikidata; may be missing a member or two" className="text-[11px] text-t2">*</span> : null}</li>))}</ul>

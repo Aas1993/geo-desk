@@ -9,7 +9,10 @@
     "lint": "eslint",
     "copy-worker": "cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs public/",
     "predev": "npm run copy-worker",
-    "prebuild": "npm run copy-worker"
+    "prebuild": "npm run copy-worker",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "tsx src/lib/markets/indicators.test.ts && tsx src/lib/research/normalise.test.ts",
+    "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
@@ -33,6 +36,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

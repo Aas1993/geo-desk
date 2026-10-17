@@ -7,6 +7,7 @@ import { useStore, WINDOW_MS } from "@/lib/store";
 import { useLayerStats } from "@/lib/layers/stats";
 import { positions, prepare, type SatPayload } from "@/lib/layers/satellite-client";
 import { RasterLayers } from "./RasterLayers";
+import { ChoroplethLayer } from "./ChoroplethLayers";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const ago = (t?: number) => { if (!t) return ""; const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
@@ -63,6 +64,17 @@ function DataLayer({ def, map }: { def: LayerDef; map: MLMap }) {
       const byType = colors.length ? ["match", ["get", "type"], ...colors, def.color] : def.color;
       const color = def.colorProp ? ["coalesce", ["get", def.colorProp], byType] : byType;
       const r = ["interpolate", ["linear"], ["coalesce", ["get", "sev"], 0], 0, 3.5, 1, 5.5, 2, 8, 3, 11];
+      if (def.kind === "polygons") { // areas: translucent fill (halo id) + outline (dot id)
+        map.addLayer({ id: halo, type: "fill", source: src, paint: { "fill-color": color as never, "fill-opacity": 0.32 } }, "border");
+        map.addLayer({ id: dot, type: "line", source: src, paint: { "line-color": color as never, "line-width": 0.8, "line-opacity": 0.7 } }, "border");
+        dataLayerIds.add(halo);
+        map.on("click", halo, (e) => {
+          const f = e.features?.[0]; if (!f) return; const p = f.properties as Feat & Record<string, unknown>; const sub = def.sub?.find((x) => x.key === p.type);
+          new Popup({ closeButton: true, maxWidth: "320px", className: "gd-popup" }).setLngLat(e.lngLat)
+            .setHTML(`<div class="gd-pop"><div class="gd-pop-k" style="color:${esc(sub?.color ?? def.color)}">${esc(sub?.en ?? def.en)}</div><div class="gd-pop-t">${esc(p.title)}</div>${p.desc ? `<div class="gd-pop-d">${esc(p.desc)}</div>` : ""}<div class="gd-pop-m">${p.src ? esc(p.src) : ""}</div></div>`).addTo(map);
+        });
+        return;
+      }
       map.addLayer({ id: halo, type: "circle", source: src, paint: { "circle-radius": ["*", r, 2.4] as never, "circle-color": color as never, "circle-opacity": 0.16, "circle-blur": 0.6 } });
       map.addLayer({ id: dot, type: "circle", source: src, paint: { "circle-radius": r as never, "circle-color": color as never, "circle-opacity": 0.95, "circle-stroke-color": "#04070d", "circle-stroke-width": 1 } });
       if (def.label) map.addLayer({ id: `${src}-label`, type: "symbol", source: src, layout: { "text-field": ["get", def.label], "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"], "text-size": 11, "text-offset": [0, -1.1], "text-allow-overlap": false }, paint: { "text-color": color as never, "text-halo-color": "#04070d", "text-halo-width": 1.4 } });
@@ -96,7 +108,7 @@ function DataLayer({ def, map }: { def: LayerDef; map: MLMap }) {
   // cleanup on unmount (layer toggled off)
   useEffect(() => () => {
     try { for (const id of [`${src}-label`, dot, halo]) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource(src)) map.removeSource(src); } catch {}
-    dataLayerIds.delete(dot); useLayerStats.getState().set(def.id, { state: "idle", total: 0, shown: 0, byKey: {} });
+    dataLayerIds.delete(dot); dataLayerIds.delete(halo); useLayerStats.getState().set(def.id, { state: "idle", total: 0, shown: 0, byKey: {} });
   }, [map, def.id, src, halo, dot]);
   return null;
 }
@@ -106,5 +118,5 @@ export function DataLayers() {
   const on = useStore((s) => s.layers); const [map, setM] = useState<MLMap | null>(null); const alive = useRef(true);
   useEffect(() => { alive.current = true; const off = onMap((m) => alive.current && setM(m)); return () => { alive.current = false; off(); }; }, []);
   if (!map) return null;
-  return <><RasterLayers map={map} />{LAYERS.filter((l) => isData(l) && on[l.id] && (l.kind === "points" || l.kind === "viewport" || l.kind === "moving" || l.kind === "client" || l.id === "weather")).map((l) => <DataLayer key={l.id} def={l} map={map} />)}</>;
+  return <><RasterLayers map={map} />{LAYERS.filter((l) => isData(l) && on[l.id] && (l.kind === "points" || l.kind === "viewport" || l.kind === "moving" || l.kind === "client" || l.kind === "polygons" || l.id === "weather")).map((l) => <DataLayer key={l.id} def={l} map={map} />)}{LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "choropleth").map((l) => <ChoroplethLayer key={l.id} def={l} map={map} />)}</>;
 }

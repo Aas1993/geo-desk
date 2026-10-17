@@ -46,7 +46,7 @@ export const LAYERS: LayerDef[] = [
       { key: "bomber", en: "Bombers", ar: "قاذفات" }, { key: "fighter", en: "Fighters", ar: "مقاتلات" }, { key: "heli", en: "Helicopters", ar: "مروحيات" }, { key: "other", en: "Other", ar: "أخرى" } ] } ] }),
   L("vessels", "live", "Live vessels (AIS)", "السفن المباشرة (AIS)", "#2de39a", "points", "needs-key", { note: "Needs a free aisstream.io key (AISSTREAM_API_KEY). No keyless global AIS feed exists." }),
   L("telegram", "live", "Telegram on the map", "تيليغرام على الخريطة", "#5aa9ff", "points", "unavailable", { note: "Scraping Telegram channels conflicts with Telegram's terms; no compliant feed." }),
-  L("events", "live", "Global events", "أحداث العالم", "#ff5d73", "points", "soon", { api: "events", refreshSec: 600, timeFilter: true, note: "GDELT, last ~90 minutes of coded events.", sub: [
+  L("events", "live", "Global events", "أحداث العالم", "#ff5d73", "points", "live", { api: "events", refreshSec: 600, timeFilter: true, note: "GDELT, last ~90 minutes of coded events.", sub: [
     { key: "conflict", en: "Armed conflict", ar: "نزاع مسلح", color: "#ff5d73" }, { key: "protest", en: "Protest & unrest", ar: "احتجاجات واضطرابات", color: "#ffb547" },
     { key: "coercion", en: "Coercion & threats", ar: "إكراه وتهديد", color: "#ff8a4c" }, { key: "diplomacy", en: "Diplomacy", ar: "دبلوماسية", color: "#3ddcff" } ] }),
   L("hazards", "live", "Natural hazards", "الكوارث الطبيعية", "#ffb547", "points", "live", { api: "hazards", refreshSec: 600, timeFilter: true, note: "USGS earthquakes, NASA EONET and GDACS.", sub: [
@@ -73,9 +73,10 @@ export const LAYERS: LayerDef[] = [
   L("conflicts", "security", "Active conflicts", "النزاعات النشطة", "#ff5d73", "points", "needs-key", { note: "UCDP/ACLED need an access token." }),
   L("carriers", "security", "US carrier groups", "مجموعات حاملات الطائرات الأمريكية", "#ffb547", "points", "soon", { note: "No open feed; needs curated tracking." }),
   L("bases", "security", "Military bases", "القواعد العسكرية", "#ffb547", "points", "soon"),
-  L("gpsjam", "security", "GPS interference", "التشويش على GPS", "#ff8a4c", "polygons", "soon", { api: "gpsjam", refreshSec: 21600 }),
+  L("gpsjam", "security", "GPS interference", "التشويش على GPS", "#ff8a4c", "polygons", "live", { api: "gpsjam", refreshSec: 21600, note: "Share of aircraft reporting degraded GPS yesterday, from ADS-B (GPSJam).", sub: [
+    { key: "high", en: "Severe (10%+ of aircraft)", ar: "شديد (10%+ من الطائرات)", color: "#ff5d73" }, { key: "med", en: "Elevated (2–10%)", ar: "مرتفع (2–10%)", color: "#ffb547" } ] }),
   L("cyber", "security", "Cyber threats", "التهديدات السيبرانية", "#b693ff", "points", "unavailable", { note: "No compliant open feed." }),
-  L("sanctions", "security", "Sanctions", "العقوبات", "#ff5d73", "choropleth", "soon", { note: "OFAC SDN and UN consolidated list, by country of address." }),
+  L("sanctions", "security", "Sanctions", "العقوبات", "#ff5d73", "choropleth", "live", { note: "OFAC SDN and UN consolidated list, by country of address." }),
   // ───────────── Economy ─────────────
   L("aid", "economy", "Foreign aid", "المساعدات الخارجية", "#2de39a", "choropleth", "soon", { note: "World Bank ODA received, latest year." }),
   L("exchanges", "economy", "Stock exchanges", "البورصات", "#ffc247", "points", "soon"),

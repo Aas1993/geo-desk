@@ -4,7 +4,8 @@ const UA = { "User-Agent": "geo-desk/0.1 (local dev build script)" };
 const j = async (u, h = {}) => { const r = await fetch(u, { headers: { ...UA, ...h } }); if (!r.ok) throw new Error(u + " " + r.status); return r.json(); };
 
 const wb = (await j("https://api.worldbank.org/v2/country?format=json&per_page=400"))[1]
-  .filter((c) => c.region.id !== "NA" && c.capitalCity !== "" || ["PSE"].includes(c.id));
+  .filter((c) => c.region.id !== "NA" && c.capitalCity !== "" || ["PSE", "ISR", "HKG", "MAC"].includes(c.id)); // World Bank leaves the capital blank for these, so they need an explicit include
+const CAPITAL = { ISR: "Jerusalem", HKG: "Hong Kong", MAC: "Macao" };
 const ind = async (code) => {
   const rows = (await j(`https://api.worldbank.org/v2/country/all/indicator/${code}?format=json&per_page=20000&mrnev=1`))[1] ?? [];
   const m = {}; for (const r of rows) if (r.value != null) m[r.countryiso3code] = { v: r.value, y: +r.date }; return m;
@@ -33,7 +34,7 @@ const out = wb.map((c) => {
   const m = meta[c.id] ?? {};
   return {
     iso3: c.id, iso2: c.iso2Code, qid: m.qid ?? null, num: m.num ?? null, name: c.name.replace(/, (Rep\.|Dem\. Rep\.|Islamic Rep\.|Arab Rep\.)$/, ""),
-    nameAr: m.ar ?? null, capital: c.capitalCity || null,
+    nameAr: m.ar ?? null, capital: c.capitalCity || CAPITAL[c.id] || null,
     lat: c.latitude ? +c.latitude : null, lng: c.longitude ? +c.longitude : null,
     region: c.region.value, flag: flag(c.iso2Code),
     population: pop[c.id] ?? null, areaKm2: area[c.id]?.v ?? null,

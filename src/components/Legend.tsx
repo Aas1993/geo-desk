@@ -8,14 +8,20 @@ import { useYesterday, yesterdayNow } from "./RasterLayers";
 /** Bottom-right key for every switched-on data layer: colour dot, name and live count. */
 export function Legend() {
   const { t, lang } = useT(); const on = useStore((s) => s.layers); const filters = useStore((s) => s.filters); const win = useStore((s) => s.timeWindow); const stats = useLayerStats((s) => s.layers);
-  const active = LAYERS.filter((l) => isData(l) && on[l.id] && l.sub); const date = useStore((s) => s.imageryDate); const setDate = useStore((s) => s.setImageryDate);
+  const active = LAYERS.filter((l) => isData(l) && on[l.id] && l.sub); const choro = LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "choropleth"); const date = useStore((s) => s.imageryDate); const setDate = useStore((s) => s.setImageryDate);
   const imagery = !!on.imagery; const latest = useYesterday(); const day = date ?? latest ?? "";
   const shift = (n: number) => { if (!day) return; const d = new Date(day + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); const v = d.toISOString().slice(0, 10); if (v <= yesterdayNow() && v >= "2012-01-19") setDate(v); };
-  if (!active.length && !imagery) return null;
+  if (!active.length && !imagery && !choro.length) return null;
   return (
     <aside aria-label={t("legend")} className="glass anim-rise absolute bottom-16 end-[76px] z-20 hidden max-h-[46vh] w-[230px] overflow-y-auto rounded-[14px] p-3 sm:block scroll-thin">
       <div className="label mb-2 flex items-center justify-between"><span>{t("legend")}</span>{win !== "all" && <span className="num rounded bg-bg3 px-1.5 text-t1">{win}</span>}</div>
       {imagery && <div className="mb-2"><div className="mb-1 text-[11.5px] font-semibold text-t1">NASA VIIRS true colour</div><div className="flex items-center gap-1"><button onClick={() => shift(-1)} aria-label="Previous day" className="grid size-7 place-items-center rounded-md bg-bg3 text-t1 hover:text-t0">‹</button><input type="date" value={day} min="2012-01-19" max={latest ?? undefined} onChange={(e) => e.target.value && setDate(e.target.value)} className="num h-7 flex-1 rounded-md border border-line bg-bg2 px-2 text-[12px] text-t0 outline-none" /><button onClick={() => shift(1)} aria-label="Next day" className="grid size-7 place-items-center rounded-md bg-bg3 text-t1 hover:text-t0">›</button></div></div>}
+      {choro.map((l) => (
+        <div key={l.id} className="mb-2">
+          <div className="mb-1 text-[11.5px] font-semibold text-t1">{lang === "ar" ? l.ar : l.en}</div>
+          <div className="h-2 rounded-full" style={{ background: `linear-gradient(90deg, ${l.color}0f, ${l.color}a0)` }} />
+          <div className="num mt-1 flex justify-between text-[11px] text-t2"><span>1</span><span>{stats[l.id]?.byKey.max?.toLocaleString() ?? "…"}</span></div>
+        </div>))}
       {active.map((l) => { const keys = allowedKeys(l, filters[l.id]); return (
         <div key={l.id} className="mb-2 last:mb-0">
           <div className="mb-1 text-[11.5px] font-semibold text-t1">{lang === "ar" ? l.ar : l.en}</div>

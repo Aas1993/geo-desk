@@ -7,6 +7,8 @@ import { epidemics } from "@/lib/layers/sources/epidemics";
 import { launches } from "@/lib/layers/sources/launches";
 import { flights } from "@/lib/layers/sources/flights";
 import { satellites } from "@/lib/layers/sources/satellites";
+import { events } from "@/lib/layers/sources/events";
+import { gpsjam } from "@/lib/layers/sources/gpsjam";
 import { radar, weather } from "@/lib/layers/sources/weather";
 
 type Loader = (q: URLSearchParams) => Promise<object>;
@@ -17,6 +19,8 @@ const LOADERS: Record<string, { ttlSec: number; load: Loader; keyed?: (q: URLSea
   launches: { ttlSec: 1800, load: () => launches() },
   satellites: { ttlSec: 7200, load: () => satellites() },
   weather: { ttlSec: 1800, load: () => weather() },
+  events: { ttlSec: 600, load: () => events() },
+  gpsjam: { ttlSec: 21600, load: () => gpsjam() },
   radar: { ttlSec: 120, load: () => radar() },
   // area queries are cached per ~1° cell so panning does not hammer the free API
   flights: { ttlSec: 10, load: (q) => flights(q), keyed: (q) => `${Math.round(+(q.get("lat") ?? 0))},${Math.round(+(q.get("lon") ?? 0))},${q.get("dist") ?? 0}` },

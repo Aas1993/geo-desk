@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Geo Desk
 
-## Getting Started
+A dark, full-screen world map with a dossier for every country — UAE-centric, inspired by the DiploMaps concept (own name, own code, own data pipeline).
 
-First, run the development server:
+Design plan: [docs/design-plan.md](docs/design-plan.md).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+node scripts/build-countries.mjs   # one-off: public/data/countries.json (World Bank + Wikidata)
+node scripts/build-un.mjs          # one-off: UN voting data + HS chapter names (streams ~145 MB from Harvard Dataverse, ~35 s)
+npm run dev                        # copies the MapLibre worker to /public, then starts Next on :3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## What Phase 0–1 ships
+- MapLibre globe, Natural Earth boundaries, country select/hover/outline, capitals, deep links (`?sel=ARE&tab=economy#zoom/lat/lng`).
+- Country panel: Overview (capital, local time, weather, AQI, leaders, borders), Economy, Trade, Military (SIPRI via World Bank), Society, News.
+- Search (`/` or ⌘K), layers drawer, live headline ticker (RSS), EN/AR with RTL, light/dark, text size, mobile bottom sheet.
+- Every figure shows its year and source; unavailable data shows an honest empty state.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Phase 2 (added)
+- **Trade with the UAE** (Trade tab): UN Comtrade public preview, latest of 2024/2023/2022, top HS chapters both ways, 5-year trend. Falls back to the partner's mirror data when the UAE has no report. Server-side queue + 24 h in-memory cache (first lookup ≈ 11–17 s because of Comtrade's rate limit).
+- **UN votes** tab: ideal-point history vs the UAE, share of agreeing votes with the UAE, most/least similar voters (Voeten et al., 2019–2024).
+- **Compare view** (⇄ in the panel header, `?cmp=ISO3`): two countries side by side across 15 indicators, plus UN agreement and ideal points.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## UAE equities (ADX + DFM) — `/markets`
+- **Universe**: all 83 ADX and 56 DFM listings (`node scripts/build-markets.mjs`; DFM tickers are validated against DFM's own disclosure feed, vendor aliases such as AIRA are dropped in favour of AIRARABIA).
+- **Board**: sortable/filterable table with price, change, volume, 52-week range, 1W/1M/3M/YTD/1Y returns, RSI, distance from SMA200, 60-day volatility, sparkline, movers, advancers/decliners, CSV export.
+- **Stock page** (`/markets/DFM/EMAAR`): interactive chart (line/candles, SMA 20/50/200, EMA, Bollinger, volume, RSI, MACD, crosshair), performance and risk, technical readings, pivot points, valuation / profitability / health / growth ratios, income statement, balance sheet and cash flow (annual & quarterly), dividend history, earnings vs estimates, and the company's **DFM disclosure timeline with PDF links**.
+- **Data honesty**: ADX forbids automated retrieval and DFM's public feed carries disclosures only, so prices and fundamentals come from a licensed vendor (Twelve Data, which lists both exchanges). Put a key in `.env.local` (`TWELVEDATA_API_KEY`, see `.env.example`). Without one the pages still list every stock and show DFM filings, and say plainly that prices aren't connected. ADX filings are not shown (no compliant source).
+- Indicator maths is dependency-free and tested (`npx tsx src/lib/markets/indicators.test.ts`, includes Wilder's textbook RSI). Vendor response mappers are checked against the vendor's demo payloads (`npx tsx scripts/verify-td-shapes.ts`).
+- `GD_FIXTURES=1` (dev only) swaps in clearly-labelled synthetic data so the UI can be worked on without a key; it is ignored in production builds.
 
-## Learn More
+## Connecting prices (checklist)
+0. **Plan note (checked 17 Oct 2026 via the vendor's `/exchanges?show_plan=true`)**: Twelve Data lists ADX on **Pro** and DFM on **Ultra**. Free/Basic keys do not cover either exchange.
+1. Get a key on a plan that covers them and put it in `.env.local`: `TWELVEDATA_API_KEY=...` (and `TWELVEDATA_RPM=<credits per minute on your plan>`; free = 8).
+2. `node scripts/verify-markets.mjs --limit=16` — quick smoke test (reads your plan, probes every dataset on ADCB and EMAAR, quotes 16 symbols per exchange).
+3. `node scripts/verify-markets.mjs` — full check of all 139 listings. It retries vendor aliases (e.g. EMAR for EMAAR), writes `public/data/vendor-map.json` (alias fixes and "no vendor data" flags, read by the server) and `vendor-report.json`.
+4. Restart `npm run dev`, open `/markets`, then a stock such as `/markets/DFM/EMAAR` and `/markets/ADX/ADCB`.
+A batch of N symbols costs N credits; pacing follows `TWELVEDATA_RPM`. Fundamentals (statistics, statements) are usually paid-plan datasets; where your plan lacks one, that panel says so and the rest still works.
 
-To learn more about Next.js, take a look at the following resources:
+## Free live data without a key: TradingView widgets
+Without a licensed key the markets pages use TradingView's embeddable widgets (display-only, TradingView attribution kept, personal/non-commercial use per tradingview.com/policies):
+- `/markets` → **Live screener** with 12 UAE views — Overview, Top gainers, Top losers, Most active, Performance, Valuation, Dividends, Margins, Income statement, Balance sheet, Oscillators, Trend-following — plus a UAE economic calendar (~144 ADX+DFM stocks). All checked in the browser. TradingView's heatmap and hotlists widgets do **not** support UAE markets, so they are not offered.
+- Stock page → **Live** tab: technical gauge, fundamental data and company profile. Work for ADX and DFM.
+- Not usable: TradingView blocks ADX/DFM symbols in its embedded chart, quote and ticker-tape widgets ("only available on TradingView"), so the live chart is an outbound link.
+- Widget data can't be read or processed by our code, so it can't feed the table, returns or indicators. Freshness (end-of-day vs delayed) is set by TradingView's exchange licence — verify timestamps during market hours (Mon–Fri 10:00–15:00 GST).
+- Considered and not used: scraping adx.ae / dfm.ae (ADX forbids automated retrieval; no licence found for DFM's site) and Yahoo's unofficial endpoints (terms prohibit automated access).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## AI research tab (stock pages → "AI research")
+An AI analyst briefed as a senior GCC banker writes an initiation-style note on the selected stock: executive summary and research stance, snapshot and ownership, dated recent developments, financial position (multi-year table plus sector KPIs), **trading and liquidity including number of trades where the exchange publishes it**, valuation and dividends vs peers, technical context, catalysts, bull/base/bear scenarios, ranked risks and red flags, management questions, a data-gaps table and a numbered source list.
+- **How it researches**: `src/lib/research/gather.ts` first collects verified facts (DFM's disclosure feed with PDF links, recent headlines, and licensed price data if connected), then Claude (`claude-opus-5-5`, effort high) browses with the server-side `web_search` and `web_fetch` tools, reading DFM filing PDFs and public sources. `adx.ae` is excluded (its terms prohibit automated retrieval).
+- **Honesty rules** (in `src/lib/research/prompt.ts`): every figure cited with `[n]`, tagged with period and nature (reported / estimate / computed), "Not found" instead of guessing, web content treated as data not instructions, no price targets, a qualitative stance that is explicitly not a recommendation.
+- **Streaming**: SSE route `/api/research/[exchange]/[symbol]` shows searches and page reads live, handles `pause_turn`, caches finished notes for 6 h, uses the refusal fallback, and reports token usage and cost. The finished note is saved in your browser and can be copied or downloaded as Markdown.
+- **Credentials**: the SDK uses `ANTHROPIC_API_KEY`, or your `ant auth login` profile (active here). **Each note bills that account** (web research costs more than chat; the panel shows real token use). `RESEARCH_MODEL=claude-sonnet-5-5` is cheaper; `RESEARCH_ENABLED=0` switches it off.
+- **First live run (EMAAR, 17 Oct 2026)**: ~12 minutes, 8 searches and 8 page reads, ≈$1.67 in tokens (Opus 5.5), 27k-character note, 26 cited sources. Reviewed against the primary documents it cited: the H1-26 press release (revenue +21% to AED 23.9bn, EBITDA 12.9bn, attributable profit 8,670m, sales 26.6bn, backlog 164.9bn, land bank 590m sq ft), the ICD→Dubai Holding transfer (22.2723%, group c.29.73%) and the 16 Sep board decision (AED 4.4bn / 0.5 per share special dividend, subject to approval; "utilising various businesses" under review) all matched. Its own computed ratios (market cap, P/E, yield, turnover, EV/EBITDA) re-computed correctly. Not independently checked: the S&P rating PDF (scanned image) and third-party price pages.
+- Issues the live run exposed and fixes: sections came out of order (§6 before §5) → `normaliseNote` re-sorts them and the prompt now says research first, write once in order; progress lines showed empty queries → tool inputs are now read from the block start as well as deltas, and "Analysing" lines collapse; the sources panel now separates the 26 cited from other search hits; the UI's time/cost estimate was wrong (said 2–6 min) → corrected.
+- **Number of trades**: per-stock trade counts are not published free (only market-wide totals), so the analyst reports "not found" and gives labelled proxies (market-wide trades/value, the stock's share of turnover). A licensed exchange data feed would be needed for the real figure.
+- Knobs: `RESEARCH_MODEL`, `RESEARCH_EFFORT` (low…max, default high), `RESEARCH_ENABLED=0`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Look & feel ("Ledger")
+Graphite surfaces, warm ivory ink, one gold accent; Fraunces (display), Instrument Sans (UI), IBM Plex Mono (numbers); flat hairline panels docked beside a left rail; light "paper" theme; gains/losses in dedicated green/red tokens.
 
-## Deploy on Vercel
+## Not built yet (see plan §9)
+Visits, briefs, live flight/vessel/event layers, per-resolution UN votes by issue. Their layers appear greyed with a "Soon" tag.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Notes
+- REST Countries' public API is deprecated, so country basics come from World Bank + Wikidata at build time.
+- Turbopack can't bundle MapLibre's worker, so `npm run copy-worker` serves it from `/public`.
+- Arabic mode translates the UI and country names; region, language and capital names stay English (source data).

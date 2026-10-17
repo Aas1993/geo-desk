@@ -12,6 +12,8 @@ export type LayerDef = {
   members?: string;
   /** Feature property holding a CSS colour (overrides the sub-type colour) and one holding a text label drawn beside the dot. */
   colorProp?: string; label?: string;
+  /** Swatches for categorical choropleths (replaces the gradient bar in the legend). */
+  legend?: { label: string; ar: string; color: string }[];
 };
 export const GROUPS: { id: GroupId; en: string; ar: string; open?: boolean; parent?: string }[] = [
   { id: "map", en: "Map details", ar: "تفاصيل الخريطة" },
@@ -68,6 +70,11 @@ export const LAYERS: LayerDef[] = [
   L("launches", "live", "Space launches", "إطلاقات الفضاء", "#ffc247", "points", "live", { api: "launches", refreshSec: 1800, note: "Launch Library 2 upcoming launches." }),
   L("ticker", "live", "Headline ticker", "شريط العناوين", "#ff5d73", "base", "live"),
   // ───────────── Diplomacy & media ─────────────
+  L("agreements", "diplomacy", "UAE agreements (count)", "الاتفاقيات الإماراتية (العدد)", "#ffc247", "choropleth", "live", { note: "Treaties and MoUs the UAE has with each country: MOFA and Ministry of Foreign Trade, rebuilt daily." }),
+  L("cepa", "diplomacy", "UAE CEPA trade deals", "اتفاقيات الشراكة الاقتصادية الشاملة", "#2de39a", "choropleth", "live", { note: "Official Ministry of Foreign Trade pages. The Ministry reports more concluded than are individually documented.", legend: [{ label: "In force", ar: "سارية", color: "#2de39a" }, { label: "Signed", ar: "موقعة", color: "#ffb547" }, { label: "Negotiations concluded", ar: "انتهت المفاوضات", color: "#3ddcff" }] }),
+  L("dta", "diplomacy", "Double-taxation treaties", "اتفاقيات تجنب الازدواج الضريبي", "#5aa9ff", "choropleth", "live", { note: "Countries with a double-taxation agreement listed by MOFA or the Ministry of Foreign Trade.", legend: [{ label: "Treaty listed", ar: "اتفاقية مدرجة", color: "#5aa9ff" }] }),
+  L("airagreements", "diplomacy", "Air services agreements", "اتفاقيات النقل الجوي", "#b693ff", "choropleth", "live", { note: "Countries with an air transport / air services agreement or MoU listed by MOFA.", legend: [{ label: "Agreement listed", ar: "اتفاقية مدرجة", color: "#b693ff" }] }),
+  L("jec", "diplomacy", "Joint economic committees", "اللجان الاقتصادية المشتركة", "#ff8a4c", "choropleth", "live", { note: "Joint economic committees with a recorded meeting history (Ministry of Foreign Trade).", legend: [{ label: "Committee", ar: "لجنة", color: "#ff8a4c" }] }),
   L("missions", "diplomacy", "UAE missions", "البعثات الإماراتية", "#3ddcff", "points", "soon", { note: "Needs a curated embassy dataset." }),
   L("visits", "diplomacy", "Official visits", "الزيارات الرسمية", "#2de39a", "lines", "soon", { note: "Needs curated visit records." }),
   L("thinktanks", "diplomacy", "Think tanks", "مراكز الفكر", "#b693ff", "points", "soon"),

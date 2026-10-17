@@ -1,0 +1,100 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { Sparkles, RefreshCw, Copy, Download, ExternalLink } from "lucide-react";
+import { useT } from "@/lib/store";
+import type { Country } from "@/lib/types";
+
+type Fact = { id: string; kind: string; text: string; src: string; url?: string };
+type Brief = { headline: string; confidence: "low" | "medium" | "high"; sections: { key: string; bullets: { text: string; basis: string[] }[] }[] };
+type Saved = { brief: Brief; facts: Fact[]; gaps: string[]; at: string; model: string; usage: { input: number; output: number; usd: number | null }; cached?: boolean };
+type Status = { enabled: boolean; model: string; ttlHours: number; remainingThisHour: number };
+
+const LABEL: Record<string, { en: string; ar: string }> = {
+  political: { en: "Political", ar: "سياسي" }, military: { en: "Military", ar: "عسكري" }, security: { en: "Security", ar: "أمني" },
+  intel: { en: "Intel", ar: "استخباري" }, conflict: { en: "Conflict", ar: "نزاع" }, outlook: { en: "Outlook", ar: "التوقعات" },
+};
+const UI = {
+  en: { run: "Generate brief", rerun: "Regenerate", running: "Writing the brief…", gathering: "Collecting facts and drafting. This takes about 10–20 seconds.",
+    intro: "A one-page brief on this country written by AI from today's headlines, GDELT events, hazards, outbreaks and sanctions data. It starts only when you click, and each new run bills your Anthropic account.",
+    cost: "Cost", cached: "cached", background: "background, not from today's sources", based: "Facts used", gaps: "Not covered", copy: "Copy", copied: "Copied", download: "Download .md",
+    disclaimer: "AI-generated from public sources for information only. Verify before relying on it; cited facts are listed below. Not an intelligence assessment or advice.", conf: "Confidence", left: "new briefs left this hour", disabled: "AI briefs are switched off on this server." },
+  ar: { run: "إنشاء الموجز", rerun: "إعادة الإنشاء", running: "جارٍ كتابة الموجز…", gathering: "جمع الوقائع وكتابة المسودة. يستغرق نحو 10–20 ثانية.",
+    intro: "موجز من صفحة واحدة عن هذه الدولة يكتبه الذكاء الاصطناعي من عناوين اليوم وأحداث GDELT والكوارث والأوبئة وبيانات العقوبات. لا يبدأ إلا بضغطتك، وكل تشغيل جديد يُحتسب على حساب Anthropic الخاص بك.",
+    cost: "التكلفة", cached: "مخزّن", background: "خلفية عامة، ليست من مصادر اليوم", based: "الوقائع المستخدمة", gaps: "غير مغطّى", copy: "نسخ", copied: "تم النسخ", download: "تنزيل .md",
+    disclaimer: "مُولَّد بالذكاء الاصطناعي من مصادر عامة للاطلاع فقط. تحقق قبل الاعتماد عليه؛ الوقائع المستشهد بها مدرجة أدناه. ليس تقييمًا استخباريًا ولا نصيحة.", conf: "الثقة", left: "موجزات جديدة متبقية هذه الساعة", disabled: "موجزات الذكاء الاصطناعي متوقفة على هذا الخادم." },
+} as const;
+
+const toMarkdown = (c: Country, s: Saved, lang: "en" | "ar") => {
+  const L = (k: string) => LABEL[k]?.[lang] ?? k; const f = new Map(s.facts.map((x) => [x.id, x]));
+  const body = s.brief.sections.filter((x) => x.bullets.length).map((x) => `## ${L(x.key)}\n${x.bullets.map((b) => `- ${b.text}${b.basis.length ? ` [${b.basis.join(", ")}]` : ""}`).join("\n")}`).join("\n\n");
+  const src = [...new Set(s.brief.sections.flatMap((x) => x.bullets.flatMap((b) => b.basis)))].map((id) => f.get(id)).filter(Boolean).map((x) => `- [${x!.id}] ${x!.text} (${x!.src})${x!.url ? ` ${x!.url}` : ""}`).join("\n");
+  return `# ${c.name}: country brief\n_${s.brief.headline}_\n\nGenerated ${s.at} by ${s.model}. Confidence: ${s.brief.confidence}. AI-generated from public sources; verify before relying on it.\n\n${body}\n\n## Facts cited\n${src}\n`;
+};
+
+/** AI country brief. Never starts on its own: a click runs one cheap model call (no web tools) over a fact pack built from the app's own feeds. */
+export function BriefTab({ c }: { c: Country }) {
+  const { lang } = useT(); const u = UI[lang]; const storeKey = `gd-brief:${c.iso3}:${lang}`;
+  const [phase, setPhase] = useState<"idle" | "running" | "done" | "error">("idle"); const [saved, setSaved] = useState<Saved | null>(null);
+  const [err, setErr] = useState(""); const [status, setStatus] = useState<Status | null>(null); const [copied, setCopied] = useState(false); const abort = useRef<AbortController | null>(null);
+
+  useEffect(() => { // restore the last brief for this country/language from this browser, and probe the server's guardrails
+    const t0 = setTimeout(() => { try { const s = localStorage.getItem(storeKey); if (s) { setSaved(JSON.parse(s) as Saved); setPhase("done"); } else { setSaved(null); setPhase("idle"); } } catch { setSaved(null); setPhase("idle"); } setErr(""); }, 0);
+    fetch("/api/brief/" + c.iso3).then((r) => r.json()).then((j: Status) => setStatus(j)).catch(() => {});
+    return () => { clearTimeout(t0); abort.current?.abort(); };
+  }, [storeKey, c.iso3]);
+
+  const run = async (refresh: boolean) => {
+    abort.current?.abort(); const ac = new AbortController(); abort.current = ac; setPhase("running"); setErr("");
+    try {
+      const r = await fetch("/api/brief/" + c.iso3, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang, refresh }), signal: ac.signal });
+      const j = await r.json(); if (!r.ok) throw new Error(j.message ?? j.error ?? `HTTP ${r.status}`);
+      setSaved(j as Saved); setPhase("done"); try { localStorage.setItem(storeKey, JSON.stringify(j)); } catch {}
+      fetch("/api/brief/" + c.iso3).then((x) => x.json()).then(setStatus).catch(() => {});
+    } catch (e) { if ((e as Error).name !== "AbortError") { setErr((e as Error).message); setPhase("error"); } }
+  };
+  const md = saved ? toMarkdown(c, saved, lang) : "";
+  const copy = async () => { try { await navigator.clipboard.writeText(md); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch {} };
+  const download = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" })); a.download = `${c.iso3}-brief.md`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+  const facts = new Map((saved?.facts ?? []).map((f) => [f.id, f]));
+  const L = (k: string) => LABEL[k]?.[lang] ?? k;
+
+  if (status && !status.enabled) return <p className="text-[13px] text-t1">{u.disabled}</p>;
+  return (
+    <div className="space-y-3">
+      {phase !== "done" && phase !== "running" && (
+        <div className="rounded-[10px] border border-line bg-bg2 p-3.5">
+          <p className="text-[13px] leading-relaxed text-t1">{u.intro}</p>
+          <button onClick={() => run(false)} className="mt-3 inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-semibold text-[var(--accent-ink)] shadow-[var(--glow)]"><Sparkles size={15} />{u.run}</button>
+          {status && <p className="num mt-2 text-[11px] text-t2">{status.model} · {status.remainingThisHour} {u.left}</p>}
+        </div>
+      )}
+      {phase === "running" && <div role="status" className="rounded-[10px] border border-line bg-bg2 p-4"><div className="skeleton mb-3 h-4 w-2/3" /><div className="skeleton mb-2 h-3 w-full" /><div className="skeleton mb-2 h-3 w-5/6" /><div className="skeleton h-3 w-4/6" /><p className="mt-3 text-[12.5px] text-t1">{u.running} {u.gathering}</p></div>}
+      {phase === "error" && <div role="alert" className="rounded-[10px] border border-down/40 bg-down/10 p-3 text-[13px] text-t0">{err}<button onClick={() => run(false)} className="ms-3 underline">{u.run}</button></div>}
+      {phase === "done" && saved && (
+        <article className="space-y-3">
+          <div className="rounded-[10px] border border-line bg-bg2 p-3.5">
+            <p className="display text-[15px] font-semibold leading-snug text-t0">{saved.brief.headline}</p>
+            <p className="num mt-1.5 text-[11px] text-t2">{u.conf}: <span className={saved.brief.confidence === "high" ? "text-up" : saved.brief.confidence === "low" ? "text-warn" : "text-t1"}>{saved.brief.confidence}</span></p>
+          </div>
+          {saved.brief.sections.filter((s) => s.bullets.length).map((s) => (
+            <section key={s.key}>
+              <h3 className="label mb-1.5">{L(s.key)}</h3>
+              <ul className="space-y-2">{s.bullets.map((b, i) => (
+                <li key={i} className="text-[13px] leading-relaxed text-t0">{b.text}{" "}
+                  {b.basis.length ? b.basis.map((id) => { const f = facts.get(id); const chip = <span key={id} title={f ? `${f.text} (${f.src})` : id} className="num mx-0.5 inline-block rounded bg-bg3 px-1 text-[10.5px] text-t1">{id}</span>; return f?.url ? <a key={id} href={f.url} target="_blank" rel="noreferrer noopener" className="hover:text-accent">{chip}</a> : chip; })
+                    : s.key !== "outlook" && <span className="text-[11px] italic text-t2">({u.background})</span>}</li>))}</ul>
+            </section>))}
+          {!!saved.gaps.length && <p className="text-[12px] text-t2"><b>{u.gaps}:</b> {saved.gaps.join(" ")}</p>}
+          <details className="rounded-[10px] border border-line bg-bg1/60 p-3 text-[12px] text-t1"><summary className="cursor-pointer text-t0">{u.based} ({saved.facts.length})</summary>
+            <ul className="mt-2 space-y-1.5">{saved.facts.map((f) => <li key={f.id}><span className="num me-1 text-t2">{f.id}</span>{f.text.slice(0, 220)} <span className="text-t2">· {f.src}</span>{f.url && <a href={f.url} target="_blank" rel="noreferrer noopener" className="ms-1 inline-flex align-middle text-accent" aria-label="Open source"><ExternalLink size={11} /></a>}</li>)}</ul></details>
+          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+            <button onClick={copy} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Copy size={13} />{copied ? u.copied : u.copy}</button>
+            <button onClick={download} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Download size={13} />{u.download}</button>
+            <button onClick={() => run(true)} className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><RefreshCw size={13} />{u.rerun}</button>
+          </div>
+          <p className="num text-[11px] text-t2">{saved.model} · {u.cost} {saved.usage.usd != null ? `$${saved.usage.usd.toFixed(saved.usage.usd < 0.1 ? 3 : 2)}` : "n/a"}{saved.cached ? ` · ${u.cached}` : ""} · {saved.at.slice(0, 16).replace("T", " ")} UTC</p>
+          <p className="text-[11px] leading-snug text-t2">{u.disclaimer}</p>
+        </article>)}
+    </div>
+  );
+}

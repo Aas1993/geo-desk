@@ -69,25 +69,39 @@ function classify(title) {
   return { c: cs.slice(0, 4), k: kind, l: level, dir };
 }
 
+// ── UAE company and fund deals abroad (a second reading of the same headlines) ──
+// A deal needs a UAE investor or company named in the headline, a deal verb, and a partner country named. Sports, events and consumer promotions are excluded.
+const INVESTORS = /\b(ADQ|ADIA|Mubadala|MGX|Lunate|IHC|International Holding Company|ADNOC|XRG|Masdar|TAQA|AD Ports|Abu Dhabi Ports|DP World|Emirates Global Aluminium|EGA|EDGE Group|EDGE\b|Etihad|flydubai|e&|Etisalat|du\b|Emirates NBD|First Abu Dhabi Bank|FAB\b|Mashreq|Emaar|Aldar|Dubai Holding|Dubai Investments|DEWA|Majid Al Futtaim|Al Dahra|Agthia|Lulu|Alpha Dhabi|2PointZero|ADFD|Abu Dhabi Fund for Development|Investcorp|Brookfield|Sheraa|Khazna|G42|Space42|Abu Dhabi Investment|Dubai Ports|Jafza|DMCC|Emirates Telecommunications|Noon|Careem|Amea Power|AMEA Power|Alpha Wave|Ghitha|Modon|Tabreed|Mubadala Energy|Mubadala Capital|Abu Dhabi National Oil|Emirates Airline|Emirates Group)\b/i;
+const DEAL_VERB = /\b(invest(s|ed|ing|ment|ments)?|acqui(re|res|red|sition)|stake|buys?|bought|takes? over|merger|joint venture|JV\b|financ(e|es|ed|ing)|loan|concession|builds?|develop(s|ed|ing|ment)?|launch(es|ed)?|inaugurat(e|es|ed)|breaks? ground|commission(s|ed)?|plant\b|terminal|facility|contract|awarded?|agreement to|signs? (a |an )?(deal|agreement|contract|MoU)|partner(s|ship)?|funding|fund\b|expands?|expansion|opens?)\b/i;
+const DEAL_NOISE = /\b(pavilion|exhibition|expo|football|cricket|tennis|golf|rally|championship|league|match|weather|fuel prices?|stock market|shares? (rise|fall|close)|index|tourist|visa\b|invitation)\b/i;
+const SECTOR = [["energy", /\b(energy|oil|gas|LNG|solar|wind|power|renewable|hydrogen|refiner|petrochemical|nuclear)\b/i], ["ports and logistics", /\b(port|terminal|logistics|shipping|freight|cargo|airport|rail|canal)\b/i], ["real estate", /\b(real estate|property|housing|tower|residential|mixed-use|development of)\b/i], ["finance", /\b(bank|financ|fund|capital|loan|insurance|fintech|equity|bond)\b/i], ["technology", /\b(AI\b|artificial intelligence|data cent|cloud|digital|telecom|semiconductor|chip|fintech|software|space)\b/i], ["food and agriculture", /\b(food|agricultur|farm|grain|wheat|fertili[sz]er|dairy|fisher)\b/i], ["industry", /\b(aluminium|steel|mining|mineral|factory|manufactur|industrial|defence|defense)\b/i], ["health", /\b(hospital|health|pharma|medical)\b/i]];
+function classifyDeal(title) {
+  if (DEAL_NOISE.test(title) || !INVESTORS.test(title) || !DEAL_VERB.test(title)) return null; const cs = named(title).filter((c) => c !== "ARE"); if (!cs.length) return null;
+  const who = [...new Set([...title.matchAll(new RegExp(INVESTORS.source, "gi"))].map((m) => m[0].replace(/\s+/g, " ")))].slice(0, 3); const sector = SECTOR.find(([, re]) => re.test(title))?.[0] ?? null;
+  return { c: cs.slice(0, 3), by: who, sector };
+}
+
 // ── read the monthly sitemaps ──
 const index = await get("https://www.wam.ae/sitemap.xml");
 const months = [...new Set([...index.matchAll(/sitemap\/news\/en\/(\d{4})\/(\d{1,2})\/english\.xml/g)].map((m) => `${m[1]}/${m[2]}`))].sort((a, b) => { const [ay, am] = a.split("/").map(Number), [by, bm] = b.split("/").map(Number); return ay - by || am - bm; }).slice(-MONTHS);
 if (!months.length) { console.error("REFUSING TO WRITE: no monthly sitemaps found"); process.exit(1); }
-const VERSION = 3; // bump when classify() or the country terms change: older months are only re-read when the stored version differs
+const VERSION = 4; // bump when classify() or the country terms change: older months are only re-read when the stored version differs
 const prevFile = existsSync(OUT) ? JSON.parse(readFileSync(OUT, "utf8")) : { items: [] }; const prev = prevFile.v === VERSION ? prevFile : { items: [] }; const byId = new Map((prev.items ?? []).map((x) => [x.u, x]));
+const DEALS_OUT = new URL("../public/data/deals.json", import.meta.url); const prevDealsFile = existsSync(DEALS_OUT) ? JSON.parse(readFileSync(DEALS_OUT, "utf8")) : { items: [] }; const prevDeals = prevDealsFile.v === VERSION ? prevDealsFile : { items: [] }; const dealsById = new Map((prevDeals.items ?? []).map((x) => [x.u, x]));
 const hot = new Set(months.slice(-2)); const have = new Set((prev.items ?? []).map((x) => x.d.slice(0, 7).replace("-0", "/").replace("-", "/"))); let scanned = 0, kept = 0;
 for (const m of months) {
   const [y, mo] = m.split("/"); if (!hot.has(m) && (prev.items ?? []).some((x) => x.d.startsWith(`${y}-${String(mo).padStart(2, "0")}`))) continue; // earlier months already done
   await sleep(1_500); const xml = await get(`https://www.wam.ae/sitemap/news/en/${m}/english.xml`); let n = 0, k = 0;
   for (const u of xml.split("<url>").slice(1)) {
     const loc = u.match(/<loc>([^<]+)<\/loc>/)?.[1]; const date = u.match(/<news:publication_date>([^<]+)</)?.[1]; const title = unesc(u.match(/<news:title>([\s\S]*?)<\/news:title>/)?.[1] ?? ""); if (!loc || !date || !title) continue; n++;
-    const id = loc.replace(/^.*\/en\/article\//, ""); const c = classify(title); if (!c) continue; k++; byId.set(id, { u: id, d: date.slice(0, 10), t: title.slice(0, 200), ...c });
+    const id = loc.replace(/^.*\/en\/article\//, ""); const dl = classifyDeal(title); if (dl) dealsById.set(id, { u: id, d: date.slice(0, 10), t: title.slice(0, 200), ...dl }); const c = classify(title); if (!c) continue; k++; byId.set(id, { u: id, d: date.slice(0, 10), t: title.slice(0, 200), ...c });
   }
   scanned += n; kept += k; console.log(m, "articles", n, "kept", k);
 }
 const items = [...byId.values()].sort((a, b) => b.d.localeCompare(a.d) || a.u.localeCompare(b.u));
 const cs = new Set(items.flatMap((x) => x.c)); const pcs = prevOf("visits.json", (j) => new Set(j.items.flatMap((x) => x.c)).size); if (items.length < 300 || cs.size < 60 || thin(cs.size, pcs, 0.8)) { console.error(`REFUSING TO WRITE: ${items.length} items, ${cs.size} countries`); process.exit(1); }
 writeFileSync(OUT, JSON.stringify({ v: VERSION, built: new Date().toISOString(), source: { name: "WAM (Emirates News Agency) headlines, classified by rules", url: "https://www.wam.ae/en", note: "What WAM reported, auto-classified from headlines; not a complete diplomatic diary. Links open the WAM article." }, from: items[items.length - 1].d, items }));
+{ const deals = [...dealsById.values()].sort((a, b) => b.d.localeCompare(a.d) || a.u.localeCompare(b.u)); const dc = new Set(deals.flatMap((x) => x.c)); const pd = prevOf("deals.json", (j) => j.items.length); if (deals.length >= 100 && dc.size >= 30 && !thin(deals.length, pd, 0.7)) { writeFileSync(DEALS_OUT, JSON.stringify({ v: VERSION, built: new Date().toISOString(), source: { name: "WAM (Emirates News Agency) headlines: UAE companies and funds, classified by rules", url: "https://www.wam.ae/en", note: "Deals, investments, projects and financings that WAM headlines attribute to a named UAE investor in a partner country. Announcements, not completed or verified transactions; values and stakes are not extracted. Not a complete list of UAE investments." }, items: deals })); console.log("deals", deals.length, "in", dc.size, "countries"); } else console.error("deals not written:", deals.length, dc.size); }
 const byKind = {}, byLevel = {}; for (const x of items) { byKind[x.k] = (byKind[x.k] ?? 0) + 1; byLevel[x.l] = (byLevel[x.l] ?? 0) + 1; }
 console.log(`items ${items.length} from ${items[items.length - 1].d}; countries ${cs.size}; scanned ${scanned}; kinds ${JSON.stringify(byKind)}; levels ${JSON.stringify(byLevel)}`);
 for (const x of items.slice(0, 6)) console.log(" ", x.d, x.c.join("/"), x.k, "L" + x.l, x.dir ?? "-", "|", x.t.slice(0, 95));

@@ -4,6 +4,7 @@ import { countryFacts } from "@/lib/ask/facts";
 import { LAYERS } from "@/lib/layers/registry";
 import { tradeSummary, usdM, type OutlookData, type PartnershipData, type TradeData } from "@/lib/intel";
 import type { Fact } from "@/lib/brief/facts";
+import { intelFor } from "@/lib/intel-data";
 
 export type Tile = { label: string; value: string; sub?: string };
 const rd = async <T,>(f: string): Promise<T | null> => { try { return JSON.parse(await readFile(path.join(process.cwd(), "public/data", f), "utf8")) as T; } catch { return null; } };
@@ -34,5 +35,10 @@ export async function dossierFacts(iso3: string): Promise<{ name: string; nameAr
   const mm = ms?.countries[iso3]; const amb = mm?.find((m) => m.type === "embassy")?.head; if (mm?.length) tiles.push({ label: "UAE missions", value: String(mm.length), sub: amb ? `Amb. ${amb.name}` : undefined });
   const last = (vs?.items ?? []).find((x) => x.c.includes(iso3) && x.l >= 2); if (last) tiles.push({ label: "Last senior engagement", value: last.d, sub: last.k });
   const g26 = oe?.growth?.[2026]; if (g26 != null) tiles.push({ label: "IMF growth 2026F", value: `${g26.toFixed(1)}%`, sub: oe?.inflation?.[2026] != null ? `inflation ${oe.inflation[2026]}%` : undefined });
+  try { const it = await intelFor(iso3); const q: Record<string, string> = { mutual: "mutual", "uae-leverage": "UAE leverage", "uae-exposed": "UAE exposed", light: "light ties", partial: "partial" };
+    if (it?.leverage) tiles.push({ label: "Leverage (them / UAE)", value: `${it.leverage.theirs ?? "–"} / ${it.leverage.ours ?? "–"}`, sub: q[it.leverage.quadrant] });
+    if (it?.temperature) tiles.push({ label: "Bilateral temperature", value: `${it.temperature.g > 0 ? "+" : ""}${it.temperature.g.toFixed(2)}`, sub: it.temperature.worldG != null ? `all countries ${it.temperature.worldG > 0 ? "+" : ""}${it.temperature.worldG.toFixed(2)}` : undefined });
+    if (it && it.deals.total) tiles.push({ label: "UAE deals in WAM", value: String(it.deals.total), sub: `${it.deals.last90} in 90 days` });
+  } catch { /* tiles are optional */ }
   return { name: base.name, nameAr: c?.nameAr ?? null, facts, gaps: base.gaps, tiles };
 }

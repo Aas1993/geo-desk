@@ -9,6 +9,7 @@ import { UNTab } from "./tabs2";
 import { BriefTab } from "./BriefTab";
 import { MinisterTab } from "./MinisterTab";
 import { DeskTab } from "./DeskTab";
+import { IntelTab } from "./IntelTab";
 import { AgreementsTab } from "./AgreementsTab";
 import { MediaTab } from "./MediaTab";
 import { DiplomacyTab } from "./DiplomacyTab";
@@ -17,7 +18,7 @@ import { useDashboard } from "@/lib/dashboard-store";
 import { printOnePager } from "@/lib/one-pager";
 import type { Country, CountryDetail, TabId } from "@/lib/types";
 
-const TABS: TabId[] = ["overview", "brief", "minister", "desk", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
+const TABS: TabId[] = ["overview", "brief", "intel", "minister", "desk", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
 const cache = new Map<string, CountryDetail>(); const stamp = new Map<string, number>(); // weather and air quality are part of the detail, so it is refreshed when older than 15 minutes
 const fresh = (iso: string) => (stamp.get(iso) ?? 0) > Date.now() - 900_000;
 
@@ -93,6 +94,7 @@ export function CountryPanel() {
       <div ref={body} role="tabpanel" className="scroll-thin flex-1 space-y-3 overflow-y-auto p-4" style={{ overscrollBehavior: "contain" }}>
         {tab === "overview" && <OverviewTab c={c} detail={detail} />}
         {tab === "brief" && <BriefTab c={c} />}
+        {tab === "intel" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "الرؤى تخص الدول الأخرى." : "Intel covers other countries."}</p> : <IntelTab c={c} />)}
         {tab === "desk" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "موجز المكتب يخص الدول الأخرى." : "The desk brief covers other countries."}</p> : <DeskTab c={c} />)}
         {tab === "minister" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "موجز الوزير يخص الدول التي تلتقي بها الإمارات." : "The ministerial brief covers the countries the UAE meets with."}</p> : <MinisterTab c={c} />)}
         {tab === "economy" && <EconomyTab c={c} detail={detail} />}

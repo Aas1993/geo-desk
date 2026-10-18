@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { sessionState } from "./markets/format";
+import { intelFor } from "./intel-data";
 const read = (p: string) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
 const countries = read("../../public/data/countries.json") as { iso3: string; name: string; capital: string | null; lat: number | null; lng: number | null; region: string }[];
 const by = new Map(countries.map((c) => [c.iso3, c]));
@@ -61,4 +62,21 @@ const at = (iso: string) => new Date(iso); // 2026-10-18 is a Sunday
 assert.equal(sessionState(at("2026-10-18T07:00:00Z"), "QSE").open, true, "Qatar trades on Sunday 10:00 AST"); assert.equal(sessionState(at("2026-10-18T07:00:00Z"), "UAE").open, false, "the UAE market is shut on Sunday");
 assert.equal(sessionState(at("2026-10-16T07:00:00Z"), "QSE").open, false, "Qatar is shut on Friday"); assert.equal(sessionState(at("2026-10-16T07:00:00Z"), "UAE").open, true, "the UAE trades on Friday 11:00 GST");
 assert.equal(sessionState(at("2026-10-18T10:30:00Z"), "QSE").open, false, "Qatar is shut after 13:15 AST"); assert.equal(sessionState(at("2026-10-18T05:00:00Z"), "QSE").open, false, "Qatar is shut before 09:30 AST");
+// intel datasets: governance, leaders, UAE aid, leverage, bilateral temperature, UAE deals
+const iso = new Set(countries.map((c) => c.iso3));
+const gv = read("../../public/data/governance.json") as { year: number; countries: Record<string, Record<string, number>> };
+assert.ok(Object.keys(gv.countries).length >= 180 && gv.year >= 2023, "governance coverage"); for (const [k, v] of Object.entries(gv.countries)) { assert.ok(iso.has(k), `governance: unknown ${k}`); for (const d of ["pv", "ge", "rl", "cc", "rq", "va"]) if (v[d] != null) assert.ok(v[d] >= 0 && v[d] <= 100, `${k} ${d}=${v[d]}`); }
+const ld = read("../../public/data/leaders.json") as { countries: Record<string, { state?: { name: string; start: string | null; birth: string | null }; gov?: { name: string; start: string | null; birth: string | null }; elections?: { date: string }[] }> };
+assert.ok(Object.values(ld.countries).filter((x) => x.state).length >= 150, "leaders: too few heads of state"); const todayS = new Date().toISOString().slice(0, 10);
+for (const [k, v] of Object.entries(ld.countries)) { assert.ok(iso.has(k), `leaders: unknown ${k}`); for (const p of [v.state, v.gov]) { if (!p) continue; assert.ok(p.name && !/^Q\d+$/.test(p.name), `${k}: unlabelled leader`); if (p.start) assert.ok(p.start <= todayS, `${k}: leader start in the future`); if (p.birth) { const age = (Date.now() - Date.parse(p.birth)) / 31557600000; assert.ok(age > 25 && age < 110, `${k}: implausible age ${Math.round(age)}`); } } for (const e of v.elections ?? []) assert.ok(e.date >= todayS.slice(0, 7), `${k}: election in the past`); }
+const ad = read("../../public/data/uae-aid.json") as { years: number[]; totals: Record<string, number>; countries: Record<string, Record<string, number>> };
+assert.ok(Object.keys(ad.countries).length >= 40 && Object.values(ad.totals).every((v) => v >= 0), "aid coverage"); for (const k of Object.keys(ad.countries)) assert.ok(iso.has(k), `aid: unknown ${k}`); const lastFull = String(ad.years[ad.years.length - 2]); assert.equal(Object.entries(ad.countries).sort((a, b) => (b[1][lastFull] ?? 0) - (a[1][lastFull] ?? 0))[0][0], "PSE", "Palestine is the largest humanitarian recipient in the last full year");
+const lv = read("../../public/data/leverage.json") as { countries: Record<string, { theirs: number | null; ours: number | null; quadrant: string }> };
+assert.ok(Object.keys(lv.countries).length >= 100, "leverage coverage"); for (const [k, v] of Object.entries(lv.countries)) { assert.ok(iso.has(k) && k !== "ARE", `leverage: bad ${k}`); for (const a of [v.theirs, v.ours]) if (a != null) assert.ok(a >= 0 && a <= 100, `${k}: percentile ${a}`); assert.ok(["mutual", "uae-leverage", "uae-exposed", "light", "partial"].includes(v.quadrant), k); }
+const tm = read("../../public/data/temperature.json") as { countries: Record<string, { n: number; g: number; coop: number; conflict: number; weeks: { w: string; n: number; g: number }[] }> };
+assert.ok(Object.keys(tm.countries).length >= 40, "temperature coverage"); for (const [k, v] of Object.entries(tm.countries)) { assert.ok(iso.has(k) && k !== "ARE", `temperature: bad ${k}`); assert.ok(v.n >= 15 && v.g >= -10 && v.g <= 10 && v.coop >= 0 && v.conflict >= 0 && v.coop + v.conflict <= 1.001, `${k}: ${JSON.stringify({ n: v.n, g: v.g })}`); const ws = v.weeks.map((x) => x.w); assert.deepEqual([...ws].sort(), ws, `${k}: weeks out of order`); }
+const dl = read("../../public/data/deals.json") as { items: { u: string; d: string; t: string; c: string[]; by: string[] }[] };
+assert.ok(dl.items.length >= 100, "deals coverage"); const dids = dl.items.map((x) => x.u); assert.equal(new Set(dids).size, dids.length, "duplicate deal ids"); for (const x of dl.items) { assert.ok(x.c.length && x.c.every((c) => iso.has(c) && c !== "ARE"), `deal ${x.u}: bad countries`); assert.ok(x.by.length && x.d <= todayS, `deal ${x.u}: no investor or a future date`); }
+for (const [f, max] of [["leverage", 45], ["deals", 45], ["temperature", 30], ["governance", 400], ["leaders", 70], ["uae-aid", 70]] as const) { const d = read(`../../public/data/${f}.json`) as { built: string }; assert.ok(age(d.built) < max, `${f}.json was built ${Math.round(age(d.built))} days ago`); }
+void (async () => { const e = await intelFor("EGY"); assert.ok(e && e.leverage && e.temperature && e.governance && e.leaders && e.deals.total > 0, "EGY intel payload is incomplete"); assert.equal(await intelFor("ARE"), null); assert.equal(await intelFor("XXX"), null); assert.ok(e!.metrics.partnershipScore != null && e!.ids.visits.length > 0); console.log("intel payload: ok"); })();
 console.log("integrity: all assertions passed");

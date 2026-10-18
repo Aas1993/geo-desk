@@ -15,7 +15,7 @@ const EFFORT = (EFFORTS as readonly string[]).includes(process.env.RESEARCH_EFFO
 const MAX_PER_HOUR = Math.max(1, +(process.env.RESEARCH_MAX_PER_HOUR ?? 6) || 6); const MAX_CONCURRENT = 2; const MAX_TURNS = 5;
 const MAX_RUN_USD = maxRunUsd(process.env.RESEARCH_MAX_RUN_USD); // a note never spends more than this: the output room shrinks as money is spent, and the stream is cut off when the running total passes it (default 1, never above 5)
 const SEARCHES = 8, FETCHES = 4, FETCH_TOKENS = 20_000; // research budget for the whole run
-const BLOCKED = ["adx.ae"]; // ADX's terms prohibit automated retrieval; Cloudflare blocks it anyway.
+const BLOCKED = ["adx.ae", "qe.com.qa"]; // ADX's terms prohibit automated retrieval; Cloudflare blocks it anyway.
 
 type Source = { url: string; title: string; kind: "search" | "fetch" };
 type Done = { report: string; sources: Source[]; usage: Usage; at: string; model: string };
@@ -65,7 +65,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ exchang
           ...(FETCHES - u.fetches > 0 ? [{ type: "web_fetch_20260209", name: "web_fetch", max_uses: FETCHES - u.fetches, blocked_domains: BLOCKED, max_content_tokens: FETCH_TOKENS }] : []),
         ] as unknown as Anthropic.Beta.BetaToolUnion[];
         const cost = () => runUsd(u, MODEL);
-        let messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: [{ type: "text", text: userMessage({ facts: renderFacts(facts), asOf: facts.asOf, arabic }), cache_control: { type: "ephemeral" } }] }]; // cached, so the continuation turns read the facts at the cache price
+        let messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: [{ type: "text", text: userMessage({ facts: renderFacts(facts), asOf: facts.asOf, arabic, exchange: l.exchange }), cache_control: { type: "ephemeral" } }] }]; // cached, so the continuation turns read the facts at the cache price
         const sources: Source[] = []; const seen = new Map<string, Source>(); let report = ""; let stop: string | null = null;
         const addSource = (url: string, title: string, kind: Source["kind"]) => {
           if (!url) return; const prev = seen.get(url);

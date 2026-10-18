@@ -17,7 +17,7 @@ const TTL = 6 * 3600_000;
 const MAX_CONCURRENT = 2; // runs in flight at once, whatever their options
 const MAX_RUN_USD = maxRunUsd(process.env.DOSSIER_MAX_RUN_USD); // a run never spends more than this: the output room shrinks as money is spent, and a stream is cut off the moment the running total passes it
 const MAX_TURNS = 4;
-const BLOCKED = ["adx.ae"]; // ADX's terms prohibit automated retrieval
+const BLOCKED = ["adx.ae", "qe.com.qa"]; // ADX's terms prohibit automated retrieval
 
 type Source = { url: string; title: string; kind: "search" | "fetch" };
 type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number; searches: number; fetches: number; usd: number | null };

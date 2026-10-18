@@ -29,16 +29,17 @@ npm run dev                        # copies the MapLibre worker to /public, then
 - **UN votes** tab: ideal-point history vs the UAE, share of agreeing votes with the UAE, most/least similar voters (Voeten et al., through 2023).
 - **Compare view** (⇄ in the panel header, `?cmp=ISO3`): two countries side by side across 15 indicators, plus UN agreement and ideal points.
 
-## UAE equities (ADX + DFM) — `/markets`
-- **Universe**: all 83 ADX and 56 DFM listings (`node scripts/build-markets.mjs`; DFM tickers are validated against DFM's own disclosure feed, vendor aliases such as AIRA are dropped in favour of AIRARABIA).
+## Gulf equities (ADX + DFM + Qatar) — `/markets`
+- **Universe**: all 83 ADX, 56 DFM and 55 Qatar Stock Exchange (QSE, Boursa Qatar) listings (`node scripts/build-markets.mjs`; DFM tickers are validated against DFM's own disclosure feed, vendor aliases such as AIRA are dropped in favour of AIRARABIA).
 - **Board**: sortable/filterable table with price, change, volume, 52-week range, 1W/1M/3M/YTD/1Y returns, RSI, distance from SMA200, 60-day volatility, sparkline, movers, advancers/decliners, CSV export.
 - **Stock page** (`/markets/DFM/EMAAR`): interactive chart (line/candles, SMA 20/50/200, EMA, Bollinger, volume, RSI, MACD, crosshair), performance and risk, technical readings, pivot points, valuation / profitability / health / growth ratios, income statement, balance sheet and cash flow (annual & quarterly), dividend history, earnings vs estimates, and the company's **DFM disclosure timeline with PDF links**.
 - **Data honesty**: ADX forbids automated retrieval and DFM's public feed carries disclosures only, so prices and fundamentals come from a licensed vendor (Twelve Data, which lists both exchanges). Put a key in `.env.local` (`TWELVEDATA_API_KEY`, see `.env.example`). Without one the pages still list every stock and show DFM filings, and say plainly that prices aren't connected. ADX filings are not shown (no compliant source).
+- **Qatar (QSE)**: listings come from the vendor's reference list (symbols such as `AHCS@S` are dropped). Quoted in QAR, Sunday to Thursday 09:30 to 13:15 AST (continuous trading to 13:00, then the closing auction). There is no Qatar disclosure feed in the app: qe.com.qa asks robots not to read its documents, so `qe.com.qa` is also blocked for the AI research and briefing tools, which use other public sources instead. The Indices panel has the QE Index and USD/QAR as TradingView embeds (the `QSE:GNRI` symbol is unverified). Prices and fundamentals need a Twelve Data Pro key, as for ADX; none is set in this checkout, so the Qatar rows show the same "prices not connected" state as ADX and DFM.
 - Indicator maths is dependency-free and tested (`npx tsx src/lib/markets/indicators.test.ts`, includes Wilder's textbook RSI). Vendor response mappers are checked against the vendor's demo payloads (`npx tsx scripts/verify-td-shapes.ts`).
 - `GD_FIXTURES=1` (dev only) swaps in clearly-labelled synthetic data so the UI can be worked on without a key; it is ignored in production builds.
 
 ## Connecting prices (checklist)
-0. **Plan note (checked 17 Oct 2026 via the vendor's `/exchanges?show_plan=true`)**: Twelve Data lists ADX on **Pro** and DFM on **Ultra**. Free/Basic keys do not cover either exchange.
+0. **Plan note (checked 17 Oct 2026 via the vendor's `/exchanges?show_plan=true`)**: Twelve Data lists ADX and the Qatar Stock Exchange (code QE, MIC DSMD) on **Pro** and DFM on **Ultra**. Free/Basic keys do not cover either exchange.
 1. Get a key on a plan that covers them and put it in `.env.local`: `TWELVEDATA_API_KEY=...` (and `TWELVEDATA_RPM=<credits per minute on your plan>`; free = 8).
 2. `node scripts/verify-markets.mjs --limit=16` — quick smoke test (reads your plan, probes every dataset on ADCB and EMAAR, quotes 16 symbols per exchange).
 3. `node scripts/verify-markets.mjs` — full check of all 139 listings. It retries vendor aliases (e.g. EMAR for EMAAR), writes `public/data/vendor-map.json` (alias fixes and "no vendor data" flags, read by the server) and `vendor-report.json`.

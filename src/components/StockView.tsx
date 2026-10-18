@@ -45,7 +45,7 @@ export function StockView({ exchange, symbol }: { exchange: string; symbol: stri
   const synthetic = [quote, daily, head].some((x) => x.result?.ok && x.result.synthetic);
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { const t0 = setTimeout(() => setNow(new Date()), 0); return () => clearTimeout(t0); }, []);
-  const open = q?.marketOpen ?? (now ? sessionState(now).open : null);
+  const open = q?.marketOpen ?? (now ? sessionState(now, listing?.exchange === "QSE" ? "QSE" : "UAE").open : null);
 
   const chart = useMemo(() => {
     if (SEPARATE.includes(range)) { const a = alt.result?.ok ? alt.result.data : null; return a ? { full: a.bars, from: 0, interval: a.interval } : null; }

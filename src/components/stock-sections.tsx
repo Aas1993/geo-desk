@@ -155,12 +155,12 @@ export function AboutPanel({ p }: { p: Profile }) {
 }
 
 type FilingsRes = { available: boolean; reason?: string; items: Filing[]; total: number; error?: string };
-export function FilingsTab({ base, exchange }: { base: string; exchange: "ADX" | "DFM" }) {
+export function FilingsTab({ base, exchange }: { base: string; exchange: "ADX" | "DFM" | "QSE" }) {
   const { t, lang } = useT(); const [skip, setSkip] = useState(0); const [extra, setExtra] = useState<Filing[]>([]);
   const first = useApi<FilingsRes>(`${base}/filings?skip=0`); const more = useApi<FilingsRes>(skip > 0 ? `${base}/filings?skip=${skip}` : null);
   if (first.loading) return <Pending rows={6} />;
   const r = first.result; if (!r || !r.ok) return <Unavailable error="upstream" message={r && !r.ok ? r.message : undefined} onRetry={first.retry} />;
-  if (!r.data.available) return <Panel><p className="text-[13px] text-t1">{r.data.reason === "adx_no_feed" || exchange === "ADX" ? t("mk_adxNote") : (lang === "ar" ? "لا يوجد ربط لهذا الرمز في تغذية دبي المالي." : "This ticker could not be matched to an issuer in DFM's disclosure feed.")}</p></Panel>;
+  if (!r.data.available) return <Panel><p className="text-[13px] text-t1">{r.data.reason === "adx_no_feed" || exchange === "ADX" ? t("mk_adxNote") : r.data.reason === "qse_no_feed" || exchange === "QSE" ? t("mk_qseNote") : (lang === "ar" ? "لا يوجد ربط لهذا الرمز في تغذية دبي المالي." : "This ticker could not be matched to an issuer in DFM's disclosure feed.")}</p></Panel>;
   const moreItems = more.result?.ok && more.result.data.items ? more.result.data.items : [];
   const items = [...r.data.items, ...extra, ...moreItems.filter((m) => !r.data.items.some((i) => i.id === m.id) && !extra.some((i) => i.id === m.id))];
   const total = r.data.total;

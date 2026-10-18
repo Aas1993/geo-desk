@@ -1,4 +1,4 @@
-// Twelve Data client — a licensed market-data vendor that lists ADX (XADS) and DFM (XDFM).
+// Twelve Data client — a licensed market-data vendor that lists ADX (XADS), DFM (XDFM) and the Qatar Stock Exchange (DSMD).
 // We never scrape the exchanges: ADX forbids automated retrieval, and DFM's open feed only carries disclosures.
 // Serialised queue + cache so a free-tier key (8 req/min) degrades to "slow", not "broken".
 import type { ApiError, Bar, Dividend, Earning, Fundamentals, Listing, Profile, Quote, Statement, Stats } from "./types";

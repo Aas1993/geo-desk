@@ -5,9 +5,9 @@ import { useStore, useT } from "@/lib/store";
 import { TvWidget } from "./TradingView";
 
 const TABS = [
-  { id: "indices", en: "Indices", ar: "المؤشرات", symbols: [["FOREXCOM:SPXUSD", "S&P 500"], ["FOREXCOM:NSXUSD", "Nasdaq 100"], ["FOREXCOM:DJI", "Dow Jones"], ["FOREXCOM:UK100", "FTSE 100"], ["FOREXCOM:GRXEUR", "DAX"], ["FOREXCOM:JP225", "Nikkei 225"], ["DFM:DFMGI", "DFM General Index"], ["ADX:FADGI", "FTSE ADX General"]] },
+  { id: "indices", en: "Indices", ar: "المؤشرات", symbols: [["FOREXCOM:SPXUSD", "S&P 500"], ["FOREXCOM:NSXUSD", "Nasdaq 100"], ["FOREXCOM:DJI", "Dow Jones"], ["FOREXCOM:UK100", "FTSE 100"], ["FOREXCOM:GRXEUR", "DAX"], ["FOREXCOM:JP225", "Nikkei 225"], ["DFM:DFMGI", "DFM General Index"], ["ADX:FADGI", "FTSE ADX General"], ["QSE:GNRI", "QE Index (Qatar)"]] },
   { id: "commodities", en: "Commodities", ar: "السلع", symbols: [["TVC:UKOIL", "Brent crude"], ["TVC:USOIL", "WTI crude"], ["TVC:GOLD", "Gold"], ["TVC:SILVER", "Silver"], ["NYMEX:NG1!", "Natural gas"], ["COMEX:HG1!", "Copper"]] },
-  { id: "fx", en: "Currencies", ar: "العملات", symbols: [["FX:EURUSD", "EUR/USD"], ["FX:GBPUSD", "GBP/USD"], ["FX_IDC:USDAED", "USD/AED"], ["FX_IDC:USDSAR", "USD/SAR"], ["FX_IDC:USDINR", "USD/INR"], ["FX_IDC:USDCNY", "USD/CNY"], ["FX:USDJPY", "USD/JPY"]] },
+  { id: "fx", en: "Currencies", ar: "العملات", symbols: [["FX:EURUSD", "EUR/USD"], ["FX:GBPUSD", "GBP/USD"], ["FX_IDC:USDAED", "USD/AED"], ["FX_IDC:USDSAR", "USD/SAR"], ["FX_IDC:USDQAR", "USD/QAR"], ["FX_IDC:USDINR", "USD/INR"], ["FX_IDC:USDCNY", "USD/CNY"], ["FX:USDJPY", "USD/JPY"]] },
   { id: "crypto", en: "Crypto", ar: "العملات المشفرة", symbols: [["BITSTAMP:BTCUSD", "Bitcoin"], ["BITSTAMP:ETHUSD", "Ethereum"], ["COINBASE:SOLUSD", "Solana"], ["BINANCE:XRPUSDT", "XRP"], ["BINANCE:BNBUSDT", "BNB"]] },
 ] as const;
 

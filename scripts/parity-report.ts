@@ -39,7 +39,7 @@ lines.push("## Not layers", "", "| Feature | Status | Where / what is missing |"
     ["**Markets panel (indices, commodities, FX, crypto), prediction-market odds, live TV, launches, capitals weather**", "Live", "Layers + dashboard widgets (TradingView display-only embeds, Kalshi public data, official YouTube streams)"],
     ["Day/night, flat/globe, satellite basemap, my location, time window, URL-shared state", "Live", "Right rail, layers drawer"],
     ["Arabic/English with RTL, light/dark, text size", "Live", "Top bar, right rail"],
-    ["UAE markets desk (ADX/DFM) with AI research notes", "Live", "Markets (beyond DiploMaps)"],
+    ["Gulf markets desk (ADX, DFM and Qatar) with AI research notes", "Live", "Markets (beyond DiploMaps)"],
     ["Telegram channel alerts on the map and in alerts", "Blocked", "Scraping Telegram channels breaks its terms; not built"],
     ["X / Twitter, Bluesky, Reddit, YouTube social feeds", "Blocked", "X API is paid; others need accounts or keys; shown honestly in the Media tab"],
     ["Live vessels (AIS), public webcams, ACLED/UCDP conflict feed", "Needs key", "Free keys required (aisstream, webcam provider, ACLED/UCDP): add them in .env.local"],

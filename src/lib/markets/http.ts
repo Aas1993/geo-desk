@@ -9,5 +9,5 @@ export const jsonErr = (e: unknown) => {
 };
 export const ok = (body: Record<string, unknown>, maxAge = 60) => Response.json({ ...body, synthetic: fixturesOn() }, { headers: { "Cache-Control": fixturesOn() ? "no-store" : `public, s-maxage=${maxAge}, stale-while-revalidate=${maxAge * 5}` } });
 export async function listingOr404(ex: string, sym: string): Promise<Listing | Response> {
-  const l = await findListing(ex, sym); return l ?? Response.json({ error: "not_found", message: "Unknown ADX/DFM symbol" } satisfies ApiError, { status: 404 });
+  const l = await findListing(ex, sym); return l ?? Response.json({ error: "not_found", message: "Unknown ADX/DFM/QSE symbol" } satisfies ApiError, { status: 404 });
 }

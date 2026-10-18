@@ -2,6 +2,7 @@
 // Cross-dataset invariants that a ministerial product must not break: names, attribution of agreements and visits, embassy pins, memberships, freshness.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { sessionState } from "./markets/format";
 const read = (p: string) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
 const countries = read("../../public/data/countries.json") as { iso3: string; name: string; capital: string | null; lat: number | null; lng: number | null; region: string }[];
 const by = new Map(countries.map((c) => [c.iso3, c]));
@@ -49,4 +50,15 @@ const mt = read("../../public/data/media-tone.json") as { days: number }; const 
 assert.equal(mt.days, def, `media-tone.json covers ${mt.days} days but the builder default is ${def}`);
 // the stated CEPA counts match the records
 if (ag.cepaSummary) assert.ok(Object.values(ag.countries).filter((c) => c.cepa?.status === "in-force").length >= 15);
+// markets: the Qatar Stock Exchange is in the universe, cleanly, and sessions follow each market's own week
+const mk = (read("../../public/data/markets.json") as { rows: { exchange: string; symbol: string; currency: string; mic: string; name: string }[] }).rows;
+const keys = mk.map((r) => `${r.exchange}:${r.symbol}`); assert.equal(new Set(keys).size, keys.length, "duplicate exchange:symbol");
+const qse = mk.filter((r) => r.exchange === "QSE"); assert.ok(qse.length >= 40 && qse.length <= 70, `QSE has ${qse.length} listings`);
+for (const r of qse) { assert.equal(r.currency, "QAR", r.symbol); assert.equal(r.mic, "DSMD", r.symbol); assert.match(r.symbol, /^[A-Z0-9]{3,6}$/, `vendor placeholder ${r.symbol}`); assert.ok(r.name && r.name !== r.symbol); }
+for (const sym of ["QNBK", "IQCD", "ORDS", "QIBK", "DHBK", "QEWS"]) assert.ok(qse.some((r) => r.symbol === sym), `${sym} missing from QSE`);
+assert.ok(mk.filter((r) => r.exchange !== "QSE").every((r) => r.currency === "AED"), "UAE listings are in dirhams");
+const at = (iso: string) => new Date(iso); // 2026-10-18 is a Sunday
+assert.equal(sessionState(at("2026-10-18T07:00:00Z"), "QSE").open, true, "Qatar trades on Sunday 10:00 AST"); assert.equal(sessionState(at("2026-10-18T07:00:00Z"), "UAE").open, false, "the UAE market is shut on Sunday");
+assert.equal(sessionState(at("2026-10-16T07:00:00Z"), "QSE").open, false, "Qatar is shut on Friday"); assert.equal(sessionState(at("2026-10-16T07:00:00Z"), "UAE").open, true, "the UAE trades on Friday 11:00 GST");
+assert.equal(sessionState(at("2026-10-18T10:30:00Z"), "QSE").open, false, "Qatar is shut after 13:15 AST"); assert.equal(sessionState(at("2026-10-18T05:00:00Z"), "QSE").open, false, "Qatar is shut before 09:30 AST");
 console.log("integrity: all assertions passed");

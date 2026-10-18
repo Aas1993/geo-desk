@@ -7,6 +7,7 @@ import { Markdown } from "./Markdown";
 import { BUDGET, COUNTERPARTS, DEPTHS, FOCUSES, MEETINGS, type Counterpart, type Depth, type Focus, type Meeting } from "@/lib/dossier/options";
 import { briefingHtml, printBriefing, saveBlob } from "@/lib/dossier/export";
 import type { Country } from "@/lib/types";
+import { safeHttp } from "@/lib/url";
 
 type Source = { url: string; title: string; kind: "search" | "fetch" };
 type Tile = { label: string; value: string; sub?: string };
@@ -172,7 +173,7 @@ export function DossierWorkspace({ c, onClose }: { c: Country; onClose: () => vo
           </div>
           <aside className="min-w-0 space-y-4">
             <section className="rounded-[12px] border border-line bg-bg1 p-3.5"><h3 className="label mb-2">{u.sources} ({cited.length ? `${cited.length} ${u.cited} · ${rest.length} ${u.other}` : sources.length})</h3>
-              {!sources.length ? <p className="text-[12.5px] text-t2">—</p> : <ol className="scroll-thin max-h-[480px] space-y-2 overflow-y-auto text-[12.5px]">{[...cited, ...rest].map((s, i) => <li key={s.url} className="flex gap-2"><span className="num w-5 shrink-0 text-end text-t2">{i + 1}</span><a href={s.url} target="_blank" rel="noreferrer noopener" className="min-w-0 break-words text-t1 hover:text-accent"><span className="block truncate text-t0" title={s.title} dir="auto">{s.title}</span><span className="num text-[11px] text-t2">{host(s.url)}</span></a></li>)}</ol>}
+              {!sources.length ? <p className="text-[12.5px] text-t2">—</p> : <ol className="scroll-thin max-h-[480px] space-y-2 overflow-y-auto text-[12.5px]">{[...cited, ...rest].map((s, i) => <li key={s.url} className="flex gap-2"><span className="num w-5 shrink-0 text-end text-t2">{i + 1}</span><a href={safeHttp(s.url)} target="_blank" rel="noreferrer noopener" className="min-w-0 break-words text-t1 hover:text-accent"><span className="block truncate text-t0" title={s.title} dir="auto">{s.title}</span><span className="num text-[11px] text-t2">{host(s.url)}</span></a></li>)}</ol>}
             </section>
             {saved && <section className="rounded-[12px] border border-line bg-bg1 p-3.5"><h3 className="label mb-2">{u.usage}</h3><dl className="num grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12.5px]"><dt className="text-t2">{u.searches}</dt><dd className="text-end">{saved.usage.searches}</dd><dt className="text-t2">{u.pages}</dt><dd className="text-end">{saved.usage.fetches}</dd><dt className="text-t2">{u.tokens}</dt><dd className="text-end">{Math.round((saved.usage.input + saved.usage.cacheRead + saved.usage.cacheWrite) / 1000)}k / {Math.round(saved.usage.output / 1000)}k</dd><dt className="text-t2">{u.costL}</dt><dd className="text-end">{saved.usage.usd != null ? `$${saved.usage.usd.toFixed(2)}` : "n/a"}</dd></dl><p className="mt-2 text-[11px] text-t2">{saved.model} · {saved.at.slice(0, 16).replace("T", " ")} UTC{saved.cached ? " · cached" : ""}</p><p className="mt-1 text-[11px] text-t2">{u.pptx}</p></section>}
           </aside>

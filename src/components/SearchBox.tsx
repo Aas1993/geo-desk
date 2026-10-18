@@ -12,7 +12,7 @@ const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCas
 
 export function useCountries() {
   const [d, setD] = useState<CountryData | null>(null);
-  useEffect(() => { loadCountries().then(setD); }, []);
+  useEffect(() => { let dead = false; let n = 0; const go = () => loadCountries().then((x) => { if (!dead) setD(x); }).catch(() => { if (!dead && n++ < 5) setTimeout(go, 2000 * n); }); go(); return () => { dead = true; }; }, []);
   return d;
 }
 let uni: Promise<Listing[]> | null = null;

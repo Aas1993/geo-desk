@@ -50,6 +50,6 @@ export async function buildAlerts(): Promise<AlertsPayload> {
   for (const x of (vs?.items ?? []).filter((v) => v.d >= since && v.l >= 2).slice(0, 15)) items.push({ id: `wam:${x.u}`, cat: "diplomacy", kind: "diplomacy", t: Date.parse(x.d + "T12:00:00Z"), title: x.t, sev: x.l === 3 ? 2 : 1, src: "WAM", url: `https://www.wam.ae/en/article/${x.u}`, uae: true, security: false });
   const u = rw?.countries.ARE; if (u && u.n7 > 0) items.push({ id: `cyber:ARE:${rw!.built.slice(0, 10)}`, cat: "cyber", kind: "cyber", t: Date.parse((u.last || rw!.built.slice(0, 10)) + "T12:00:00Z"), title: `${u.n7} ransomware leak-site posting${u.n7 > 1 ? "s" : ""} naming UAE organisations in the last 7 days (${u.n30} in 30 days)`, sev: u.n7 >= 5 ? 2 : 1, src: "ransomware.live", url: "https://www.ransomware.live/map/ae", uae: true, security: true });
   const seen = new Set<string>();
-  const out = items.filter((a) => a.t > 0 && !seen.has(a.id) && seen.add(a.id)).sort((a, b) => b.t - a.t).slice(0, 200);
+  const out = items.filter((a) => a.t > 0 && !seen.has(a.id) && seen.add(a.id)).map((a) => (a.url && !/^https?:\/\//i.test(a.url) ? { ...a, url: undefined } : a)).sort((a, b) => b.t - a.t).slice(0, 200);
   return { items: out, fetchedAt: Date.now(), sources };
 }

@@ -8,6 +8,7 @@ import type { Bar, Dividend, Earning, Filing, Profile, Quote, Statement, Stats }
 import type { Lang } from "@/lib/format";
 import { KV, Panel, Pending, Unavailable } from "./markets-ui";
 import { RangeBar } from "./market-charts";
+import { safeHttp } from "@/lib/url";
 
 export function KeyStats({ q, stats, cur }: { q: Quote | null; stats: Stats | null; cur: string }) {
   const { t, lang } = useT();
@@ -148,7 +149,7 @@ export function AboutPanel({ p }: { p: Profile }) {
     <Panel title={t("st_about")}>
       {p.description && <p className="mb-3 text-[13px] leading-relaxed text-t1">{p.description}</p>}
       {p.sector && <KV k={t("st_sector")} v={p.sector} />}{p.industry && <KV k={t("st_industry")} v={p.industry} />}{p.employees != null && <KV k={t("st_employees")} v={intl(p.employees, "en")} />}{p.ceo && <KV k="CEO" v={p.ceo} />}{(p.city || p.country) && <KV k={t("st_hq")} v={[p.city, p.country].filter(Boolean).join(", ")} />}
-      {p.website && <KV k={t("st_website")} v={<a href={p.website} target="_blank" rel="noreferrer" className="text-accent hover:underline">{p.website.replace(/^https?:\/\/(www\.)?/, "")}</a>} />}
+      {p.website && <KV k={t("st_website")} v={<a href={safeHttp(p.website)} target="_blank" rel="noreferrer" className="text-accent hover:underline">{p.website.replace(/^https?:\/\/(www\.)?/, "")}</a>} />}
     </Panel>
   );
 }

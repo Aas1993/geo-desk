@@ -17,16 +17,19 @@ const gap = () => Math.max(0, Math.round(60000 / Math.max(1, Number(process.env.
 let chain: Promise<unknown> = Promise.resolve();
 const cache = new Map<string, { exp: number; v: unknown }>(); const inflight = new Map<string, Promise<unknown>>();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+let queued = 0; const MAX_QUEUE = 30; // calls waiting behind the rate limiter; past this the API answers "rate" at once instead of piling up sleeps
 
 async function call(path: string, params: Record<string, string | number>, ttlMs: number, cost = 1): Promise<Record<string, unknown>> {
   if (!keyConfigured()) throw new MarketError("no_key", "TWELVEDATA_API_KEY is not set");
   const q = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])); const url = `${BASE}/${path}?${q}`; // key added below, never cached/logged
   const hit = cache.get(url); if (hit && hit.exp > Date.now()) return hit.v as Record<string, unknown>;
   const dup = inflight.get(url); if (dup) return dup as Promise<Record<string, unknown>>;
+  if (queued >= MAX_QUEUE) throw new MarketError("rate", "Market data is busy — try again shortly");
+  queued++;
   const run = chain.then(async () => {
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
-        const r = await fetch(`${url}&apikey=${process.env.TWELVEDATA_API_KEY}`, { cache: "no-store" });
+        const r = await fetch(url, { cache: "no-store", headers: { Authorization: `apikey ${process.env.TWELVEDATA_API_KEY}` }, signal: AbortSignal.timeout(15_000) });
         const j = (await r.json().catch(() => null)) as Record<string, unknown> | null;
         if (!j) throw new MarketError("upstream", `HTTP ${r.status}`);
         if (j.status === "error" || (typeof j.code === "number" && j.code >= 400)) {
@@ -39,7 +42,7 @@ async function call(path: string, params: Record<string, string | number>, ttlMs
         cache.set(url, { exp: Date.now() + ttlMs, v: j }); return j;
       }
       throw new MarketError("rate", "Rate limit — try again shortly");
-    } finally { await sleep(gap() * cost); } // a batch of N symbols costs N credits
+    } finally { queued--; await sleep(gap() * cost); } // a batch of N symbols costs N credits
   });
   chain = run.catch(() => {});
   const p = run.finally(() => inflight.delete(url)); inflight.set(url, p); return p;

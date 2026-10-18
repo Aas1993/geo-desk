@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Map as MLMap, Marker, setRTLTextPlugin, setWorkerUrl, type GeoJSONSource, type StyleSpecification } from "maplibre-gl";
 import { loadCountries, type CountryData } from "@/lib/countries";
 import { useStore } from "@/lib/store";
@@ -75,6 +75,7 @@ function buildStyle(d: CountryData, theme: "dark" | "light"): StyleSpecification
 }
 
 export default function MapCanvas() {
+  const [failed, setFailed] = useState(false);
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const dataRef = useRef<CountryData | null>(null);
@@ -87,7 +88,7 @@ export default function MapCanvas() {
   useEffect(() => {
     let dead = false; let created: MLMap | null = null;
     setupOnce();
-    loadCountries().then((d) => {
+    loadCountries().catch((e) => { if (!dead) setFailed(true); throw e; }).then((d) => {
       if (dead || !el.current) return; dataRef.current = d;
       const h = readHash(); const st = useStore.getState();
       const map = new MLMap({
@@ -109,7 +110,7 @@ export default function MapCanvas() {
       map.on("mouseleave", "fill", () => { if (hover.current) map.setFeatureState({ source: "countries", id: hover.current }, { hover: false }); hover.current = null; map.getCanvas().style.cursor = ""; });
       map.on("moveend", () => { const c = map.getCenter(); history.replaceState(null, "", `${location.pathname}${location.search}#${map.getZoom().toFixed(2)}/${c.lat.toFixed(3)}/${c.lng.toFixed(3)}`); });
       map.once("load", () => { applyAll(); syncRef.current(!h); document.documentElement.dataset.mapReady = "1"; });
-    });
+    }).catch(() => { /* reported through the failed state */ });
     return () => { dead = true; created?.remove(); mapRef.current = null; setMap(null); };
   }, []);
 
@@ -176,5 +177,5 @@ export default function MapCanvas() {
   useEffect(() => { if (homeNonce) mapRef.current?.flyTo({ center: [54, 24], zoom: isMobile() ? 3.6 : 4.6, duration: 1200 }); }, [homeNonce]);
   useEffect(() => { if (!zoomCmd.n) return; if (zoomCmd.dir > 0) mapRef.current?.zoomIn(); else mapRef.current?.zoomOut(); }, [zoomCmd]);
 
-  return <div className="absolute inset-0"><div ref={el} style={{ position: "absolute", inset: 0 }} aria-label="World map" role="application" /></div>;
+  return <div className="absolute inset-0"><div ref={el} style={{ position: "absolute", inset: 0 }} aria-label="World map" role="application" />{failed && <div role="alert" className="absolute inset-x-4 top-24 z-10 mx-auto max-w-sm rounded-[10px] border border-down/40 bg-bg1 p-3 text-[13px] text-t0">The map data could not be loaded. Check the connection and <button onClick={() => location.reload()} className="underline">reload</button>.</div>}</div>;
 }

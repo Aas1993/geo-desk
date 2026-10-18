@@ -1,3 +1,4 @@
+import { openHtml } from "../url";
 // Turns the briefing's markdown into standalone HTML for printing to PDF and for a Word-compatible .doc. Escapes everything; only http(s) links are kept.
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const inline = (t: string) => esc(t).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_m, a: string, u: string) => `<a href="${u}">${a}</a>`).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<i>$2</i>").replace(/`([^`]+)`/g, "<code>$1</code>");
@@ -22,5 +23,5 @@ const CSS = `@page{size:A4;margin:16mm}body{font:11px/1.45 -apple-system,"Segoe 
 export function briefingHtml(md: string, o: { title: string; rtl: boolean; foot: string; classification: string }, forWord = false): string {
   return `<!doctype html><html${forWord ? ' xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"' : ""} lang="${o.rtl ? "ar" : "en"}" dir="${o.rtl ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(o.title)}</title><style>${CSS}</style></head><body><div class="cls">${esc(o.classification)}</div>${mdToHtml(md)}<div class="foot">${esc(o.foot)}</div></body></html>`;
 }
-export function printBriefing(html: string) { const url = URL.createObjectURL(new Blob([html.replace("</body>", "<script>addEventListener(\"load\",()=>setTimeout(()=>print(),400))</script></body>")], { type: "text/html" })); const w = window.open(url, "_blank", "noopener"); if (!w) { URL.revokeObjectURL(url); return false; } setTimeout(() => URL.revokeObjectURL(url), 120_000); return true; }
+export function printBriefing(html: string) { return openHtml(html.replace("</body>", "<script>addEventListener(\"load\",()=>setTimeout(()=>print(),400))</script></body>")); }
 export function saveBlob(name: string, type: string, data: string) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }

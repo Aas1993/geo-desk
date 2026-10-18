@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { rejectCrossSite } from "@/lib/guard";
+import { rejectCrossSite, safeMessage } from "@/lib/guard";
 import { WORLD_SYSTEM } from "@/lib/ask/prompt";
 import { renderFacts, worldFacts } from "@/lib/ask/facts";
 
@@ -23,6 +23,6 @@ export async function POST(req: Request) {
     const u = msg.usage, pr = PRICE[MODEL], cr = u.cache_read_input_tokens ?? 0, cw = u.cache_creation_input_tokens ?? 0; const cited = new Set([...brief.matchAll(/F\d+/g)].map((m) => m[0]));
     const done: Done = { brief, facts: facts.filter((f) => cited.has(f.id)).map(({ id, text, src, url }) => ({ id, text, src, url })), at: new Date().toISOString(), model: MODEL, usage: { usd: pr ? (u.input_tokens * pr.in + u.output_tokens * pr.out + cr * pr.cacheRead + cw * pr.cacheWrite) / 1e6 : null } };
     store.cache.set(key, done); return Response.json({ ...done, cached: false });
-  } catch (e) { if (req.signal.aborted) return Response.json({ error: "aborted" }, { status: 499 }); const status = e instanceof Anthropic.APIError ? e.status : undefined; return Response.json({ error: "upstream", message: status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : e instanceof Error ? e.message : "error" }, { status: 502 }); }
+  } catch (e) { if (req.signal.aborted) return Response.json({ error: "aborted" }, { status: 499 }); const status = e instanceof Anthropic.APIError ? e.status : undefined; return Response.json({ error: "upstream", message: status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : safeMessage(e) }, { status: 502 }); }
   finally { store.running = false; }
 }

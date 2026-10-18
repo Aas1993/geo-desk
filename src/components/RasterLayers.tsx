@@ -10,7 +10,7 @@ export function useYesterday() { const [d, setD] = useState<string | null>(null)
 
 function useRaster(map: MLMap, id: string, on: boolean, tiles: string | null, opts: { opacity: number; maxzoom: number; before?: string; attribution: string }) {
   useEffect(() => {
-    if (!on || !tiles) return;
+    if (!on || !tiles) { try { if (map.getLayer(id)) map.removeLayer(id); if (map.getSource(id)) map.removeSource(id); } catch { /* style not ready */ } return; } // switched off: take the overlay off the map
     const add = () => {
       const src = map.getSource(id) as RasterTileSource | undefined;
       if (src) { src.setTiles([tiles]); return; }

@@ -22,7 +22,7 @@ export function TvWidget({ kind, config, height, title }: { kind: TvKind; config
     const s = document.createElement("script"); s.src = `https://s3.tradingview.com/external-embedding/embed-widget-${kind}.js`; s.async = true;
     s.text = JSON.stringify({ autosize: true, colorTheme: theme, isTransparent: false, backgroundColor: theme === "dark" ? "#0a111e" : "#f6f9fd", locale: lang === "ar" ? "ar_AE" : "en", ...config });
     const credit = document.createElement("div"); credit.className = "tradingview-widget-copyright"; credit.style.cssText = "font-size:11px;padding-top:4px;color:var(--t2)";
-    credit.innerHTML = `<a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank" style="color:var(--accent)">${title} · Track all markets on TradingView</a>`;
+    const a = document.createElement("a"); a.href = "https://www.tradingview.com/"; a.rel = "noopener nofollow"; a.target = "_blank"; a.style.color = "var(--accent)"; a.textContent = `${title} · Track all markets on TradingView`; credit.append(a);
     host.append(inner, credit, s);
     return () => { host.innerHTML = ""; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

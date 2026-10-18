@@ -7,5 +7,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ exchange
   if (!l.feedSymbol) return Response.json({ available: false, reason: "no_feed_match", items: [], total: 0 });
   const skip = Math.max(0, parseInt(new URL(req.url).searchParams.get("skip") ?? "0", 10) || 0);
   try { const r = await filings(l.feedSymbol, skip); return Response.json({ available: true, ...r }, { headers: { "Cache-Control": "public, s-maxage=600" } }); }
-  catch (e) { return Response.json({ available: true, error: (e as Error).message, items: [], total: 0 }, { status: 502 }); }
+  catch (e) { return Response.json({ available: true, error: "upstream", items: [], total: 0 }, { status: 502 }); }
 }

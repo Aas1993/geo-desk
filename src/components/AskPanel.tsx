@@ -5,6 +5,7 @@ import { useStore, useT } from "@/lib/store";
 import { useDashboard } from "@/lib/dashboard-store";
 import { Markdown } from "./Markdown";
 import { Skeleton } from "./ui";
+import { safeHttp } from "@/lib/url";
 
 type Res = { answer: string; scope: string; facts: { id: string; text: string; src: string; url?: string }[]; at: string; model: string; usage: { usd: number | null }; cached?: boolean };
 const T = {
@@ -33,7 +34,7 @@ export function AskPanel() {
         {phase === "busy" && <div role="status"><Skeleton h={14} className="mb-2 w-2/3" /><Skeleton h={12} className="mb-2" /><Skeleton h={12} className="w-5/6" /><p className="mt-3 text-[12.5px] text-t1">{u.thinking}</p></div>}
         {phase === "error" && <div role="alert" className="rounded-[8px] border border-down/40 bg-down/10 p-3 text-[13px]">{err}</div>}
         {res && <article className="space-y-3"><div className="text-[13px] leading-relaxed"><Markdown source={res.answer} /></div>
-          {res.facts.length > 0 && <details className="rounded-[10px] border border-line bg-bg1/60 p-3 text-[12px]"><summary className="cursor-pointer text-t0">{u.sources} ({res.facts.length})</summary><ul className="mt-2 space-y-1.5">{res.facts.map((f) => <li key={f.id}><span className="num me-1 text-t2">{f.id}</span>{f.text.slice(0, 200)} <span className="text-t2">· {f.src}</span>{f.url && <a href={f.url} target="_blank" rel="noreferrer noopener" aria-label="Open source" className="ms-1 inline-flex align-middle text-accent"><ExternalLink size={11} /></a>}</li>)}</ul></details>}
+          {res.facts.length > 0 && <details className="rounded-[10px] border border-line bg-bg1/60 p-3 text-[12px]"><summary className="cursor-pointer text-t0">{u.sources} ({res.facts.length})</summary><ul className="mt-2 space-y-1.5">{res.facts.map((f) => <li key={f.id}><span className="num me-1 text-t2">{f.id}</span>{f.text.slice(0, 200)} <span className="text-t2">· {f.src}</span>{f.url && <a href={safeHttp(f.url)} target="_blank" rel="noreferrer noopener" aria-label="Open source" className="ms-1 inline-flex align-middle text-accent"><ExternalLink size={11} /></a>}</li>)}</ul></details>}
           <p className="num text-[11px] text-t2">{res.model} · {u.cost} {res.usage.usd != null ? `$${res.usage.usd.toFixed(3)}` : "n/a"}{res.cached ? ` · ${u.cachedL}` : ""} · {res.scope}</p><p className="text-[11px] leading-snug text-t2">{u.note}</p></article>}
       </div>
     </aside>

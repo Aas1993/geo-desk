@@ -6,6 +6,7 @@ import { Panel } from "./markets-ui";
 import { Markdown } from "./Markdown";
 import { normaliseNote } from "@/lib/research/normalise";
 import type { Listing } from "@/lib/markets/types";
+import { safeHttp } from "@/lib/url";
 
 type Source = { url: string; title: string; kind: "search" | "fetch" };
 type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number; searches: number; fetches: number; usd: number | null };
@@ -107,7 +108,7 @@ export function ResearchTab({ listing, lang }: { listing: Listing; lang: "en" | 
         <Panel title={`${t("rs_sources")} (${cited.length ? `${cited.length} ${t("rs_cited")} · ${rest.length} ${t("rs_otherRes")}` : sources.length})`}>
           {sources.length === 0 ? <p className="text-[12.5px] text-t2">{t("rs_sourcesEmpty")}</p> : (
             <ol className="max-h-[520px] space-y-2 overflow-y-auto text-[12.5px]">{[...cited, ...rest].map((s, i) => (
-              <li key={s.url} className="flex gap-2"><span className="num w-5 shrink-0 text-end text-t2">{i + 1}</span><a href={s.url} target="_blank" rel="noreferrer noopener" className="min-w-0 break-words text-t1 hover:text-accent"><span className="block truncate text-t0" title={s.title}>{s.title}</span><span className="num text-[11px] text-t2">{host(s.url)} · {cited.includes(s) ? <b className="font-medium text-accent">{t("rs_cited")}</b> : s.kind === "fetch" ? t("rs_read") : t("rs_found")}</span></a></li>))}</ol>)}
+              <li key={s.url} className="flex gap-2"><span className="num w-5 shrink-0 text-end text-t2">{i + 1}</span><a href={safeHttp(s.url)} target="_blank" rel="noreferrer noopener" className="min-w-0 break-words text-t1 hover:text-accent"><span className="block truncate text-t0" title={s.title}>{s.title}</span><span className="num text-[11px] text-t2">{host(s.url)} · {cited.includes(s) ? <b className="font-medium text-accent">{t("rs_cited")}</b> : s.kind === "fetch" ? t("rs_read") : t("rs_found")}</span></a></li>))}</ol>)}
           <p className="mt-3 text-[11px] text-t2">{t("rs_sourcesNote")}</p>
         </Panel>
         {saved && (

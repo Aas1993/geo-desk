@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { rejectCrossSite } from "@/lib/guard";
+import { oneLine, rejectCrossSite, safeMessage } from "@/lib/guard";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { peekArticles } from "@/lib/media/gdelt";
@@ -42,7 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
     const uniq = new Map<string, Item>(); for (const it of [...inNeg, ...inPos, ...outNeg, ...outPos, ...tU.slice(0, 8), ...tC.slice(0, 8)]) if (!uniq.has(it.id)) uniq.set(it.id, it);
     const items = [...uniq.values()]; if (items.length < 4) return Response.json({ error: "thin", message: "Not enough recent coverage was found to judge a stance. Try again later." }, { status: 422 });
     store.runs.push(Date.now());
-    const text = items.map((it) => `[${it.id}] (${it.kind === "thinktank" ? "think tank" : "media"}, ${it.outlet}, ${new Date(it.ts).toISOString().slice(0, 10)}, TARGET: ${target(it)}) ${it.title}`).join("\n");
+    const text = items.map((it) => `[${it.id}] (${it.kind === "thinktank" ? "think tank" : "media"}, ${oneLine(it.outlet, 80)}, ${new Date(it.ts).toISOString().slice(0, 10)}, TARGET: ${target(it)}) ${oneLine(it.title, 300)}`).join("\n");
     const client = new Anthropic(); // credentials: ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login` profile
     const msg = await client.messages.create({
       model: MODEL, max_tokens: 6000, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: userMessage({ items: text, country: name, arabic }) }],
@@ -58,7 +58,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
   } catch (e) {
     if (req.signal.aborted) return Response.json({ error: "aborted" }, { status: 499 });
     const status = e instanceof Anthropic.APIError ? e.status : undefined;
-    const message = status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : status === 400 && /credit/i.test(String((e as Error).message)) ? "Your Anthropic credit balance is too low." : e instanceof Error ? e.message : "error";
+    const message = status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : status === 400 && /credit/i.test(String((e as Error).message)) ? "Your Anthropic credit balance is too low." : safeMessage(e);
     return Response.json({ error: "upstream", message }, { status: 502 });
   } finally { store.running.delete(key); }
 }

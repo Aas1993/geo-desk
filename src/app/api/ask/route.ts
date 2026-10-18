@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { rejectCrossSite } from "@/lib/guard";
+import { rejectCrossSite, safeMessage } from "@/lib/guard";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { ASK_SYSTEM, askMessage } from "@/lib/ask/prompt";
@@ -40,6 +40,6 @@ export async function POST(req: Request) {
   } catch (e) {
     if (req.signal.aborted) return Response.json({ error: "aborted" }, { status: 499 });
     const status = e instanceof Anthropic.APIError ? e.status : undefined;
-    return Response.json({ error: "upstream", message: status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : status === 400 && /credit/i.test(String((e as Error).message)) ? "Your Anthropic credit balance is too low." : e instanceof Error ? e.message : "error" }, { status: 502 });
+    return Response.json({ error: "upstream", message: status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : status === 400 && /credit/i.test(String((e as Error).message)) ? "Your Anthropic credit balance is too low." : safeMessage(e) }, { status: 502 });
   } finally { store.running.delete(key); }
 }

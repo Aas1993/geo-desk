@@ -1,4 +1,5 @@
 // Tiny in-memory TTL cache with single-flight, shared by the layer data routes. Per-process, lost on restart (see the architecture notes).
+const MAX_ENTRIES = 600; // the key space of area layers is large and caller-controlled, so the cache is bounded: expired entries go first, then the oldest
 const store = new Map<string, { exp: number; v: unknown }>(); const inflight = new Map<string, Promise<unknown>>();
 /** Read a cached value without loading it; undefined when absent or expired. */
 export function peek<T>(key: string): T | undefined { const hit = store.get(key); return hit && hit.exp > Date.now() ? (hit.v as T) : undefined; }
@@ -6,7 +7,7 @@ export async function cached<T>(key: string, ttlMs: number, load: () => Promise<
   const hit = store.get(key); const now = Date.now();
   if (hit && hit.exp > now) return { value: hit.v as T, at: hit.exp - ttlMs, fromCache: true };
   const dup = inflight.get(key); if (dup) return { value: (await dup) as T, at: now, fromCache: true };
-  const p = load().then((v) => { store.set(key, { exp: Date.now() + ttlMs, v }); return v; }).finally(() => inflight.delete(key));
+  const p = load().then((v) => { store.set(key, { exp: Date.now() + ttlMs, v }); if (store.size > MAX_ENTRIES) { const t = Date.now(); for (const [k, e] of store) if (e.exp <= t) store.delete(k); while (store.size > MAX_ENTRIES) store.delete(store.keys().next().value as string); } return v; }).finally(() => inflight.delete(key));
   inflight.set(key, p);
   try { return { value: await p, at: Date.now(), fromCache: false }; }
   catch (e) { if (hit) return { value: hit.v as T, at: hit.exp - ttlMs, fromCache: true }; throw e; } // serve stale on upstream failure

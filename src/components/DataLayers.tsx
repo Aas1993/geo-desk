@@ -109,10 +109,10 @@ function DataLayer({ def, map }: { def: LayerDef; map: MLMap }) {
   useEffect(() => {
     const apply = () => {
       if (!map.getLayer(dot)) return;
-      const cutoff = Date.now() - WINDOW_MS[win]; const base: unknown[] = ["in", ["get", "k"], ["literal", keys]];
+      const cutoff = Date.now() - WINDOW_MS[win]; const typed = !!def.sub?.length; const base: unknown[] = typed ? ["in", ["get", "k"], ["literal", keys]] : ["has", "k"]; // layers with no sub-types have nothing to filter by type
       const f = def.timeFilter && win !== "all" ? ["all", base, ["any", ["!", ["has", "t"]], [">=", ["get", "t"], cutoff]]] : base;
       map.setFilter(halo, f as never); map.setFilter(dot, f as never); if (map.getLayer(`${src}-label`)) map.setFilter(`${src}-label`, f as never);
-      if (data) { const byKey: Record<string, number> = {}; let shown = 0; for (const x of data.features) { const p = x.properties as Feat & { k: string }; if (!keys.includes(p.k)) continue; if (def.timeFilter && win !== "all" && p.t && p.t < cutoff) continue; shown++; byKey[p.k] = (byKey[p.k] ?? 0) + 1; byKey[p.type] = (byKey[p.type] ?? 0) + (p.sub ? 0 : 0); } setStat(def.id, { shown, byKey }); }
+      if (data) { const byKey: Record<string, number> = {}; let shown = 0; for (const x of data.features) { const p = x.properties as Feat & { k: string }; if (def.sub?.length && !keys.includes(p.k)) continue; if (def.timeFilter && win !== "all" && p.t && p.t < cutoff) continue; shown++; byKey[p.k] = (byKey[p.k] ?? 0) + 1; byKey[p.type] = (byKey[p.type] ?? 0) + (p.sub ? 0 : 0); } setStat(def.id, { shown, byKey }); }
     };
     apply(); const i = setInterval(apply, 60_000); const onIdle = () => { if (map.getLayer(dot)) { apply(); map.off("idle", onIdle); } }; map.on("idle", onIdle);
     return () => { clearInterval(i); map.off("idle", onIdle); };

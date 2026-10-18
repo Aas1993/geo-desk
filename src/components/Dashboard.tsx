@@ -14,6 +14,7 @@ import { Skeleton } from "./ui";
 import { ClosestPartners } from "./Partnership";
 import { ExportDemand } from "./OutlookCard";
 import type { CountryDetail } from "@/lib/types";
+import { safeHttp } from "@/lib/url";
 
 type L = "en" | "ar";
 const km = (a: [number, number], b: [number, number]) => { const r = Math.PI / 180, dLat = (b[1] - a[1]) * r, dLon = (b[0] - a[0]) * r, x = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.sin(dLon / 2) ** 2; return 12742 * Math.asin(Math.sqrt(x)); };
@@ -46,7 +47,7 @@ function Wid({ id, children }: { id: WidgetId; children: React.ReactNode }) {
 }
 const Li = ({ children }: { children: React.ReactNode }) => <li className="py-1.5 text-[12.5px] leading-snug text-t0">{children}</li>;
 const Meta = ({ children }: { children: React.ReactNode }) => <div className="num mt-0.5 text-[10.5px] text-t2">{children}</div>;
-const A = ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href} target="_blank" rel="noreferrer noopener" className="hover:text-accent">{children}</a>;
+const A = ({ href, children }: { href: string; children: React.ReactNode }) => <a href={safeHttp(href)} target="_blank" rel="noreferrer noopener" className="hover:text-accent">{children}</a>;
 
 /* ───────── widgets ───────── */
 type WeatherFC = { features: { properties: { id: string; title: string; desc?: string }; geometry: { coordinates: [number, number] } }[] };

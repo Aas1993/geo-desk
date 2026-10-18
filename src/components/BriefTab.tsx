@@ -4,6 +4,7 @@ import { Sparkles, RefreshCw, Copy, Download, ExternalLink } from "lucide-react"
 import { useT } from "@/lib/store";
 import { useNow } from "@/lib/use-now";
 import type { Country } from "@/lib/types";
+import { safeHttp } from "@/lib/url";
 
 type Fact = { id: string; kind: string; text: string; src: string; url?: string };
 type Brief = { headline: string; confidence: "low" | "medium" | "high"; sections: { key: string; bullets: { text: string; basis: string[] }[] }[] };
@@ -81,12 +82,12 @@ export function BriefTab({ c }: { c: Country }) {
               <h3 className="label mb-1.5">{L(s.key)}</h3>
               <ul className="space-y-2">{s.bullets.map((b, i) => (
                 <li key={i} className="text-[13px] leading-relaxed text-t0">{b.text}{" "}
-                  {b.basis.length ? b.basis.map((id) => { const f = facts.get(id); const chip = <span key={id} title={f ? `${f.text} (${f.src})` : id} className="num mx-0.5 inline-block rounded bg-bg3 px-1 text-[10.5px] text-t1">{id}</span>; return f?.url ? <a key={id} href={f.url} target="_blank" rel="noreferrer noopener" className="hover:text-accent">{chip}</a> : chip; })
+                  {b.basis.length ? b.basis.map((id) => { const f = facts.get(id); const chip = <span key={id} title={f ? `${f.text} (${f.src})` : id} className="num mx-0.5 inline-block rounded bg-bg3 px-1 text-[10.5px] text-t1">{id}</span>; return f?.url ? <a key={id} href={safeHttp(f.url)} target="_blank" rel="noreferrer noopener" className="hover:text-accent">{chip}</a> : chip; })
                     : s.key !== "outlook" && <span className="text-[11px] italic text-t2">({u.background})</span>}</li>))}</ul>
             </section>))}
           {!!saved.gaps.length && <p className="text-[12px] text-t2"><b>{u.gaps}:</b> {saved.gaps.join(" ")}</p>}
           <details className="rounded-[10px] border border-line bg-bg1/60 p-3 text-[12px] text-t1"><summary className="cursor-pointer text-t0">{u.based} ({saved.facts.length})</summary>
-            <ul className="mt-2 space-y-1.5">{saved.facts.map((f) => <li key={f.id}><span className="num me-1 text-t2">{f.id}</span>{f.text.slice(0, 220)} <span className="text-t2">· {f.src}</span>{f.url && <a href={f.url} target="_blank" rel="noreferrer noopener" className="ms-1 inline-flex align-middle text-accent" aria-label="Open source"><ExternalLink size={11} /></a>}</li>)}</ul></details>
+            <ul className="mt-2 space-y-1.5">{saved.facts.map((f) => <li key={f.id}><span className="num me-1 text-t2">{f.id}</span>{f.text.slice(0, 220)} <span className="text-t2">· {f.src}</span>{f.url && <a href={safeHttp(f.url)} target="_blank" rel="noreferrer noopener" className="ms-1 inline-flex align-middle text-accent" aria-label="Open source"><ExternalLink size={11} /></a>}</li>)}</ul></details>
           <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
             <button onClick={copy} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Copy size={13} />{copied ? u.copied : u.copy}</button>
             <button onClick={download} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Download size={13} />{u.download}</button>

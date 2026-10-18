@@ -8,14 +8,15 @@ const stamp = (ts: string) => Date.UTC(+ts.slice(0, 4), +ts.slice(4, 6) - 1, +ts
 const fmt = (ms: number) => new Date(ms).toISOString().replace(/[-:T]/g, "").slice(0, 14);
 
 async function file(ts: string): Promise<string[]> {
-  const r = await fetch(`http://data.gdeltproject.org/gdeltv2/${ts}.export.CSV.zip`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(25_000), cache: "no-store" });
+  const r = await fetch(`https://data.gdeltproject.org/gdeltv2/${ts}.export.CSV.zip`, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(25_000), cache: "no-store" });
   if (!r.ok) return [];
-  const files = unzipSync(new Uint8Array(await r.arrayBuffer())); const first = Object.values(files)[0];
+  const buf = new Uint8Array(await r.arrayBuffer()); if (buf.length > 20_000_000) return []; // a 15-minute file is under 2 MB; refuse anything absurd
+  const files = unzipSync(buf, { filter: (f) => f.originalSize < 100_000_000 }); const first = Object.values(files)[0];
   return new TextDecoder().decode(first).split("\n");
 }
 /** Last ~90 minutes of coded events, clustered by place and kind so one big story is one marker. */
 export async function events(): Promise<GeoJSON.FeatureCollection> {
-  const head = await (await fetch("http://data.gdeltproject.org/gdeltv2/lastupdate.txt", { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15_000), cache: "no-store" })).text();
+  const head = await (await fetch("https://data.gdeltproject.org/gdeltv2/lastupdate.txt", { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15_000), cache: "no-store" })).text();
   const latest = head.split("\n")[0].split(" ")[2]?.match(/(\d{14})\.export/)?.[1]; if (!latest) throw new Error("GDELT index unavailable");
   const base = stamp(latest); const stamps = Array.from({ length: 6 }, (_, i) => fmt(base - i * 15 * 60_000));
   const lines = (await Promise.allSettled(stamps.map(file))).flatMap((r) => (r.status === "fulfilled" ? r.value : []));

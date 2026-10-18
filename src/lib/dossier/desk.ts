@@ -48,7 +48,7 @@ export const PRESETS: { id: string; en: string; ar: string; topics: string[] }[]
   { id: "joint", en: "Joint political and economic", ar: "السياسي والاقتصادي معًا", topics: T("leadership", "domestic", "foreign", "security", "sanctions", "macro", "fiscal", "external", "trade", "investment", "sectors", "history", "agreements", "scenarios", "watch", "actions") },
   { id: "all", en: "Everything", ar: "كل شيء", topics: ALL_TOPICS },
 ];
-export const DESK_LENGTHS = [["short", "Short (about 1,500 words)", "قصير (نحو 1500 كلمة)"], ["standard", "Standard (about 4,000 words)", "قياسي (نحو 4000 كلمة)"], ["detailed", "Detailed (about 8,000 words)", "مفصّل (نحو 8000 كلمة)"], ["exhaustive", "Exhaustive (about 14,000 words)", "شامل جدًا (نحو 14000 كلمة)"]] as const;
+export const DESK_LENGTHS = [["short", "Short (about 1,500 words)", "قصير (نحو 1500 كلمة)"], ["standard", "Standard (about 4,000 words)", "قياسي (نحو 4000 كلمة)"], ["detailed", "Detailed (about 6,000 words)", "مفصّل (نحو 6000 كلمة)"], ["exhaustive", "Exhaustive (up to about 10,000 words)", "شامل جدًا (حتى نحو 10000 كلمة)"]] as const;
 export const DESK_STYLES = [["bullets", "Bullet summary", "نقاط موجزة"], ["analysis", "Analytical prose", "تحليل نثري"], ["full", "Full analysis with evidence tables", "تحليل كامل مع جداول الأدلة"]] as const;
 export const DESK_HORIZONS = [["30d", "Last 30 days", "آخر 30 يومًا"], ["12m", "Last 12 months", "آخر 12 شهرًا"], ["5y", "Five years", "خمس سنوات"]] as const;
 export const DESK_LENSES = [["joint", "Political and economic", "السياسي والاقتصادي"], ["political", "Political emphasis", "تركيز سياسي"], ["economic", "Economic emphasis", "تركيز اقتصادي"]] as const;
@@ -63,10 +63,10 @@ export function cleanDeskOptions(b: Record<string, unknown>): DeskOptions {
 export const deskKey = (iso3: string, o: DeskOptions) => { const s = JSON.stringify([o.topics, o.custom, o.length, o.style, o.horizon, o.lens, o.lang, o.context]); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return `desk:${iso3}:${o.lang}:${o.length}:${h >>> 0}`; };
 /** Search and fetch budgets and output ceilings per length: these bound what one run can cost. */
 export const DESK_BUDGET: Record<DeskLength, { maxTokens: number; searches: number; fetches: number; fetchTokens: number; words: number }> = {
-  short: { maxTokens: 14_000, searches: 6, fetches: 3, fetchTokens: 20_000, words: 1500 },
-  standard: { maxTokens: 32_000, searches: 10, fetches: 6, fetchTokens: 25_000, words: 4000 },
-  detailed: { maxTokens: 50_000, searches: 16, fetches: 10, fetchTokens: 30_000, words: 8000 },
-  exhaustive: { maxTokens: 64_000, searches: 22, fetches: 14, fetchTokens: 30_000, words: 14000 },
+  short: { maxTokens: 12_000, searches: 5, fetches: 1, fetchTokens: 8_000, words: 1500 },
+  standard: { maxTokens: 24_000, searches: 8, fetches: 2, fetchTokens: 10_000, words: 4000 },
+  detailed: { maxTokens: 38_000, searches: 12, fetches: 3, fetchTokens: 12_000, words: 6000 },
+  exhaustive: { maxTokens: 50_000, searches: 14, fetches: 4, fetchTokens: 12_000, words: 10000 },
 };
 const label = (key: string) => DESK_TOPICS.flatMap((g) => g.items).find((i) => i.key === key)?.en ?? key;
 
@@ -99,10 +99,13 @@ Where a topic needs UAE internal records, positions or mandates (for example con
 - "Watchlist": a table (indicator or event, trigger or date, why it matters to the UAE, what to do).
 
 # Length and balance
-The request gives a total word target. Spend about 10 percent on Part 1 and 10 percent on Part 3 and divide the rest across the chosen topics, giving more to topics that matter more under the stated lens (political emphasis, economic emphasis or joint) and to topics where the evidence is richest. Stay within about 15 percent of the target in total. Tables and links cost space: plan the budget so that all three parts are finished, and shorten topic sections rather than leave out Part 3 or end mid-sentence. In a short brief, keep Part 3 to the chronology and the watchlist. Never pad: if the evidence is thin, say so and keep that section short.
+The request gives a total word target. Spend about 10 percent on Part 1 and 10 percent on Part 3 and divide the rest across the chosen topics, giving more to topics that matter more under the stated lens (political emphasis, economic emphasis or joint) and to topics where the evidence is richest. For the Detailed and Exhaustive lengths treat the target as a floor: write at least 85 percent of it, spending the extra on evidence tables, drivers and implications for the UAE, never on repetition. Stay within about 15 percent above the target in total. Tables and links cost space: plan the budget so that all three parts are finished, and shorten topic sections rather than leave out Part 3 or end mid-sentence. In a short brief, keep Part 3 to the chronology and the watchlist. Never pad: if the evidence is thin, say so and keep that section short.
 
 # Horizon
 The request gives a time horizon (last 30 days, last 12 months or five years). Weight developments and data inside it, mention longer-run context only where it changes the reading, and date every item. Today's date is given in the request: do not cite anything dated after it.
+
+# Cost discipline
+Every run has a hard ceiling of about one US dollar, and web searches and fetched pages are what use it up. Plan the searches before you start: list what the facts lack, then run only the searches that fill those gaps, never the same query twice. Prefer what the search results already say over fetching a page, and fetch a page only to verify a number that decides a conclusion. Write each section once, in final form: no drafts, no preamble, no restating the same fact in several sections (refer to it instead). Keep tables compact. If you are running short of budget, finish every part in shorter form rather than leave a part out.
 
 # Research method
 Start from the facts, then research with the tools only what the facts lack, topic by topic, preferring official, institutional and primary sources with dates. Stop once a topic is adequately supported. Write in the requested language; for Arabic use Modern Standard Arabic, keep URLs and fact ids such as F12 in Latin characters and keep table structure.`;

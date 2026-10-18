@@ -6,6 +6,7 @@ import { briefingHtml, mdToHtml } from "./dossier/export";
 import { SYSTEM, userMessage } from "./dossier/prompt";
 import { buildDeck, parseSections } from "./dossier/deck";
 import { noteText, oneLine, rejectCrossSite, safeMessage } from "./guard";
+import { PRICE, maxRunUsd, outputRoom, runUsd } from "./dossier/cost";
 import { ALL_TOPICS, DESK_BUDGET, DESK_SYSTEM, DESK_TOPICS, PRESETS, cleanDeskOptions, deskKey, deskMessage } from "./dossier/desk";
 
 const d = cleanOptions({});
@@ -31,6 +32,12 @@ assert.ok(html.includes("<table>") && html.includes("&lt;script&gt;") && !html.i
 assert.ok(html.includes("<b>bold</b>") && html.includes("<ul><li>one</li><li>two</li></ul>") && html.includes('<h1 class="part">'));
 const doc = briefingHtml("# T", { title: "A & B", rtl: true, foot: "f", classification: "c" }, true);
 assert.ok(doc.includes('dir="rtl"') && doc.includes("A &amp; B") && doc.includes("urn:schemas-microsoft-com:office:word"));
+// cost: the ceiling defaults to one dollar and can never be raised past five; money is computed from tokens and searches; output room shrinks as money is spent
+assert.equal(maxRunUsd(undefined), 1); assert.equal(maxRunUsd("0.5"), 0.5); assert.equal(maxRunUsd("50"), 5); assert.equal(maxRunUsd("junk"), 1); assert.equal(maxRunUsd("-3"), 1);
+const t0 = { input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000, searches: 100 };
+assert.ok(Math.abs(runUsd(t0, "claude-sonnet-5-5") - (2 + 10 + 0.2 + 2.5 + 1)) < 1e-9); assert.ok(Math.abs(runUsd(t0, "claude-opus-5-5") - (4 + 20 + 0.2 + 5 + 1)) < 1e-9); assert.equal(runUsd(t0, "some-new-model"), runUsd(t0, "claude-opus-5-5"), "an unknown model is priced like the dearest one");
+assert.ok(PRICE["claude-sonnet-5-5"].out < PRICE["claude-opus-5-5"].out);
+assert.ok(outputRoom(0, 1, "claude-sonnet-5-5") > outputRoom(0.5, 1, "claude-sonnet-5-5") && outputRoom(0.95, 1, "claude-sonnet-5-5") === 0 && outputRoom(0, 1, "claude-opus-5-5") < outputRoom(0, 1, "claude-sonnet-5-5"));
 // guard: only same-origin JSON may start a paid run; untrusted text cannot forge fact lines or close tags
 const rq = (h: Record<string, string>) => new Request("http://localhost:3020/api/x", { method: "POST", headers: h });
 assert.equal(rejectCrossSite(rq({ "content-type": "application/json", host: "localhost:3020" })), null);

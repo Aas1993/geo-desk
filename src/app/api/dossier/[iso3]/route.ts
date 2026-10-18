@@ -5,18 +5,17 @@ import { DESK_BUDGET, DESK_SYSTEM, cleanDeskOptions, deskKey, deskMessage } from
 import { SYSTEM, userMessage } from "@/lib/dossier/prompt";
 import { renderFacts } from "@/lib/ask/facts";
 import { rejectCrossSite, safeMessage } from "@/lib/guard";
+import { PRICE, maxRunUsd, outputRoom, runUsd } from "@/lib/dossier/cost";
 
 export const maxDuration = 800; // a comprehensive briefing researches and writes for several minutes
-const MODEL = process.env.DOSSIER_MODEL || "claude-opus-5-5";
+const MODEL = process.env.DOSSIER_MODEL || "claude-sonnet-5-5"; // Sonnet by default: about half the price of Opus per token, which is what keeps a run under the dollar ceiling
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
-const EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as (typeof EFFORTS)[number]) : "medium";
+const ENV_EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as (typeof EFFORTS)[number]) : null; // otherwise: low for short runs (less thinking, fewer tokens), medium for long ones
+const effortFor = (long: boolean): (typeof EFFORTS)[number] => ENV_EFFORT ?? (long ? "medium" : "low");
 const MAX_PER_HOUR = Math.max(1, +(process.env.DOSSIER_MAX_PER_HOUR ?? 4) || 4);
 const TTL = 6 * 3600_000;
-// $ per million tokens (Anthropic price list, cached 2026-10-06) and about $0.01 per web search; the figure shown is an estimate. Unknown models report no dollar figure.
-const PRICE: Record<string, { in: number; out: number; cacheRead: number; cacheWrite: number }> = { "claude-opus-5-5": { in: 4, out: 20, cacheRead: 0.2, cacheWrite: 5 }, "claude-sonnet-5-5": { in: 2, out: 10, cacheRead: 0.2, cacheWrite: 2.5 } };
-const SEARCH_USD = 0.01;
 const MAX_CONCURRENT = 2; // runs in flight at once, whatever their options
-const MAX_RUN_USD = Math.max(1, +(process.env.DOSSIER_MAX_RUN_USD ?? 6) || 6); // a run stops researching once its estimated cost passes this
+const MAX_RUN_USD = maxRunUsd(process.env.DOSSIER_MAX_RUN_USD); // a run never spends more than this: the output room shrinks as money is spent, and a stream is cut off the moment the running total passes it
 const MAX_TURNS = 4;
 const BLOCKED = ["adx.ae"]; // ADX's terms prohibit automated retrieval
 
@@ -29,7 +28,7 @@ const prune = () => { const now = Date.now(); for (const [k, v] of store.cache) 
 
 export async function GET() {
   const recent = store.runs.filter((t) => Date.now() - t < 3600_000).length;
-  return Response.json({ enabled: process.env.DOSSIER_ENABLED !== "0", model: MODEL, effort: EFFORT, remainingThisHour: Math.max(0, MAX_PER_HOUR - recent), budget: BUDGET }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ enabled: process.env.DOSSIER_ENABLED !== "0", model: MODEL, effort: ENV_EFFORT ?? "low/medium", maxRunUsd: MAX_RUN_USD, remainingThisHour: Math.max(0, MAX_PER_HOUR - recent), budget: BUDGET }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ iso3: string }> }) {
@@ -63,49 +62,63 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
           ...(bud.searches - u.searches > 0 ? [{ type: "web_search_20260209", name: "web_search", max_uses: bud.searches - u.searches, blocked_domains: BLOCKED }] : []),
           ...(bud.fetches - u.fetches > 0 ? [{ type: "web_fetch_20260209", name: "web_fetch", max_uses: bud.fetches - u.fetches, blocked_domains: BLOCKED, max_content_tokens: bud.fetchTokens }] : []),
         ] as unknown as Anthropic.Beta.BetaToolUnion[];
-        const cost = () => { const pr = PRICE[MODEL] ?? PRICE["claude-opus-5-5"]; return (u.input * pr.in + u.output * pr.out + u.cacheRead * pr.cacheRead + u.cacheWrite * pr.cacheWrite) / 1e6 + u.searches * SEARCH_USD; };
-        let messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: desk ? deskMessage({ facts: renderFacts(gathered.facts, gathered.gaps), asOf: new Date().toISOString(), country: gathered.name, options: deskOptions! }) : userMessage({ facts: renderFacts(gathered.facts, gathered.gaps), asOf: new Date().toISOString(), country: gathered.name, options: options! }) }];
+        const cost = () => runUsd(u, MODEL);
+        const firstText = desk ? deskMessage({ facts: renderFacts(gathered.facts, gathered.gaps), asOf: new Date().toISOString(), country: gathered.name, options: deskOptions! }) : userMessage({ facts: renderFacts(gathered.facts, gathered.gaps), asOf: new Date().toISOString(), country: gathered.name, options: options! });
+        let messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: [{ type: "text", text: firstText, cache_control: { type: "ephemeral" } }] }]; // cached, so the continuation turns read the facts at the cache price
         const sources: Source[] = []; const seen = new Map<string, Source>(); let report = ""; let stop: string | null = null;
         const addSource = (url: string, title: string, kind: Source["kind"]) => {
           if (!/^https?:\/\//i.test(url)) return; const prev = seen.get(url);
           if (prev) { if (kind === "fetch" && prev.kind !== "fetch") { prev.kind = "fetch"; send({ type: "source", ...prev }); } return; }
           const s = { url, title: title || url, kind }; seen.set(url, s); sources.push(s); send({ type: "source", ...s });
         };
-        for (let turn = 0; turn < MAX_TURNS; turn++) {
+        const long = desk ? deskOptions!.length === "detailed" || deskOptions!.length === "exhaustive" : options!.depth === "comprehensive"; let costStopped = false;
+        for (let turn = 0; turn < MAX_TURNS && !costStopped; turn++) {
+          // output room shrinks as money is spent, so one turn can never plan to write past the ceiling
+          const maxTok = Math.max(1500, Math.min(bud.maxTokens, outputRoom(cost(), MAX_RUN_USD, MODEL)));
+          const tac = new AbortController(); ac.signal.addEventListener("abort", () => tac.abort(), { once: true });
           const s = client.beta.messages.stream({
-            model: MODEL, max_tokens: bud.maxTokens, system: [{ type: "text", text: desk ? DESK_SYSTEM : SYSTEM, cache_control: { type: "ephemeral" } }], messages, tools: toolsLeft(),
-            output_config: { effort: EFFORT }, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
-          }, { signal: ac.signal });
+            model: MODEL, max_tokens: maxTok, system: [{ type: "text", text: desk ? DESK_SYSTEM : SYSTEM, cache_control: { type: "ephemeral" } }], messages, tools: toolsLeft(),
+            output_config: { effort: effortFor(long) },
+          }, { signal: tac.signal });
           const pending = new Map<number, { name: string; json: string; start: Record<string, unknown> }>();
-          for await (const ev of s) {
-            if (ev.type === "content_block_start") {
-              const b = ev.content_block as unknown as { type: string; name?: string; content?: unknown; input?: Record<string, unknown> };
-              if (b.type === "server_tool_use") pending.set(ev.index, { name: b.name ?? "tool", json: "", start: b.input ?? {} });
-              else if (b.type === "web_search_tool_result") { if (Array.isArray(b.content)) for (const r of b.content as { url?: string; title?: string }[]) addSource(r.url ?? "", r.title ?? "", "search"); else send({ type: "status", text: "A web search returned an error; continuing with other sources." }); }
-              else if (b.type === "web_fetch_tool_result") { const c = b.content as { type?: string; url?: string; error_code?: string; content?: { title?: string } } | undefined; if (c?.type === "web_fetch_result" && c.url) addSource(c.url, c.content?.title ?? "", "fetch"); else send({ type: "status", text: `A page could not be fetched (${c?.error_code ?? "error"}); continuing.` }); }
-            } else if (ev.type === "content_block_delta") {
-              if (ev.delta.type === "text_delta") { report += ev.delta.text; send({ type: "text", delta: ev.delta.text }); }
-              else if (ev.delta.type === "input_json_delta") { const p = pending.get(ev.index); if (p) p.json += ev.delta.partial_json; }
-            } else if (ev.type === "content_block_stop") {
-              const p = pending.get(ev.index);
-              if (p) { pending.delete(ev.index); let input: Record<string, unknown> = p.start; try { const d = JSON.parse(p.json || "{}"); if (Object.keys(d).length) input = d; } catch {}
-                if (p.name === "web_search") { u.searches++; send({ type: "tool", name: "search", detail: String(input.query ?? "") }); }
-                else if (p.name === "web_fetch") { u.fetches++; send({ type: "tool", name: "fetch", detail: String(input.url ?? "") }); }
-                else send({ type: "tool", name: "analyse", detail: "" }); }
+          const turnStart = report.length; const live = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 }; // this turn's tokens so far, read from the stream, so the ceiling is enforced while it runs
+          const liveUsd = () => runUsd({ input: u.input + live.input, output: u.output + live.output, cacheRead: u.cacheRead + live.cacheRead, cacheWrite: u.cacheWrite + live.cacheWrite, searches: u.searches }, MODEL);
+          try {
+            for await (const ev of s) {
+              if (ev.type === "message_start") { const mu = ev.message.usage; live.input = mu.input_tokens ?? 0; live.cacheRead = mu.cache_read_input_tokens ?? 0; live.cacheWrite = mu.cache_creation_input_tokens ?? 0; }
+              else if (ev.type === "message_delta") { live.output = ev.usage.output_tokens ?? live.output; }
+              else if (ev.type === "content_block_start") {
+                const b = ev.content_block as unknown as { type: string; name?: string; content?: unknown; input?: Record<string, unknown> };
+                if (b.type === "server_tool_use") pending.set(ev.index, { name: b.name ?? "tool", json: "", start: b.input ?? {} });
+                else if (b.type === "web_search_tool_result") { if (Array.isArray(b.content)) for (const r of b.content as { url?: string; title?: string }[]) addSource(r.url ?? "", r.title ?? "", "search"); else send({ type: "status", text: "A web search returned an error; continuing with other sources." }); }
+                else if (b.type === "web_fetch_tool_result") { const c = b.content as { type?: string; url?: string; error_code?: string; content?: { title?: string } } | undefined; if (c?.type === "web_fetch_result" && c.url) addSource(c.url, c.content?.title ?? "", "fetch"); else send({ type: "status", text: `A page could not be fetched (${c?.error_code ?? "error"}); continuing.` }); }
+              } else if (ev.type === "content_block_delta") {
+                if (ev.delta.type === "text_delta") { report += ev.delta.text; send({ type: "text", delta: ev.delta.text }); live.output = Math.max(live.output, Math.round((report.length - turnStart) / 2.8)); } // text tokens so far, a little over-counted on purpose; the exact figure arrives with message_delta
+                else if (ev.delta.type === "input_json_delta") { const p = pending.get(ev.index); if (p) p.json += ev.delta.partial_json; }
+              } else if (ev.type === "content_block_stop") {
+                const p = pending.get(ev.index);
+                if (p) { pending.delete(ev.index); let input: Record<string, unknown> = p.start; try { const d = JSON.parse(p.json || "{}"); if (Object.keys(d).length) input = d; } catch {}
+                  if (p.name === "web_search") { u.searches++; send({ type: "tool", name: "search", detail: String(input.query ?? "") }); }
+                  else if (p.name === "web_fetch") { u.fetches++; send({ type: "tool", name: "fetch", detail: String(input.url ?? "") }); }
+                  else send({ type: "tool", name: "analyse", detail: "" }); }
+              }
+              if (!costStopped && liveUsd() > MAX_RUN_USD) { costStopped = true; tac.abort(); }
             }
-          }
+          } catch (e) { if (!costStopped) throw e; }
+          if (costStopped) { u.input += live.input; u.output += live.output; u.cacheRead += live.cacheRead; u.cacheWrite += live.cacheWrite; stop = "cost"; send({ type: "status", text: `Stopped at the per-run cost limit of $${MAX_RUN_USD.toFixed(2)}.` }); break; }
           const m = await s.finalMessage(); stop = m.stop_reason;
           u.input += m.usage.input_tokens ?? 0; u.output += m.usage.output_tokens ?? 0; u.cacheRead += m.usage.cache_read_input_tokens ?? 0; u.cacheWrite += m.usage.cache_creation_input_tokens ?? 0;
-          if (m.stop_reason === "pause_turn" && cost() > MAX_RUN_USD) { send({ type: "status", text: `Stopped researching: the estimated cost passed the per-run limit of $${MAX_RUN_USD}.` }); break; }
+          if (m.stop_reason === "pause_turn" && cost() > MAX_RUN_USD * 0.9) { send({ type: "status", text: "Stopped researching: close to the per-run cost limit." }); break; }
           if (m.stop_reason === "pause_turn") { messages = [...messages, { role: "assistant", content: m.content as Anthropic.Beta.BetaContentBlockParam[] }]; send({ type: "status", text: "Still researching…" }); continue; }
           break;
         }
+        if (costStopped) report += `\n\n> Stopped at the per-run cost limit of $${MAX_RUN_USD.toFixed(2)}: this briefing is incomplete. Choose a shorter length or fewer topics for a complete one.\n`;
         if (stop === "refusal") { send({ type: "error", error: "refusal", message: "The model declined to write this briefing." }); return finish(); }
-        const pr = PRICE[MODEL]; if (pr) u.usd = (u.input * pr.in + u.output * pr.out + u.cacheRead * pr.cacheRead + u.cacheWrite * pr.cacheWrite) / 1e6 + u.searches * SEARCH_USD;
+        u.usd = PRICE[MODEL] ? cost() : null;
         const known = new Set(gathered.facts.map((f) => f.id)); const checked = report.replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => (ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`);
         const done: Done = { report: checked, sources, tiles: gathered.tiles, usage: u, at: new Date().toISOString(), model: MODEL, options: desk ? { ...deskOptions, kind: "desk" } : options, name: gathered.name };
         if (report.trim()) { store.cache.set(key, done); prune(); }
-        send({ type: "done", cached: false, truncated: stop === "max_tokens", ...done });
+        send({ type: "done", cached: false, truncated: stop === "max_tokens" || stop === "cost", costStopped, ...done });
       } catch (e) {
         if (ac.signal.aborted) return finish();
         const authish = e instanceof Error && /authentication|api key|credential|x-api-key|oauth|refresh token|invalid_grant|expired/i.test(e.message);

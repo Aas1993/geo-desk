@@ -48,6 +48,9 @@ Sections, each opening with a two-line "Why it matters to the UAE" box (blockquo
 # Options and depth
 The user message gives the counterpart, meeting type, depth, focus areas and language. Honour the depth: executive means Part 1 only, plus the three talking points that matter most and the anticipated questions in compressed form inside Part 1, and no Parts 2 or 3 headings; standard means all three parts with Part 2 reduced to the essentials of each section; comprehensive means everything at full depth. Give the focus areas more depth and the others less, never omit a section that the depth requires. Keep to the stated length. Write in the requested language; for Arabic use Modern Standard Arabic, keep URLs and fact ids such as F12 in Latin characters and keep table structure.
 
+# Cost discipline
+Every run has a hard ceiling of about one US dollar, and web searches and fetched pages are what use it up. Plan the searches before you start: list what the facts lack, then run only the searches that fill those gaps, never the same query twice. Prefer what the search results already say over fetching a page, and fetch a page only to verify a number that decides a conclusion. Write each section once, in final form: no drafts, no preamble, no restating the same fact in several sections (refer to it instead). Keep tables compact. If you are running short of budget, finish every part in shorter form rather than leave a part out.
+
 # Research method
 Start from the facts, then research with the tools only what the facts lack: current office-holders, political situation and elections, credit ratings, macro figures and forecasts, UAE-linked projects and companies, the counterpart's published priorities and their previous statements on the UAE, regional developments. Prefer recent sources and give their dates. Stop researching once a section is adequately supported; do not exhaust the budget for its own sake.`;
 

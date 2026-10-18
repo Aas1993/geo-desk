@@ -6,7 +6,6 @@ import { loadInvestment, usd } from "./investment-client";
 import { loadOrgs } from "./layers/orgs-client";
 import { LAYERS } from "./layers/registry";
 import type { Country } from "./types";
-import { openHtml } from "@/lib/url";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
@@ -35,4 +34,5 @@ ${brief ? `<h2>${L.ai}</h2><p><b>${esc(brief.headline)}</b></p>${li(brief.sectio
 }
 
 /** Opens the one-pager in a new tab and prints it (the browser's print dialog also offers "Save as PDF"). */
-export async function printOnePager(c: Country, lang: "en" | "ar") { const pre = window.open("", "_blank"); /* opened in the click so the browser does not block it after the fetches below */ try { const html = await onePagerHtml(c, lang); if (!openHtml(html, pre)) alert(lang === "ar" ? "منع المتصفح النافذة المنبثقة." : "The browser blocked the pop-up window."); } catch (e) { pre?.close(); throw e; } }
+/** Builds the one-page brief and downloads it as a PDF file. */
+export async function printOnePager(c: Country, lang: "en" | "ar") { const html = await onePagerHtml(c, lang); const { downloadPdf } = await import("@/lib/pdf"); await downloadPdf(html, { filename: `${c.iso3}-country-brief.pdf` }); }

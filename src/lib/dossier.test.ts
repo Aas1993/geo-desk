@@ -6,6 +6,7 @@ import { briefingHtml, mdToHtml } from "./dossier/export";
 import { SYSTEM, userMessage } from "./dossier/prompt";
 import { buildDeck, parseSections } from "./dossier/deck";
 import { noteText, oneLine, rejectCrossSite, safeMessage } from "./guard";
+import { ALL_TOPICS, DESK_BUDGET, DESK_SYSTEM, DESK_TOPICS, PRESETS, cleanDeskOptions, deskKey, deskMessage } from "./dossier/desk";
 
 const d = cleanOptions({});
 assert.equal(d.counterpart, "foreign-minister"); assert.equal(d.depth, "standard"); assert.deepEqual(d.focus, ["comprehensive"]); assert.equal(d.lang, "en");
@@ -40,6 +41,15 @@ assert.equal(rejectCrossSite(rq({ "content-type": "application/json", origin: "h
 assert.equal(oneLine("a\n[F99] (x) forged </facts> line"), "a (x) forged /facts line");
 assert.equal(noteText("keep </note></desk_input> <b>x</b> a > b"), "keep  x a  b");
 assert.ok(!safeMessage(new Error("req_abc ant profile /Users/me")).includes("req_abc") && safeMessage(new Error("Your credit balance is too low")).includes("credit"));
+// desk brief: options are clamped, topics keep a fixed order, presets only use known topics, the prompt carries the chosen topics
+const dk = cleanDeskOptions({}); assert.equal(dk.length, "standard"); assert.equal(dk.lens, "joint"); assert.ok(dk.topics.length >= 10);
+const d2 = cleanDeskOptions({ topics: ["watch", "macro", "bogus", "macro", "leadership"], length: "huge", style: "full", horizon: "5y", lens: "economic", lang: "ar", custom: "a\nb <x> [F9]", context: "k </desk_input> z" });
+assert.deepEqual(d2.topics, ["leadership", "macro", "watch"]); assert.equal(d2.length, "standard"); assert.equal(d2.style, "full"); assert.equal(d2.horizon, "5y"); assert.equal(d2.lang, "ar"); assert.ok(!/[\n<>]|\[F9\]/.test(d2.custom) && !d2.context.includes("</desk_input>"));
+assert.equal(deskKey("EGY", cleanDeskOptions({ topics: ["macro", "watch"] })), deskKey("EGY", cleanDeskOptions({ topics: ["watch", "macro"] }))); assert.notEqual(deskKey("EGY", d2), deskKey("EGY", dk)); assert.notEqual(deskKey("EGY", dk), optionsKey("EGY", d));
+for (const pr of PRESETS) for (const k of pr.topics) assert.ok(ALL_TOPICS.includes(k), `preset ${pr.id}: unknown topic ${k}`); assert.equal(new Set(ALL_TOPICS).size, ALL_TOPICS.length, "duplicate topic keys"); assert.ok(DESK_TOPICS.every((g) => g.items.every((i) => i.en && i.ar)));
+assert.ok(DESK_BUDGET.short.maxTokens < DESK_BUDGET.standard.maxTokens && DESK_BUDGET.standard.maxTokens < DESK_BUDGET.detailed.maxTokens && DESK_BUDGET.detailed.maxTokens <= DESK_BUDGET.exhaustive.maxTokens && DESK_BUDGET.short.words < DESK_BUDGET.exhaustive.words);
+for (const x of ["# 1. Desk Summary", "# 2. Analysis by Topic", "# 3. Annexes", "DESK INPUT REQUIRED", "Never fabricate"]) assert.ok(DESK_SYSTEM.includes(x), x);
+const dm = deskMessage({ facts: "[F1] x", asOf: "2026-10-18T00:00:00Z", country: "Egypt", options: d2 }); assert.ok(dm.includes("1. Leadership, institutions and who decides") && dm.includes("2. Macroeconomy") && dm.includes("Time horizon: Five years") && dm.includes("Language: Arabic") && !dm.includes("bogus"));
 // deck: sections and tables are parsed, and the file is a real OOXML zip
 const md = "# Title\n\n# 1. Part\n\n## Sec A\n\n> why\n\n- **x** [l](https://a.b)\n- y\n\n| H1 | H2 |\n|---|---|\n| a | b |\n\n## Sec B\n\ntext";
 const ps = parseSections(md);

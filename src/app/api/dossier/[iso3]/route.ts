@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { dossierFacts, type Tile } from "@/lib/dossier/facts";
 import { BUDGET, cleanOptions, optionsKey } from "@/lib/dossier/options";
+import { DESK_BUDGET, DESK_SYSTEM, cleanDeskOptions, deskKey, deskMessage } from "@/lib/dossier/desk";
 import { SYSTEM, userMessage } from "@/lib/dossier/prompt";
 import { renderFacts } from "@/lib/ask/facts";
 import { rejectCrossSite, safeMessage } from "@/lib/guard";
@@ -35,7 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
   if (process.env.DOSSIER_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const bad = rejectCrossSite(req); if (bad) return bad;
   const { iso3: raw } = await params; const iso3 = raw.toUpperCase(); if (!/^[A-Z]{3}$/.test(iso3) || iso3 === "ARE") return Response.json({ error: "bad_request" }, { status: 400 });
-  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>; const options = cleanOptions(body); const refresh = body.refresh === true; const key = optionsKey(iso3, options);
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>; const desk = body.kind === "desk"; const options = desk ? null : cleanOptions(body); const deskOptions = desk ? cleanDeskOptions(body) : null; const refresh = body.refresh === true; const key = desk ? deskKey(iso3, deskOptions!) : optionsKey(iso3, options!);
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -56,14 +57,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
         if (gathered.facts.length < 6) { refund(); send({ type: "error", error: "thin", message: "Not enough data on this country yet." }); return finish(); }
         send({ type: "facts", count: gathered.facts.length, tiles: gathered.tiles, gaps: gathered.gaps });
         const u: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0, fetches: 0, usd: null };
-        const bud = BUDGET[options.depth]; const client = new Anthropic(); // credentials: ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login` profile
+        const bud = desk ? DESK_BUDGET[deskOptions!.length] : BUDGET[options!.depth]; const client = new Anthropic(); // credentials: ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login` profile
         // the budget is for the whole run: each continuation after a pause gets only what is left, and a tool with nothing left is withdrawn
         const toolsLeft = () => [
           ...(bud.searches - u.searches > 0 ? [{ type: "web_search_20260209", name: "web_search", max_uses: bud.searches - u.searches, blocked_domains: BLOCKED }] : []),
           ...(bud.fetches - u.fetches > 0 ? [{ type: "web_fetch_20260209", name: "web_fetch", max_uses: bud.fetches - u.fetches, blocked_domains: BLOCKED, max_content_tokens: bud.fetchTokens }] : []),
         ] as unknown as Anthropic.Beta.BetaToolUnion[];
         const cost = () => { const pr = PRICE[MODEL] ?? PRICE["claude-opus-5-5"]; return (u.input * pr.in + u.output * pr.out + u.cacheRead * pr.cacheRead + u.cacheWrite * pr.cacheWrite) / 1e6 + u.searches * SEARCH_USD; };
-        let messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: userMessage({ facts: renderFacts(gathered.facts, gathered.gaps), asOf: new Date().toISOString(), country: gathered.name, options }) }];
+        let messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: desk ? deskMessage({ facts: renderFacts(gathered.facts, gathered.gaps), asOf: new Date().toISOString(), country: gathered.name, options: deskOptions! }) : userMessage({ facts: renderFacts(gathered.facts, gathered.gaps), asOf: new Date().toISOString(), country: gathered.name, options: options! }) }];
         const sources: Source[] = []; const seen = new Map<string, Source>(); let report = ""; let stop: string | null = null;
         const addSource = (url: string, title: string, kind: Source["kind"]) => {
           if (!/^https?:\/\//i.test(url)) return; const prev = seen.get(url);
@@ -72,7 +73,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
         };
         for (let turn = 0; turn < MAX_TURNS; turn++) {
           const s = client.beta.messages.stream({
-            model: MODEL, max_tokens: bud.maxTokens, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }], messages, tools: toolsLeft(),
+            model: MODEL, max_tokens: bud.maxTokens, system: [{ type: "text", text: desk ? DESK_SYSTEM : SYSTEM, cache_control: { type: "ephemeral" } }], messages, tools: toolsLeft(),
             output_config: { effort: EFFORT }, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
           }, { signal: ac.signal });
           const pending = new Map<number, { name: string; json: string; start: Record<string, unknown> }>();
@@ -102,7 +103,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
         if (stop === "refusal") { send({ type: "error", error: "refusal", message: "The model declined to write this briefing." }); return finish(); }
         const pr = PRICE[MODEL]; if (pr) u.usd = (u.input * pr.in + u.output * pr.out + u.cacheRead * pr.cacheRead + u.cacheWrite * pr.cacheWrite) / 1e6 + u.searches * SEARCH_USD;
         const known = new Set(gathered.facts.map((f) => f.id)); const checked = report.replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => (ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`);
-        const done: Done = { report: checked, sources, tiles: gathered.tiles, usage: u, at: new Date().toISOString(), model: MODEL, options, name: gathered.name };
+        const done: Done = { report: checked, sources, tiles: gathered.tiles, usage: u, at: new Date().toISOString(), model: MODEL, options: desk ? { ...deskOptions, kind: "desk" } : options, name: gathered.name };
         if (report.trim()) { store.cache.set(key, done); prune(); }
         send({ type: "done", cached: false, truncated: stop === "max_tokens", ...done });
       } catch (e) {

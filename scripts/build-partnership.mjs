@@ -28,7 +28,7 @@ for (const c of countries) {
   const connectivity = Math.round(0.7 * sFl[c] + 0.3 * (raw[c].embassy ? 100 : 0)); const alignment = raw[c].alignment == null ? 0 : Math.round(((raw[c].alignment - lo) / (hi - lo || 1)) * 100);
   const comp = { trade: sTrade[c], engagement: sEng[c], agreements: sAgr[c], connectivity, investment: sInv[c], alignment };
   const score = Math.round(Object.entries(comp).reduce((s, [k, v]) => s + (W[k] * v) / 100, 0));
-  out[c] = { score, c: comp, raw: { trade: raw[c].trade, engagement: raw[c].engagement ?? 0, agreements: raw[c].agreements, flights: raw[c].flights, embassy: raw[c].embassy, investment: raw[c].investment, alignment: raw[c].alignment } };
+  out[c] = { score, c: comp, raw: { trade: raw[c].trade, engagement: Math.round((raw[c].engagement ?? 0) * 10) / 10, agreements: raw[c].agreements, flights: raw[c].flights, embassy: raw[c].embassy, investment: raw[c].investment, alignment: raw[c].alignment } };
 }
 const ranked = Object.entries(out).sort((a, b) => b[1].score - a[1].score || b[1].raw.trade - a[1].raw.trade); ranked.forEach(([k]) => { out[k].rank = 1 + ranked.filter(([, v]) => v.score > out[k].score).length; }); // equal scores share a rank
 if (ranked[0][1].score < 40 || ranked.filter(([, v]) => v.score > 0).length < 100) { console.error("REFUSING TO WRITE: scores look wrong"); process.exit(1); }

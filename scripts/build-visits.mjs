@@ -28,7 +28,7 @@ const named = (title) => { const hit = terms.filter((t) => t.re.test(title)).map
 
 // ── what kind of engagement, how senior, which direction ──
 const NOISE = /\b(pavilion|invitation|invites?|exhibition|expo|tourist|visitors?|visa|visit abu dhabi|visit dubai|hospital|patients?|football|cricket|tennis|golf|match|league|championship|rally|stock|shares?|index|weather|traffic|fuel prices?)\b/i;
-const KIND = [["message", /\b(written|oral|verbal) message|letter (from|to)|message from|cables?\b|condolences|congratulates|congratulations/i], ["call", /\b(phone|telephone|video) call|\bcalls?\b|receives (a )?call|in a call|call with|calls with/i], ["signing", /\b(signs?|signed|signing|sign(s)? (an )?(agreement|mou|memorand))\b|witnesses (the )?signing/i], ["visit", /\bvisit(s|ed|ing)?\b|arrives? (in|at)|on (an )?(official|state|working) visit|tour of|travels? to/i], ["meeting", /\b(receives?|received|meets?|met|meeting|holds? talks|talks with|discuss(es)?|welcomes?|hosts?|co-?chairs?|sessions?|consultations?)\b/i]];
+const KIND = [["message", /\b(written|oral|verbal) message|letter (from|to)|message from|cables?\b|condolences|congratulates|congratulations/i], ["call", /\b(phone|telephone|video) calls?\b|receives (a )?call|in a call|\bcalls? (with|from|to)\b|\bcalls (the|on|up)\b/i], ["signing", /\b(signs?|signed|signing|sign(s)? (an )?(agreement|mou|memorand))\b|witnesses (the )?signing/i], ["visit", /\bvisit(s|ed|ing)?\b|arrives? (in|at)|on (an )?(official|state|working) visit|tour of|travels? to/i], ["meeting", /\b(receives?|received|meets?|met|meeting|holds? talks|talks with|discuss(es)?|welcomes?|hosts?|co-?chairs?|sessions?|consultations?)\b/i]];
 const HEAD = /\b(UAE President|Mohamed bin Zayed|President (Sheikh )?Mohamed|Vice[- ]President|Mohammed bin Rashid|Mansour bin Zayed|Crown Prince|Prime Minister|Chancellor|President of|King of|King\b|Emperor|Sultan of|Emir of|Amir of|Ruler of|Head of State)\b/i;
 const MIN = /\b(Abdullah bin Zayed|Foreign Minister|Minister|Secretary[- ]General|Speaker|Chairman|Governor|Envoy|Secretary of State|Secretary)\b/i;
 const OFFICIAL = /\b(delegation|ambassador|credentials|official|commander|chief of)\b/i;
@@ -44,8 +44,11 @@ function direction(title) {
   if (UAE_ACTOR.test(title.split(/\b(visits?|arrives?|travels?|participates|attends)\b/i)[0] ?? "") && /\b(visits?|arrives?|travels?|participates|attends)\b/i.test(title)) return "out";
   return null;
 }
+// corporate and academic names are not diplomatic counterparts unless a senior UAE office-holder is named
+const CORP = /\b(Bank|Corporation|Corp\b|Group|Airlines?|Airways|Company|Holdings?|Capital|Fund|Ltd|Inc\b|PLC|Chambers?|Foundation|University|Institute|Council of|Association|Federation|Authority)\b/i;
+const UAE_SENIOR = /\b(UAE President|Mohamed bin Zayed|Vice[- ]President|Crown Prince|Abdullah bin Zayed|Foreign Minister|Minister of State|Mansour bin Zayed|Tahnoon bin Zayed|Mohammed bin Rashid)\b/i;
 function classify(title) {
-  if (NOISE.test(title)) return null; const kind = KIND.find(([, re]) => re.test(title))?.[0]; if (!kind) return null;
+  if (NOISE.test(title)) return null; if (CORP.test(title) && !UAE_SENIOR.test(title)) return null; const kind = KIND.find(([, re]) => re.test(title))?.[0]; if (!kind) return null;
   const cs = named(title); if (!cs.length) return null; // no partner country named: not useful on the map
   if (!HEAD.test(title) && !MIN.test(title) && !OFFICIAL.test(title) && kind !== "signing") return null; // keep engagements involving officials
   const level = HEAD.test(title) ? 3 : MIN.test(title) ? 2 : 1; const dir = direction(title);

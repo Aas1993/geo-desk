@@ -115,7 +115,7 @@ export default function MapCanvas() {
   }, []);
 
   function applyAll() {
-    const m = mapRef.current; if (!m || !m.isStyleLoaded()) return;
+    const m = mapRef.current; if (!m) return; if (!m.isStyleLoaded()) { m.once("idle", applyAll); return; } // tiles are loading: try again when the map is idle instead of dropping the change
     const s = useStore.getState(); const p = PAL[s.theme]; const sat = s.basemap === "satellite";
     m.setPaintProperty("bg", "background-color", p.ocean);
     m.setLayoutProperty("sat", "visibility", sat ? "visible" : "none");

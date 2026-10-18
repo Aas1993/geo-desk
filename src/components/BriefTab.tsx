@@ -41,17 +41,18 @@ export function BriefTab({ c }: { c: Country }) {
   useEffect(() => { // restore the last brief for this country/language from this browser, and probe the server's guardrails
     const t0 = setTimeout(() => { try { const s = localStorage.getItem(storeKey); if (s) { setSaved(JSON.parse(s) as Saved); setPhase("done"); } else { setSaved(null); setPhase("idle"); } } catch { setSaved(null); setPhase("idle"); } setErr(""); }, 0);
     fetch("/api/brief/" + c.iso3).then((r) => r.json()).then((j: Status) => setStatus(j)).catch(() => {});
-    return () => { clearTimeout(t0); abort.current?.abort(); };
+    return () => { clearTimeout(t0); }; // a run that is already paid for is not cancelled by switching tab or country: it finishes and is saved
   }, [storeKey, c.iso3]);
 
+  const keyRef = useRef(storeKey); useEffect(() => { keyRef.current = storeKey; });
   const run = async (refresh: boolean) => {
-    abort.current?.abort(); const ac = new AbortController(); abort.current = ac; setPhase("running"); setErr("");
+    const k = storeKey; abort.current?.abort(); const ac = new AbortController(); abort.current = ac; setPhase("running"); setErr("");
     try {
       const r = await fetch("/api/brief/" + c.iso3, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang, refresh }), signal: ac.signal });
       const j = await r.json(); if (!r.ok) throw new Error(j.message ?? j.error ?? `HTTP ${r.status}`);
-      setSaved(j as Saved); setPhase("done"); try { localStorage.setItem(storeKey, JSON.stringify(j)); } catch {}
+      try { localStorage.setItem(k, JSON.stringify(j)); } catch {} if (keyRef.current !== k) return; setSaved(j as Saved); setPhase("done");
       fetch("/api/brief/" + c.iso3).then((x) => x.json()).then(setStatus).catch(() => {});
-    } catch (e) { if ((e as Error).name !== "AbortError") { setErr((e as Error).message); setPhase("error"); } }
+    } catch (e) { if ((e as Error).name !== "AbortError" && keyRef.current === k) { setErr((e as Error).message); setPhase("error"); } }
   };
   const md = saved ? toMarkdown(c, saved, lang) : "";
   const copy = async () => { try { await navigator.clipboard.writeText(md); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch {} };

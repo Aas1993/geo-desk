@@ -12,6 +12,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with: { persist-credentials: false } # the token is only attached to the one push below
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm }
       - run: npm ci
@@ -24,14 +25,18 @@ jobs:
       - run: node scripts/build-outlook.mjs
       # the index reads everything above, so it runs last
       - run: node scripts/build-partnership.mjs
-      - name: Open a PR if the data changed
+      - name: Check the data, then open or update a PR if it changed
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
-          # the "built" timestamp changes every run, so compare everything else
-          node scripts/data-changed.mjs public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json || { echo "No data changes"; exit 0; }
-          branch="data/refresh-$(date -u +%Y%m%d)"
+          rc=0; node scripts/data-changed.mjs public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json || rc=$?
+          if [ "$rc" -eq 1 ]; then echo "No data changes"; exit 0; fi
+          if [ "$rc" -ne 0 ]; then echo "::error::the change check failed"; exit 1; fi
+          npm test # PRs opened with GITHUB_TOKEN do not trigger CI, so the tests run here, before anything is committed
+          branch="data/refresh"
           git config user.name "geo-desk-bot"; git config user.email "geo-desk-bot@users.noreply.github.com"
-          git checkout -b "$branch"; git add public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json
+          git checkout -B "$branch"; git add public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json
           git commit -m "Refresh UAE agreements, flights, investment, missions, visits, trade, outlook and partnership data ($(date -u +%F))"
-          git push origin "$branch"
-          gh pr create --base main --head "$branch" --title "Refresh UAE agreements, flights, investment, missions, visits, trade, outlook and partnership data ($(date -u +%F))" --body "Automated daily rebuild: agreements from MOFA and the Ministry of Foreign Trade, flights from Wikipedia airport tables via Wikidata, investment from the IMF, UAE missions from MOFA, visits and meetings from WAM headlines, goods trade and the World Economic Outlook from the IMF, and the Partnership Index computed from all of them. Review the diff for new or removed agreements (especially CEPAs) and routes. Sources are listed in \`scripts/build-agreements.mjs\` and \`scripts/build-flights.mjs\`."
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$branch" # one standing branch: a re-run or the next day updates the same PR instead of failing
+          if [ "$(gh pr list --head "$branch" --state open --json number -q length)" = "0" ]; then
+            gh pr create --base main --head "$branch" --title "Refresh UAE agreements, flights, investment, missions, visits, trade, outlook and partnership data" --body "Automated daily rebuild (MOFA and Ministry of Foreign Trade agreements, flights, IMF investment, trade and outlook, missions, WAM visits, then the Partnership Index). Tests passed in the job. The data files are single-line JSON, so review the numbers in the app rather than the diff. This branch is reused: a later run updates this PR."
+          fi

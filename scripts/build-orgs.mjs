@@ -47,12 +47,13 @@ const q = async (sparql) => { for (let i = 0; i < 3; i++) { const r = await fetc
 const CURATED_IDS = new Set(Object.keys(CURATED));
 // Wikidata attaches memberships of the Netherlands and Denmark to the Kingdom entities, so those two are missing from every list; both are members of all of these.
 const KINGDOM_PATCH = new Set(["unga", "who", "itu", "wto", "opcw", "coe", "osce"]);
+const PATCHES = JSON.parse((await import("node:fs")).readFileSync(new URL("./member-patches.json", import.meta.url), "utf8")); // members Wikidata lacks
 const out = {}; const source = {}; const report = [];
 for (const [id, label, expected] of WD) {
   if (CURATED_IDS.has(id)) continue;
   const rows = await q(`SELECT DISTINCT ?iso WHERE { ?o rdfs:label "${label}"@en . ?c p:P463 ?st . ?st ps:P463 ?o . FILTER NOT EXISTS { ?st pq:P582 ?end } ?c wdt:P298 ?iso . ?c wdt:P31/wdt:P279* wd:Q6256 . FILTER NOT EXISTS { ?c wdt:P576 ?cend } }`);
-  const list = [...new Set(rows.map((r) => r.iso.value))].filter((x) => valid.has(x)).sort();
-  const ok = Math.abs(list.length - expected) <= Math.max(2, expected * 0.1);
+  const list = [...new Set([...rows.map((r) => r.iso.value), ...(PATCHES[id] ?? [])])].filter((x) => valid.has(x)).sort();
+  const ok = Math.abs(list.length - expected) <= Math.max(1, Math.round(expected * 0.03)); // tight on purpose: a 10% tolerance let the Commonwealth ship without the UK
   report.push(`${ok ? "ok  " : "BAD "} ${id.padEnd(13)} ${String(list.length).padStart(3)} / ${expected}`);
   if (ok) source[id] = "wikidata";
   if (ok) out[id] = KINGDOM_PATCH.has(id) ? [...new Set([...list, "DNK", "NLD"])].sort() : list; await new Promise((r) => setTimeout(r, 600));

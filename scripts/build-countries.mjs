@@ -5,7 +5,10 @@ const j = async (u, h = {}) => { const r = await fetch(u, { headers: { ...UA, ..
 
 const wb = (await j("https://api.worldbank.org/v2/country?format=json&per_page=400"))[1]
   .filter((c) => c.region.id !== "NA" && c.capitalCity !== "" || ["PSE", "ISR", "HKG", "MAC"].includes(c.id)); // World Bank leaves the capital blank for these, so they need an explicit include
-const CAPITAL = { ISR: "Jerusalem", HKG: "Hong Kong", MAC: "Macao" };
+const CAPITAL = { ISR: "Jerusalem", PSE: "Ramallah", HKG: "Hong Kong", MAC: "Macao" }; // politically sensitive: change if the desk prefers another convention
+const COORD = { PSE: [31.9, 35.2] }; // World Bank has no point for Palestine
+// Display names: the World Bank labels ("Korea", "Congo", "West Bank and Gaza", "Venezuela, RB") are wrong or ambiguous for a ministry desk, and two countries must never share a name.
+const NAME = { PSE: "Palestine", COD: "DR Congo", COG: "Republic of the Congo", KOR: "South Korea", PRK: "North Korea", VEN: "Venezuela", BHS: "Bahamas", GMB: "Gambia", SOM: "Somalia", LAO: "Laos", RUS: "Russia", SYR: "Syria", KGZ: "Kyrgyzstan", SVK: "Slovakia", FSM: "Micronesia", BRN: "Brunei", VNM: "Vietnam", YEM: "Yemen", IRN: "Iran", EGY: "Egypt" };
 const ind = async (code) => {
   const rows = (await j(`https://api.worldbank.org/v2/country/all/indicator/${code}?format=json&per_page=20000&mrnev=1`))[1] ?? [];
   const m = {}; for (const r of rows) if (r.value != null) m[r.countryiso3code] = { v: r.value, y: +r.date }; return m;
@@ -35,10 +38,10 @@ const SPECIAL = { HKG: { num: "344", qid: "Q8646", name: "Hong Kong", nameAr: "Ù
 const out = wb.map((c) => {
   const m = meta[c.id] ?? {};
   return {
-    iso3: c.id, iso2: c.iso2Code, qid: m.qid ?? null, num: m.num ?? null, name: c.name.replace(/, (Rep\.|Dem\. Rep\.|Islamic Rep\.|Arab Rep\.)$/, ""),
+    iso3: c.id, iso2: c.iso2Code, qid: m.qid ?? null, num: m.num ?? null, name: NAME[c.id] ?? c.name.replace(/, (Rep\.|Dem\. Rep\.|Islamic Rep\.|Arab Rep\.)$/, ""),
     nameAr: m.ar ?? null, capital: c.capitalCity || CAPITAL[c.id] || null,
-    lat: c.latitude ? +c.latitude : null, lng: c.longitude ? +c.longitude : null,
-    region: c.region.value, flag: flag(c.iso2Code),
+    lat: c.latitude ? +c.latitude : COORD[c.id]?.[0] ?? null, lng: c.longitude ? +c.longitude : COORD[c.id]?.[1] ?? null,
+    region: c.region.value.trim(), flag: flag(c.iso2Code),
     population: pop[c.id] ?? null, areaKm2: area[c.id]?.v ?? null,
     currencies: [...(m.currency ?? [])].slice(0, 2), languages: [...(m.languages ?? [])].slice(0, 4),
     borders: [...(m.borders ?? [])],

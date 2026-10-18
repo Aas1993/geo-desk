@@ -4,12 +4,12 @@ import { create } from "zustand";
 import type { Alert, AlertsPayload } from "@/lib/alerts";
 
 const SEEN_KEY = "gd-alerts-seen";
-type S = { items: Alert[]; at: number | null; error: boolean; seen: number; load: () => Promise<void>; markSeen: () => void };
+type S = { items: Alert[]; at: number | null; sources: Record<string, boolean>; error: boolean; seen: number; load: () => Promise<void>; markSeen: () => void };
 const readSeen = () => { try { return +(localStorage.getItem(SEEN_KEY) ?? 0) || 0; } catch { return 0; } };
 export const useAlerts = create<S>((set, get) => ({
-  items: [], at: null, error: false, seen: 0,
+  items: [], at: null, sources: {}, error: false, seen: 0,
   load: async () => {
-    try { const r = await fetch("/api/alerts"); if (!r.ok) throw new Error(String(r.status)); const j = (await r.json()) as AlertsPayload; set({ items: j.items, at: j.fetchedAt, error: false, seen: get().seen || readSeen() }); }
+    try { const r = await fetch("/api/alerts"); if (!r.ok) throw new Error(String(r.status)); const j = (await r.json()) as AlertsPayload; set({ items: j.items, at: j.fetchedAt, sources: j.sources ?? {}, error: false, seen: get().seen || readSeen() }); }
     catch { set({ error: true }); }
   },
   markSeen: () => { const t = Date.now(); try { localStorage.setItem(SEEN_KEY, String(t)); } catch {} set({ seen: t }); },

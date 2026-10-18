@@ -46,7 +46,7 @@ lines.push("## Not layers", "", "| Feature | Status | Where / what is missing |"
     ["US carrier groups", "Blocked", "No open feed exists"],
     ["Submarine cable routes", "Blocked", "No redistributable open dataset (TeleGeography's database is paid)"],
     ["Air-raid alerts, Cloudflare Radar outages, Polymarket odds", "Blocked", "Keys or bot-protection (Cloudflare challenge) in the way; IODA outages and Kalshi odds are used instead"],
-    ["Guided tour / coach marks", "Partial", "Onboarding card exists; no step-by-step tour"],
+    ["Guided tour / coach marks", "Live", "Onboarding card plus a step-by-step guided tour (Tour.tsx)"],
   ].map((r) => `| ${r[0]} | ${r[1]} | ${r[2]} |`), "");
 writeFileSync(new URL("../docs/parity.md", import.meta.url), lines.join("\n"));
 console.log(`docs/parity.md written: ${live.length} live / ${LAYERS.length} layers`);

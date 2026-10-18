@@ -29,7 +29,8 @@ export async function buildAlerts(): Promise<AlertsPayload> {
     settle("events", cached("layer:events:", 600_000, () => events()).then((r) => r.value)),
     settle("news", cached("alerts:news", 300_000, async () => {
       const r = await Promise.all(FEEDS.map(async ([name, url]) => { try { const x = await fetch(url, { headers: { "User-Agent": "geo-desk/0.1" }, signal: AbortSignal.timeout(12_000), cache: "no-store" }); return x.ok ? parseRss(await x.text(), name, 12) : []; } catch { return []; } }));
-      return r.flat();
+      const flat = r.flat(); if (!flat.length) throw new Error("no news feed answered"); // every feed failed: report the source as down instead of an empty all-clear
+      return flat;
     }).then((r) => r.value)),
   ]);
   const items: Alert[] = [];

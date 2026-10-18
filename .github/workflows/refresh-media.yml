@@ -1,5 +1,5 @@
 name: Refresh media tone
-# Reads GDELT's raw 15-minute event files (static downloads, no rate limit): about 2,000 small files (21 days), a few minutes. Runs daily and opens a PR when the data changed.
+# Reads GDELT's raw 15-minute event files (static downloads, no rate limit): about 4,300 small files (45 days), a few minutes. Runs daily and opens a PR when the data changed.
 on:
   schedule: [{ cron: "41 2 * * *" }]
   workflow_dispatch:
@@ -11,17 +11,23 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with: { persist-credentials: false } # the token is only attached to the one push below
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: node scripts/build-media-tone.mjs
-      - name: Open a PR if the data changed
+      - name: Check the data, then open or update a PR if it changed
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
-          node scripts/data-changed.mjs public/data/media-tone.json || { echo "No data changes"; exit 0; }
-          branch="data/media-tone-$(date -u +%Y%m%d)"
+          rc=0; node scripts/data-changed.mjs public/data/media-tone.json || rc=$?
+          if [ "$rc" -eq 1 ]; then echo "No data changes"; exit 0; fi
+          if [ "$rc" -ne 0 ]; then echo "::error::the change check failed"; exit 1; fi
+          npm test # PRs opened with GITHUB_TOKEN do not trigger CI, so the tests run here, before anything is committed
+          branch="data/media-tone"
           git config user.name "geo-desk-bot"; git config user.email "geo-desk-bot@users.noreply.github.com"
-          git checkout -b "$branch"; git add public/data/media-tone.json
+          git checkout -B "$branch"; git add public/data/media-tone.json
           git commit -m "Refresh media tone data ($(date -u +%F))"
-          git push origin "$branch"
-          gh pr create --base main --head "$branch" --title "Refresh media tone data ($(date -u +%F))" --body "Automated daily rebuild of how each country's media report on the UAE (GDELT event tone, 21 days). Tone of coverage, not stance."
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$branch" # one standing branch: a re-run or the next day updates the same PR instead of failing
+          if [ "$(gh pr list --head "$branch" --state open --json number -q length)" = "0" ]; then
+            gh pr create --base main --head "$branch" --title "Refresh media tone data" --body "Automated daily rebuild of how each country's media report on the UAE (GDELT event tone, 45 days). Tone of coverage, not stance. Tests passed in the job; this branch is reused."
+          fi

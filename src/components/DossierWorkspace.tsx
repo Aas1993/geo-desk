@@ -12,9 +12,10 @@ import { safeHttp } from "@/lib/url";
 type Source = { url: string; title: string; kind: "search" | "fetch" };
 type Tile = { label: string; value: string; sub?: string };
 type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number; searches: number; fetches: number; usd: number | null };
-type Saved = { report: string; sources: Source[]; tiles: Tile[]; usage: Usage; at: string; model: string; truncated?: boolean; cached?: boolean };
+type Saved = { options?: { counterpart: string; meeting: string; depth: string; lang: string; meetingDate?: string }; report: string; sources: Source[]; tiles: Tile[]; usage: Usage; at: string; model: string; truncated?: boolean; cached?: boolean };
 type Step = { id: number; kind: "search" | "fetch" | "analyse" | "status"; text: string };
 type Status = { enabled: boolean; model: string; remainingThisHour: number };
+const safeDecode = (u: string) => { try { return decodeURI(u); } catch { return u; } };
 const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
 
 const T = {
@@ -71,7 +72,7 @@ export function DossierWorkspace({ c, onClose }: { c: Country; onClose: () => vo
     try {
       const r = await fetch("/api/dossier/" + c.iso3, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ counterpart, counterpartName: cname, meeting, meetingDate: date, depth, focus, lang, notes, refresh }), signal: ac.signal });
       if (!r.ok || !r.body) { const j = await r.json().catch(() => ({})); setErr({ error: j.error ?? "upstream", message: j.message }); setPhase("error"); return; }
-      const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
+      const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = ""; let ended = false;
       for (;;) {
         const { done, value } = await reader.read(); if (done) break; buf += dec.decode(value, { stream: true });
         let idx: number; while ((idx = buf.indexOf("\n\n")) >= 0) {
@@ -81,16 +82,17 @@ export function DossierWorkspace({ c, onClose }: { c: Country; onClose: () => vo
           else if (ev.type === "facts") { setTiles((ev.tiles as Tile[]) ?? []); push("status", `${u.facts} (${ev.count})`); }
           else if (ev.type === "tool") push(ev.name as Step["kind"], ev.detail as string);
           else if (ev.type === "source") { const n = ev as unknown as Source; setSources((s) => (s.some((x) => x.url === n.url) ? s.map((x) => (x.url === n.url ? { ...x, kind: n.kind } : x)) : [...s, n])); }
-          else if (ev.type === "error") { setErr({ error: ev.error as string, message: ev.message as string }); setPhase("error"); }
-          else if (ev.type === "done") { const d = ev as unknown as Saved; setText(d.report); setSources(d.sources); setTiles(d.tiles ?? []); setSaved(d); setPhase("done"); setNow(Date.now()); try { localStorage.setItem(storeKey, JSON.stringify(d)); } catch { /* storage full */ } fetch("/api/dossier/" + c.iso3).then((x) => x.json()).then(setStatus).catch(() => {}); }
+          else if (ev.type === "error") { ended = true; setErr({ error: ev.error as string, message: ev.message as string }); setPhase("error"); }
+          else if (ev.type === "done") { ended = true; const d = ev as unknown as Saved; setText(d.report); setSources(d.sources); setTiles(d.tiles ?? []); setSaved(d); setPhase("done"); setNow(Date.now()); try { localStorage.setItem(storeKey, JSON.stringify(d)); } catch { /* storage full */ } fetch("/api/dossier/" + c.iso3).then((x) => x.json()).then(setStatus).catch(() => {}); }
         }
       }
+      if (!ended) { setErr({ error: "upstream", message: "The connection ended before the briefing was finished. The partial text above is incomplete; run it again." }); setPhase("error"); }
     } catch (e) { if ((e as Error).name !== "AbortError") { setErr({ error: "upstream", message: (e as Error).message }); setPhase("error"); } }
   }
   const parts = useMemo(() => { const m = [...text.matchAll(/^# (?=\d\.\s)(.*)$/gm)]; const pre = m.length ? text.slice(0, m[0].index) : text; const ps = m.map((x, i) => text.slice(x.index, i + 1 < m.length ? m[i + 1].index : undefined)); return { pre, ps }; }, [text]);
   const all: string[] = ([u.p1, u.p2, u.p3] as string[]).slice(0, Math.max(1, parts.ps.length)).concat(parts.ps.length > 1 ? [u.all] : []); const last = all.length - 1; const wholeTab = parts.ps.length > 1 && part === last; const pi = Math.min(part, Math.max(0, parts.ps.length - 1));
   const body = !parts.ps.length || wholeTab ? text : (pi === 0 ? parts.pre : "") + parts.ps[pi];
-  const cited = phase === "done" ? sources.filter((s) => text.includes(s.url) || text.includes(decodeURI(s.url))) : []; const rest = sources.filter((s) => !cited.includes(s));
+  const cited = phase === "done" ? sources.filter((s) => text.includes(s.url) || text.includes(safeDecode(s.url))) : []; const rest = sources.filter((s) => !cited.includes(s));
   const name = rtl && c.nameAr ? c.nameAr : c.name; const fileBase = `${c.iso3}-ministerial-briefing`;
   const pdfHtml = () => briefingHtml(text, { title: `${u.title}: ${name}`, rtl, foot: `${u.foot} ${saved?.model ?? ""} · ${saved?.at ?? ""}`, classification: u.classification });
   const makeDeck = async () => {
@@ -163,6 +165,7 @@ export function DossierWorkspace({ c, onClose }: { c: Country; onClose: () => vo
                       <button onClick={() => setPhase("form")} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-accent hover:text-t0"><RefreshCw size={13} />{u.again}</button>
                     </div>
                   </div>)}
+                {phase === "done" && saved?.options && <p className="mb-2 text-[11.5px] text-t2">{(COUNTERPARTS.find(([k]) => k === saved.options!.counterpart)?.[1] ?? saved.options.counterpart)} · {(MEETINGS.find(([k]) => k === saved.options!.meeting)?.[1] ?? saved.options.meeting)} · {saved.options.depth}{saved.options.meetingDate ? ` · ${saved.options.meetingDate}` : ""} · {saved.options.lang.toUpperCase()}</p>}
                 {deckErr && <p role="alert" className="mb-3 rounded-[8px] border border-down/40 bg-down/10 p-2 text-[12px]">{deckErr}</p>}
                 {stale && <p role="status" className="mb-3 rounded-[8px] border border-warn/40 bg-warn/10 p-2 text-[12px]">{u.stale}</p>}
                 <article dir={rtl ? "rtl" : "ltr"}><Markdown source={phase === "done" ? body : text} />{phase === "running" && <span className="ms-0.5 inline-block h-4 w-1.5 animate-pulse bg-accent align-middle" />}</article>

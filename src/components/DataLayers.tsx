@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Popup, type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
+import type { GeoJSONSource, Map as MLMap, MapLayerMouseEvent } from "maplibre-gl"; // type-only: the library itself is loaded with the map, not with this file
 import { onMap, dataLayerIds } from "@/lib/map-bus";
 import { LAYERS, isData, type Feat, type LayerDef } from "@/lib/layers/registry";
 import { useStore, WINDOW_MS } from "@/lib/store";
@@ -54,9 +54,13 @@ function DataLayer({ def, map }: { def: LayerDef; map: MLMap }) {
   }, [def, map, setStat]);
 
   // source + layers
+  const offs = useRef<(() => void)[]>([]); // map listeners added for this layer, removed with it so a re-added layer does not stack handlers
   useEffect(() => {
     if (!data) return;
+    let dead = false;
+    const on = (type: "click" | "mouseenter" | "mouseleave", layer: string, fn: (e: MapLayerMouseEvent) => void) => { map.on(type, layer, fn); offs.current.push(() => map.off(type, layer, fn)); };
     const add = () => {
+      if (dead) return;
       const s = map.getSource(src) as GeoJSONSource | undefined;
       if (s) { s.setData(data); return; }
       map.addSource(src, { type: "geojson", data });
@@ -69,9 +73,9 @@ function DataLayer({ def, map }: { def: LayerDef; map: MLMap }) {
         map.addLayer({ id: halo, type: "line", source: src, paint: { "line-color": color as never, "line-width": 9, "line-opacity": 0.08 } }, "border");
         map.addLayer({ id: dot, type: "line", source: src, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": color as never, "line-width": w as never, "line-opacity": 0.85 } }, "border");
         dataLayerIds.add(halo);
-        map.on("click", halo, (e) => {
+        on("click", halo, async (e) => {
           const f = e.features?.[0]; if (!f) return; const p = f.properties as Feat & Record<string, unknown>; const sub = def.sub?.find((x) => x.key === p.type);
-          new Popup({ closeButton: true, maxWidth: "320px", className: "gd-popup" }).setLngLat(e.lngLat)
+          new (await import("maplibre-gl")).Popup({ closeButton: true, maxWidth: "320px", className: "gd-popup" }).setLngLat(e.lngLat)
             .setHTML(`<div class="gd-pop"><div class="gd-pop-k" style="color:${esc(sub?.color ?? def.color)}">${esc(sub?.en ?? def.en)}</div><div class="gd-pop-t">${esc(p.title)}</div>${p.desc ? `<div class="gd-pop-d">${esc(p.desc)}</div>` : ""}<div class="gd-pop-m">${p.src ? esc(p.src) : ""}</div>${typeof p.url === "string" && /^https?:/.test(p.url) ? `<a class="gd-pop-a" href="${esc(p.url)}" target="_blank" rel="noreferrer noopener">Source ↗</a>` : ""}</div>`).addTo(map);
         });
         map.on("mouseenter", halo, () => { map.getCanvas().style.cursor = "pointer"; }); map.on("mouseleave", halo, () => { map.getCanvas().style.cursor = ""; });
@@ -81,9 +85,9 @@ function DataLayer({ def, map }: { def: LayerDef; map: MLMap }) {
         map.addLayer({ id: halo, type: "fill", source: src, paint: { "fill-color": color as never, "fill-opacity": 0.32 } }, "border");
         map.addLayer({ id: dot, type: "line", source: src, paint: { "line-color": color as never, "line-width": 0.8, "line-opacity": 0.7 } }, "border");
         dataLayerIds.add(halo);
-        map.on("click", halo, (e) => {
+        on("click", halo, async (e) => {
           const f = e.features?.[0]; if (!f) return; const p = f.properties as Feat & Record<string, unknown>; const sub = def.sub?.find((x) => x.key === p.type);
-          new Popup({ closeButton: true, maxWidth: "320px", className: "gd-popup" }).setLngLat(e.lngLat)
+          new (await import("maplibre-gl")).Popup({ closeButton: true, maxWidth: "320px", className: "gd-popup" }).setLngLat(e.lngLat)
             .setHTML(`<div class="gd-pop"><div class="gd-pop-k" style="color:${esc(sub?.color ?? def.color)}">${esc(sub?.en ?? def.en)}</div><div class="gd-pop-t">${esc(p.title)}</div>${p.desc ? `<div class="gd-pop-d">${esc(p.desc)}</div>` : ""}<div class="gd-pop-m">${p.src ? esc(p.src) : ""}</div></div>`).addTo(map);
         });
         return;
@@ -92,16 +96,17 @@ function DataLayer({ def, map }: { def: LayerDef; map: MLMap }) {
       map.addLayer({ id: dot, type: "circle", source: src, paint: { "circle-radius": r as never, "circle-color": color as never, "circle-opacity": 0.95, "circle-stroke-color": "#04070d", "circle-stroke-width": 1 } });
       if (def.label) map.addLayer({ id: `${src}-label`, type: "symbol", source: src, layout: { "text-field": ["get", def.label], "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"], "text-size": 11, "text-offset": [0, -1.1], "text-allow-overlap": false }, paint: { "text-color": color as never, "text-halo-color": "#04070d", "text-halo-width": 1.4 } });
       dataLayerIds.add(dot);
-      map.on("click", dot, (e) => {
+      on("click", dot, async (e) => {
         const f = e.features?.[0]; if (!f) return; const p = f.properties as Feat & Record<string, unknown>;
         const sub = def.sub?.find((x) => x.key === p.type);
-        new Popup({ closeButton: true, maxWidth: "320px", className: "gd-popup" }).setLngLat((f.geometry as GeoJSON.Point).coordinates as [number, number])
+        new (await import("maplibre-gl")).Popup({ closeButton: true, maxWidth: "320px", className: "gd-popup" }).setLngLat((f.geometry as GeoJSON.Point).coordinates as [number, number])
           .setHTML(`<div class="gd-pop"><div class="gd-pop-k" style="color:${esc(sub?.color ?? def.color)}">${esc(sub?.en ?? def.en)}</div><div class="gd-pop-t">${esc(p.title)}</div>${p.desc ? `<div class="gd-pop-d">${esc(p.desc)}</div>` : ""}<div class="gd-pop-m">${esc(ago(p.t as number))}${p.src ? ` · ${esc(p.src)}` : ""}</div>${typeof p.url === "string" && /^https?:/.test(p.url) ? `<a class="gd-pop-a" href="${esc(p.url)}" target="_blank" rel="noreferrer noopener">Open source ↗</a>` : ""}</div>`).addTo(map);
       });
-      map.on("mouseenter", dot, () => { map.getCanvas().style.cursor = "pointer"; });
-      map.on("mouseleave", dot, () => { map.getCanvas().style.cursor = ""; });
+      on("mouseenter", dot, () => { map.getCanvas().style.cursor = "pointer"; });
+      on("mouseleave", dot, () => { map.getCanvas().style.cursor = ""; });
     };
     if (map.isStyleLoaded()) add(); else map.once("idle", add);
+    return () => { dead = true; map.off("idle", add); };
   }, [data, map, def, src, halo, dot]);
 
   // filters: sub-types + time window (re-evaluated every minute so "last hour" stays honest)
@@ -120,6 +125,7 @@ function DataLayer({ def, map }: { def: LayerDef; map: MLMap }) {
 
   // cleanup on unmount (layer toggled off)
   useEffect(() => () => {
+    for (const off of offs.current) { try { off(); } catch { /* map already gone */ } } offs.current = [];
     try { for (const id of [`${src}-label`, dot, halo]) if (map.getLayer(id)) map.removeLayer(id); if (map.getSource(src)) map.removeSource(src); } catch {}
     dataLayerIds.delete(dot); dataLayerIds.delete(halo); useLayerStats.getState().set(def.id, { state: "idle", total: 0, shown: 0, byKey: {} });
   }, [map, def.id, src, halo, dot]);

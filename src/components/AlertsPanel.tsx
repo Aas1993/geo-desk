@@ -19,8 +19,8 @@ const rel = (now: number, t: number) => { const m = Math.max(0, Math.round((now 
 
 /** The bell's feed: one merged list from hazards, WHO, GDELT and headlines, with tabs for what matters to a UAE desk. */
 export function AlertsPanel() {
-  const { t } = useT(); const open = useStore((s) => s.alertsOpen); const setOpen = useStore((s) => s.setAlertsOpen);
-  const { items, error, markSeen } = useAlerts(); const [tab, setTab] = useState<Tab>("uae"); const [now, setNow] = useState(0);
+  const { t, lang } = useT(); const open = useStore((s) => s.alertsOpen); const setOpen = useStore((s) => s.setAlertsOpen);
+  const { items, error, markSeen, sources, at } = useAlerts(); const down = Object.entries(sources).filter(([, ok]) => !ok).map(([k]) => k); const [tab, setTab] = useState<Tab>("uae"); const [now, setNow] = useState(0);
   useEffect(() => { if (!open) return; markSeen(); const tick = () => setNow(Date.now()); const first = setTimeout(tick, 0); const i = setInterval(tick, 30_000); return () => { clearTimeout(first); clearInterval(i); }; }, [open, markSeen]);
   useEffect(() => { if (!open) return; const k = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [open, setOpen]);
   const counts = useMemo(() => Object.fromEntries(TABS.map((x) => [x.id, items.filter(x.test).length])) as Record<Tab, number>, [items]);
@@ -33,6 +33,7 @@ export function AlertsPanel() {
       <div role="tablist" className="no-scrollbar flex gap-1 overflow-x-auto px-3 pt-2">
         {TABS.map((x) => <button key={x.id} role="tab" aria-selected={tab === x.id} onClick={() => setTab(x.id)} className={`flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-[9px] px-2.5 text-[12px] font-medium transition-colors ${tab === x.id ? "bg-accent text-[var(--accent-ink)]" : "bg-bg3 text-t1 hover:text-t0"}`}>{t(x.key)}<span className="num text-[10.5px] opacity-75">{counts[x.id]}</span></button>)}
       </div>
+      {(down.length > 0 || (error && items.length > 0)) && <p role="status" className="mx-3 mt-2 rounded-[8px] border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-[11.5px] leading-snug text-t0">{error && items.length > 0 ? (lang === "ar" ? "تعذّر تحديث التنبيهات؛ تُعرض آخر نتائج وصلت." : "The feed could not be refreshed; showing the last results.") : (lang === "ar" ? `مصادر لا تستجيب الآن: ${down.join("، ")}. غياب تنبيهات منها لا يعني خلو الوضع.` : `Sources not answering right now: ${down.join(", ")}. No alerts from them does not mean all clear.`)}{at ? <span className="num ms-1 text-t2">{lang === "ar" ? "آخر تحديث" : "updated"} {new Date(at).toISOString().slice(11, 16)} UTC</span> : null}</p>}
       <ul className="scroll-thin mt-2 min-h-[80px] flex-1 overflow-y-auto px-2 pb-2">
         {error && !items.length && <li className="px-3 py-6 text-center text-[13px] text-t2">{t("feedError")}</li>}
         {!error && !items.length && <li className="px-3 py-6 text-center text-[13px] text-t2">{t("feedLoading")}</li>}

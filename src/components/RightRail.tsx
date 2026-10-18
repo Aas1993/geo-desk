@@ -6,7 +6,7 @@ import { useStore, useT } from "@/lib/store";
 import { useDashboard } from "@/lib/dashboard-store";
 
 export function RightRail() {
-  const { t } = useT(); const world = usePathname() === "/";
+  const { t, lang } = useT(); const world = usePathname() === "/";
   const { theme, toggleTheme, toggleLang, cycleScale, zoom, goHome, projection, setProjection, basemap, setBasemap, terminator, toggleTerminator, locate } = useStore();
   const dashOpen = useDashboard((d) => d.open); const setDash = useDashboard((d) => d.setOpen); const setAsk = useDashboard((d) => d.setAsk);
   const sep = <div className="mx-1.5 my-0.5 h-px bg-line" />;
@@ -17,9 +17,9 @@ export function RightRail() {
       <IconBtn label={t("textSize")} onClick={cycleScale}><ALargeSmall size={19} /></IconBtn>
       {world && <>
         {sep}
-        <IconBtn label="Dashboard" active={dashOpen} onClick={() => { if (!dashOpen) useStore.getState().select(null); setDash(!dashOpen); }}><LayoutDashboard size={18} /></IconBtn>
+        <IconBtn label={lang === "ar" ? "لوحة المعلومات" : "Dashboard"} active={dashOpen} onClick={() => { if (!dashOpen) useStore.getState().select(null); setDash(!dashOpen); }}><LayoutDashboard size={18} /></IconBtn>
         <IconBtn label="Guided tour" onClick={() => window.dispatchEvent(new Event("gd-tour"))}><HelpCircle size={18} /></IconBtn>
-        <IconBtn label="Ask" onClick={() => { useStore.getState().select(null); setAsk(true); }}><Sparkles size={18} /></IconBtn>
+        <IconBtn label={lang === "ar" ? "اسأل" : "Ask"} onClick={() => { useStore.getState().select(null); setAsk(true); }}><Sparkles size={18} /></IconBtn>
         {sep}
         <IconBtn label={terminator ? t("hideNight") : t("showNight")} active={terminator} onClick={toggleTerminator}><SunMoon size={18} /></IconBtn>
         <IconBtn label={projection === "globe" ? t("flatMap") : t("globeMap")} active={projection === "mercator"} onClick={() => setProjection(projection === "globe" ? "mercator" : "globe")}>{projection === "globe" ? <MapIcon size={18} /> : <Globe size={18} />}</IconBtn>

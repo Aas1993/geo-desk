@@ -17,17 +17,18 @@ import { printOnePager } from "@/lib/one-pager";
 import type { Country, CountryDetail, TabId } from "@/lib/types";
 
 const TABS: TabId[] = ["overview", "brief", "minister", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
-const cache = new Map<string, CountryDetail>();
+const cache = new Map<string, CountryDetail>(); const stamp = new Map<string, number>(); // weather and air quality are part of the detail, so it is refreshed when older than 15 minutes
+const fresh = (iso: string) => (stamp.get(iso) ?? 0) > Date.now() - 900_000;
 
 export function useDetail(c: Country | undefined) {
   const [state, set] = useState<{ iso: string; data: CountryDetail | null; err: boolean } | null>(null);
   const [n, setN] = useState(0);
   const iso = c?.iso3; const lat = c?.lat; const lng = c?.lng; const qid = c?.qid;
   useEffect(() => {
-    if (!iso || cache.has(iso)) return;
+    if (!iso || (cache.has(iso) && fresh(iso))) return;
     let dead = false;
     fetch(`/api/country/${iso}?lat=${lat ?? ""}&lng=${lng ?? ""}&qid=${qid ?? ""}`).then((r) => { if (!r.ok) throw 0; return r.json() as Promise<CountryDetail>; })
-      .then((data) => { cache.set(iso, data); if (!dead) set({ iso, data, err: false }); })
+      .then((data) => { cache.set(iso, data); stamp.set(iso, Date.now()); if (!dead) set({ iso, data, err: false }); })
       .catch(() => { if (!dead) set({ iso, data: null, err: true }); });
     return () => { dead = true; };
   }, [iso, lat, lng, qid, n]);

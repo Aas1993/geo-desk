@@ -12,6 +12,7 @@ type Source = { url: string; title: string; kind: "search" | "fetch" };
 type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number; searches: number; fetches: number; usd: number | null };
 type Saved = { report: string; sources: Source[]; usage: Usage; at: string; model: string; truncated?: boolean };
 type Step = { id: number; kind: "search" | "fetch" | "analyse" | "status"; text: string };
+const safeDecode = (u: string) => { try { return decodeURI(u); } catch { return u; } };
 const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
 
 export function ResearchTab({ listing, lang }: { listing: Listing; lang: "en" | "ar" }) {
@@ -60,7 +61,7 @@ export function ResearchTab({ listing, lang }: { listing: Listing; lang: "en" | 
   useEffect(() => { if (phase === "running") endRef.current?.scrollIntoView({ block: "nearest" }); }, [text, steps, phase]);
 
   // sources the finished note actually cites (its URL appears in the text) are listed first
-  const cited = phase === "done" ? sources.filter((s) => text.includes(s.url) || text.includes(decodeURI(s.url))) : [];
+  const cited = phase === "done" ? sources.filter((s) => text.includes(s.url) || text.includes(safeDecode(s.url))) : [];
   const rest = sources.filter((s) => !cited.includes(s));
   const copy = async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {} };
   const download = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text + `\n\n---\nGenerated ${saved?.at ?? ""} by Geo Desk research analyst (${saved?.model ?? ""}). Not investment advice.\n`], { type: "text/markdown" })); a.download = `${listing.exchange}-${listing.symbol}-research.md`; a.click(); URL.revokeObjectURL(a.href); };

@@ -4,11 +4,11 @@
 // This replaces an earlier plan to query GDELT's DOC API per country, which answers 429 to most calls; the raw files are static downloads with no rate limit.
 // What it measures: tone of event coverage, not stance. War and crime news reads negative whatever the attitude. Outlets on generic domains (.com) that are not in the
 // outlet list cannot be attributed to a country and are left out of the per-country figures (they still count towards the world baseline).
-// Usage: node scripts/build-media-tone.mjs [--days=21]
+// Usage: node scripts/build-media-tone.mjs [--days=45]
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { unzipSync } from "fflate";
 const UA = { "User-Agent": "geo-desk research (https://github.com/Aas1993/geo-desk)" };
-const DAYS = +(process.argv.find((a) => a.startsWith("--days="))?.split("=")[1] ?? 21);
+const DAYS = +(process.argv.find((a) => a.startsWith("--days="))?.split("=")[1] ?? 45);
 const countries = JSON.parse(readFileSync(new URL("../public/data/countries.json", import.meta.url), "utf8")); const byIso2 = new Map(countries.map((c) => [c.iso2.toLowerCase(), c.iso3]));
 const host = (u) => { try { return new URL(u).hostname.toLowerCase().replace(/^www\./, ""); } catch { return null; } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

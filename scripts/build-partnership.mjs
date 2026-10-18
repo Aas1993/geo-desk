@@ -11,12 +11,13 @@ const W = { trade: 25, engagement: 20, agreements: 15, connectivity: 15, investm
 const cutoff = new Date(Date.now() - 365 * 86400e3).toISOString().slice(0, 10);
 
 const raw = {}; for (const c of countries) raw[c] = {};
-for (const c of countries) { const t = trade.countries[c]?.a?.at(-1); raw[c].trade = t ? t[1] + t[2] : 0; }                       // US$ m, last full year, exports + imports
-for (const v of visits.items) if (v.d >= cutoff) for (const c of v.c) if (raw[c]) raw[c].engagement = (raw[c].engagement ?? 0) + v.l; // senior-weighted engagements, last 12 months
+for (const c of countries) { const t = trade.countries[c]?.a?.at(-1); raw[c].trade = t && t[0] >= trade.lastYear - 1 ? t[1] + t[2] : 0; } // US$ m, exports + imports, latest year; a partner whose latest row is older than the year before last has no comparable figure and scores 0
+const KIND_W = { message: 0.25, call: 0.6, meeting: 1, visit: 1, signing: 1 }; // a condolence or congratulation cable is not a meeting
+for (const v of visits.items) if (v.d >= cutoff) for (const c of v.c) if (raw[c]) raw[c].engagement = (raw[c].engagement ?? 0) + v.l * (KIND_W[v.k] ?? 1); // senior- and kind-weighted engagements, last 12 months
 for (const c of countries) {
   const a = agr.countries[c]; const n = a ? new Set([...a.mofa, ...a.moft].map((x) => x.t.toLowerCase())).size : 0; const cepa = a?.cepa?.status === "in-force" ? 12 : a?.cepa ? 6 : 0; raw[c].agreements = n + cepa;
   const f = fl.countries[c]; const emb = (ms.countries[c] ?? []).some((m) => m.type === "embassy"); raw[c].flights = f ? f.counts.active + f.counts.seasonal : 0; raw[c].embassy = emb ? 1 : 0;
-  raw[c].investment = inv.countries[c]?.outward?.usd ?? 0; const u = un[c]; raw[c].alignment = typeof u === "number" ? u : null;
+  raw[c].investment = inv.countries[c]?.outward?.usd ?? 0; const u = un[c] ?? (c === "SRB" ? un.YUG : undefined); /* Voeten codes Serbia as YUG */ raw[c].alignment = typeof u === "number" ? u : null;
 }
 const pct = (key, get = (r) => r[key] ?? 0) => { const vals = countries.map((c) => get(raw[c])); const sorted = [...vals].sort((a, b) => a - b); const n = vals.length;
   return Object.fromEntries(countries.map((c, i) => { const v = vals[i]; if (!(v > 0)) return [c, 0]; const lower = sorted.filter((x) => x < v).length; return [c, Math.round((lower / (n - 1)) * 100)]; })); };
@@ -29,7 +30,7 @@ for (const c of countries) {
   const score = Math.round(Object.entries(comp).reduce((s, [k, v]) => s + (W[k] * v) / 100, 0));
   out[c] = { score, c: comp, raw: { trade: raw[c].trade, engagement: raw[c].engagement ?? 0, agreements: raw[c].agreements, flights: raw[c].flights, embassy: raw[c].embassy, investment: raw[c].investment, alignment: raw[c].alignment } };
 }
-const ranked = Object.entries(out).sort((a, b) => b[1].score - a[1].score || b[1].raw.trade - a[1].raw.trade); ranked.forEach(([k], i) => { out[k].rank = i + 1; });
+const ranked = Object.entries(out).sort((a, b) => b[1].score - a[1].score || b[1].raw.trade - a[1].raw.trade); ranked.forEach(([k]) => { out[k].rank = 1 + ranked.filter(([, v]) => v.score > out[k].score).length; }); // equal scores share a rank
 if (ranked[0][1].score < 40 || ranked.filter(([, v]) => v.score > 0).length < 100) { console.error("REFUSING TO WRITE: scores look wrong"); process.exit(1); }
 writeFileSync(new URL("../public/data/partnership.json", import.meta.url), JSON.stringify({ built: new Date().toISOString(), weights: W, n: countries.length, alignmentRange: [lo, hi], note: "Percentile-based composite of trade, engagement, agreements, connectivity, investment and UN voting alignment. Measures ties and activity, not friendship.", inputs: { tradeYear: trade.lastYear, engagementSince: cutoff, flightsBuilt: fl.built.slice(0, 10), visitsBuilt: visits.built.slice(0, 10) }, countries: out }));
 console.log("top 15:", ranked.slice(0, 15).map(([k, v]) => `${v.rank}.${k} ${v.score}`).join("  ")); console.log("bottom of scored:", ranked.filter(([, v]) => v.score > 0).slice(-5).map(([k, v]) => `${k} ${v.score}`).join(" "));

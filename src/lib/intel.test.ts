@@ -24,7 +24,7 @@ const dem = exportDemand(t, o, [2026, 2027]); assert.ok(dem.coverage > 0.5, `exp
 // partnership index
 assert.equal(p.n, iso.size - 1, "one score per country except the UAE"); assert.equal(Object.values(p.weights).reduce((a, b) => a + b, 0), 100, "weights must sum to 100");
 const rows = Object.values(p.countries); assert.ok(rows.every((r) => r.score >= 0 && r.score <= 100 && Object.values(r.c).every((v) => v >= 0 && v <= 100)), "scores out of range");
-assert.deepEqual(rows.map((r) => r.rank).sort((a, b) => a - b), rows.map((_, i) => i + 1), "ranks must be 1..n");
+for (const [k, r] of Object.entries(p.countries)) assert.equal(r.rank, 1 + rows.filter((x) => x.score > r.score).length, `${k}: rank must be 1 + the number of higher scores (equal scores share a rank)`);
 for (const [k, r] of Object.entries(p.countries)) { const calc = Math.round(Object.entries(r.c).reduce((s, [c, v]) => s + (p.weights[c] * v) / 100, 0)); assert.equal(r.score, calc, `${k}: score is not the weighted sum of its components`); }
 assert.ok(["SAU", "IND", "CHN", "USA"].every((k) => p.countries[k].rank <= 8), "the UAE's biggest partners should rank near the top"); assert.ok(!p.countries.ARE);
 console.log("intel: all assertions passed");

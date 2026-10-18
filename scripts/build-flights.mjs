@@ -3,6 +3,7 @@
 // with each destination airport resolved to its country through Wikidata. Wikipedia is community-maintained and can lag the real schedule by weeks;
 // the app says so, shows each page's revision date, and separates active routes from suspended, seasonal and future ones (important while Gulf airspace is disrupted).
 import { writeFileSync, readFileSync } from "node:fs";
+import { prevOf, thin } from "./prev.mjs";
 const UA = { "User-Agent": "geo-desk/0.1 (https://github.com/Aas1993/geo-desk; personal research project)" };
 const countries = JSON.parse(readFileSync(new URL("../public/data/countries.json", import.meta.url), "utf8"));
 const iso3ByQid = new Map(countries.filter((c) => c.qid).map((c) => [c.qid, c.iso3]));
@@ -64,7 +65,7 @@ for (let i = 0; i < qids.length; i += 50) {
 const dests = new Map(); let dropped = 0;
 for (const r of rows) {
   const q = qidOf.get(r.target); const i = q && info.get(q); if (!i?.iata || !i.iso3) { dropped++; continue; } // not an airport, or a country outside the atlas
-  const d = dests.get(i.iata) ?? { iata: i.iata, name: canon.get(r.target) ?? i.label, iso3: i.iso3, lat: i.lat, lon: i.lon, from: new Set(), airlines: new Map() }; dests.set(i.iata, d);
+  const d = dests.get(i.iata) ?? { iata: i.iata, name: canon.get(r.target) ?? i.label, iso3: i.iata === "HKG" ? "HKG" : i.iata === "MFM" ? "MAC" : i.iso3, lat: i.lat, lon: i.lon, from: new Set(), airlines: new Map() }; dests.set(i.iata, d);
   d.from.add(r.from); const a = d.airlines.get(r.airline) ?? { status: r.status, from: new Set() }; a.from.add(r.from);
   const rank = { active: 0, seasonal: 1, charter: 2, future: 3, suspended: 4 }; if (rank[r.status] < rank[a.status]) a.status = r.status; d.airlines.set(r.airline, a);
 }
@@ -78,7 +79,7 @@ for (const d of dests.values()) {
 for (const c of Object.values(out)) { c.destinations.sort((a, b) => a.name.localeCompare(b.name)); c.airlines = [...new Set(c.destinations.flatMap((d) => d.airlines.filter((a) => a.status === "active" || a.status === "seasonal").map((a) => a.name)))].sort(); }
 
 const total = Object.values(out).reduce((n, c) => n + c.counts.active + c.counts.seasonal, 0);
-if (Object.keys(out).length < 60 || total < 200) { console.error(`REFUSING TO WRITE: ${Object.keys(out).length} countries, ${total} live destinations`); process.exit(1); }
+const pc = prevOf("flights.json", (j) => Object.keys(j.countries).length); if (Object.keys(out).length < 60 || total < 200 || thin(Object.keys(out).length, pc, 0.9)) { console.error(`REFUSING TO WRITE: ${Object.keys(out).length} countries, ${total} live destinations`); process.exit(1); }
 writeFileSync(new URL("../public/data/flights.json", import.meta.url), JSON.stringify({ built: new Date().toISOString(), revisions, airports: Object.fromEntries(AIRPORTS), source: { name: "Wikipedia airport articles (CC BY-SA 4.0), destinations resolved via Wikidata", url: "https://en.wikipedia.org/wiki/Dubai_International_Airport#Airlines_and_destinations", note: "Community-maintained; can lag the live schedule." }, countries: out }));
 const top = Object.entries(out).map(([k, c]) => [k, c.counts.active + c.counts.seasonal, c.counts.suspended]).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, n, s]) => `${k}:${n}${s ? `(+${s} susp)` : ""}`);
 console.log(`countries ${Object.keys(out).length}, live destinations ${total}, rows ${rows.length}, dropped (non-airport/outside atlas) ${dropped}`); console.log("top:", top.join(" "));

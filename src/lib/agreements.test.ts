@@ -8,7 +8,7 @@ const d = read("../../public/data/agreements.json") as AgData; const countries =
 const entries = Object.entries(d.countries);
 assert.ok(entries.length >= 170, `only ${entries.length} countries`);
 for (const [k, c] of entries) {
-  assert.ok(countries.has(k) || k === "XKX" || k === "HKG", `unknown country ${k}` /* Kosovo and Hong Kong have agreements but no shape in the country list */);
+  assert.ok(countries.has(k) || k === "XKX", `unknown country ${k}` /* Kosovo has agreements but no shape in the country list */);
   for (const a of [...c.mofa, ...c.moft]) { assert.ok(a.t.length > 6 && a.type, `${k}: empty agreement`); assert.ok(["agreement", "mou"].includes(a.kind)); }
   if (c.cepa) { assert.match(c.cepa.url, /^https:\/\/www\.trade\.gov\.ae\//, `${k}: CEPA source must be the Ministry`); for (const f of [c.cepa.signed, c.cepa.inForce, c.cepa.due]) if (f) assert.match(f, /^20\d\d-\d\d-\d\d$/); assert.ok(!c.cepa.inForce || c.cepa.inForce >= (c.cepa.signed ?? "0"), `${k}: in force before signed`); }
 }

@@ -117,14 +117,15 @@ function StanceCard({ iso3, name, lang }: { iso3: string; name: string; lang: "e
   useEffect(() => {
     const t0 = setTimeout(() => { try { const s = localStorage.getItem(key); if (s) { setRes(JSON.parse(s)); setPhase("done"); } else { setRes(null); setPhase("idle"); } } catch { setRes(null); setPhase("idle"); } setErr(""); }, 0);
     fetch(`/api/media/${iso3}/stance`).then((r) => r.json()).then(setStatus).catch(() => {});
-    return () => { clearTimeout(t0); abort.current?.abort(); };
+    return () => { clearTimeout(t0); }; // a paid run is not cancelled by switching tab or country
   }, [key, iso3]);
+  const keyRef = useRef(key); useEffect(() => { keyRef.current = key; });
   const run = async (refresh: boolean) => {
-    abort.current?.abort(); const ac = new AbortController(); abort.current = ac; setPhase("running"); setErr("");
+    const k = key; abort.current?.abort(); const ac = new AbortController(); abort.current = ac; setPhase("running"); setErr("");
     try {
       const r = await fetch(`/api/media/${iso3}/stance`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang, refresh }), signal: ac.signal }); const j = await r.json(); if (!r.ok) throw new Error(j.message ?? j.error ?? `HTTP ${r.status}`);
-      setRes(j); setPhase("done"); try { localStorage.setItem(key, JSON.stringify(j)); } catch {} fetch(`/api/media/${iso3}/stance`).then((x) => x.json()).then(setStatus).catch(() => {});
-    } catch (e) { if ((e as Error).name !== "AbortError") { setErr((e as Error).message); setPhase("error"); } }
+      try { localStorage.setItem(k, JSON.stringify(j)); } catch {} if (keyRef.current !== k) return; setRes(j); setPhase("done"); fetch(`/api/media/${iso3}/stance`).then((x) => x.json()).then(setStatus).catch(() => {});
+    } catch (e) { if ((e as Error).name !== "AbortError" && keyRef.current === k) { setErr((e as Error).message); setPhase("error"); } }
   };
   const byId = new Map((res?.items ?? []).map((i) => [i.id, i])); const judged = res?.read.items ?? [];
   const dist = (target: "uae" | "country") => STANCES.map((s) => ({ s, n: judged.filter((i) => i.target === target && i.stance === s).length })); const tot = (target: "uae" | "country") => judged.filter((i) => i.target === target).length;

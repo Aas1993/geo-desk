@@ -8,7 +8,7 @@ const UA = { "User-Agent": "Mozilla/5.0 (compatible; geo-desk research; +https:/
 const countries = JSON.parse(readFileSync(new URL("../public/data/countries.json", import.meta.url), "utf8"));
 const norm = (s) => s.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z]/g, "");
 const byName = new Map(countries.map((c) => [norm(c.name), c.iso3])); const byIso2 = new Map(countries.map((c) => [c.iso2.toLowerCase(), c.iso3]));
-const ALIAS = { antiguaandbarabuda: "ATG", bahamas: "BHS", brunei: "BRN", capeverde: "CPV", czechrepublic: "CZE", dominican: "DOM", gambia: "GMB", kyrgyzstan: "KGZ", laos: "LAO", macedonia: "MKD", northkorea: "PRK", palestine: "PSE", russia: "RUS", saintkittsandnevis: "KNA", saintlucia: "LCA", saotimeandprincipe: "STP", slovakia: "SVK", southkorea: "KOR", turkey: "TUR", venezuela: "VEN", syria: "SYR", myanmar: "MMR", hongkong: "HKG", costarica: "CRI", equatorialguinea: "GNQ", guineaconakry: "GIN", mauritania: "MRT", peru: "PER", grenadines: "VCT", vanuata: "VUT", vanuatu: "VUT", somalia: "SOM", nauru: "NRU", kosovo: "XKX", turkiye: "TUR", drcongo: "COD", democraticrepublicofthecongo: "COD", democraticrepublicofthecongokinshasa: "COD", congo: "COG", republicofthecongo: "COG", ivorycoast: "CIV", coted: "CIV", swaziland: "SWZ", eswatini: "SWZ", unitedstates: "USA", unitedkingdom: "GBR", uk: "UK" };
+const ALIAS = { korea: "KOR", antiguaandbarabuda: "ATG", bahamas: "BHS", brunei: "BRN", capeverde: "CPV", czechrepublic: "CZE", dominican: "DOM", gambia: "GMB", kyrgyzstan: "KGZ", laos: "LAO", macedonia: "MKD", northkorea: "PRK", palestine: "PSE", russia: "RUS", saintkittsandnevis: "KNA", saintlucia: "LCA", saotimeandprincipe: "STP", slovakia: "SVK", southkorea: "KOR", turkey: "TUR", venezuela: "VEN", syria: "SYR", myanmar: "MMR", hongkong: "HKG", costarica: "CRI", equatorialguinea: "GNQ", guineaconakry: "GIN", mauritania: "MRT", peru: "PER", grenadines: "VCT", vanuata: "VUT", vanuatu: "VUT", somalia: "SOM", nauru: "NRU", kosovo: "XKX", turkiye: "TUR", drcongo: "COD", democraticrepublicofthecongo: "COD", democraticrepublicofthecongokinshasa: "COD", congo: "COG", republicofthecongo: "COG", ivorycoast: "CIV", coted: "CIV", swaziland: "SWZ", eswatini: "SWZ", unitedstates: "USA", unitedkingdom: "GBR", uk: "UK" };
 const iso = (name) => { const n = norm(name); return ALIAS[n] ?? byName.get(n) ?? null; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const get = async (url) => { const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(45_000), redirect: "follow" }); if (!r.ok) throw new Error(`${url} → ${r.status}`); return r.text(); };
@@ -46,6 +46,14 @@ const MOFA_URL = "https://www.mofa.gov.ae/en/the-UAE/UAE-the-achiever/Agreements
     for (const t of new Set(titles)) { c.mofa.push({ t, type: typeOf(t), kind: kindOf(t) }); items++; }
   }
   sources.mofa = { name: "UAE Ministry of Foreign Affairs · Agreements", url: MOFA_URL, countries: n, items, note: "Published by MOFA. Does not list CEPAs and can lag recent signings." };
+}
+// MOFA's page files a long list of plainly South Korean agreements (Republic of Korea treaties, Bank of Korea, Samsung, KEPCO ...) under the "North Korea" heading and flag, and a single item under "South Korea". If the list under North Korea is mostly South Korean and nothing in it mentions the DPRK, it belongs to South Korea.
+{
+  const SK = /Republic of Korea|Samsung|Bank of Korea|\bKorean\b|KEPCO|Korea (Nuclear|Electric|Gas|Eximbank|Trade)|Yonhap|Seoul/i, NK = /Democratic People|DPRK|Pyongyang|North Korea/i;
+  const pk = out.PRK; if (pk && pk.mofa.length > 20 && pk.mofa.filter((x) => SK.test(x.t)).length / pk.mofa.length > 0.25 && !pk.mofa.some((x) => NK.test(x.t))) {
+    const kr = rec("KOR", countries.find((x) => x.iso3 === "KOR")?.name ?? "South Korea"); const have = new Set(kr.mofa.map((x) => x.t.toLowerCase()));
+    for (const x of pk.mofa) if (!have.has(x.t.toLowerCase())) kr.mofa.push(x); console.log(`corrected MOFA label swap: ${pk.mofa.length} items moved from PRK to KOR`); pk.mofa = [];
+  }
 }
 await sleep(1200);
 
@@ -113,7 +121,7 @@ const cepas = [];
 const SUMMARY = { signed: 37, inForce: 18, negotiating: 20, asOf: "2026-07-21", source: "UAE Minister of Foreign Trade, reported by WAM and The National", url: "https://www.thenationalnews.com/business/economy/2026/07/21/uae-set-to-conclude-up-to-seven-cepas-by-year-end-dr-thani-al-zeyoudi-says/" };
 
 // ── guard: a site redesign must fail the run loudly, never overwrite good data with a thin scrape ──
-const floors = [["MOFA countries", sources.mofa.countries, 150], ["MOFA items", sources.mofa.items, 1800], ["MoFT countries", sources.moft.countries, 120], ["CEPA pages", cepas.length, 15]];
+const floors = [["MOFA countries", sources.mofa.countries, 165], ["MOFA items", sources.mofa.items, 2200], ["MoFT countries", sources.moft.countries, 165], ["CEPA pages", cepas.length, 18]];
 const bad = floors.filter(([, n, min]) => n < min); if (bad.length) { console.error("REFUSING TO WRITE, below floor:", bad.map(([k, n, min]) => `${k} ${n} < ${min}`).join("; ")); process.exit(1); }
 
 // ── write + sanity report ────────────────────────────────────────────────────

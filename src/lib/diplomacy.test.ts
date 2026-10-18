@@ -10,7 +10,7 @@ const iso = new Set((read("../../public/data/countries.json") as { iso3: string 
 
 const m = read("../../public/data/missions.json") as MissionsData; const mc = Object.entries(m.countries);
 assert.ok(mc.length >= 90, `only ${mc.length} countries with missions`); assert.ok(Object.values(m.totals).reduce((a, b) => a + b, 0) >= 110, "too few missions");
-for (const [k, list] of mc) { assert.ok(iso.has(k), `unknown country ${k}`); assert.ok(list.some((x) => x.type === "embassy") || k === "CHE" || list.length, `${k}: no mission`);
+for (const [k, list] of mc) { assert.ok(iso.has(k), `unknown country ${k}`); assert.ok(list.length > 0, `${k}: no mission`);
   for (const x of list) { assert.ok(x.name && x.type, `${k}: nameless mission`); if (x.email) assert.match(x.email, /^[\w.+-]+@[\w.-]+\.\w+$/); if (x.head) { assert.ok(!/^(H\.E\.?|HE)\s/i.test(x.head.name), `${k}: title left in name "${x.head.name}"`); assert.ok(x.head.name !== x.head.name.toUpperCase(), `${k}: all-caps name`); } if (x.lat != null) assert.ok(Math.abs(x.lat) <= 90 && Math.abs(x.lon!) <= 180); } }
 assert.equal(m.countries.IND?.filter((x) => x.type === "embassy").length, 1); assert.ok((m.countries.IND?.length ?? 0) >= 3, "India should have an embassy and consulates");
 assert.ok(m.countries.USA?.some((x) => x.type === "permanent-mission"), "UN permanent mission in the USA");

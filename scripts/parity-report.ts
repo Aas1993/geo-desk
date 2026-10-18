@@ -12,7 +12,7 @@ for (const g of GROUPS) {
   const ls = nonMember.filter((l) => l.group === g.id); if (!ls.length) continue;
   lines.push(`## ${g.en}`, "", "| Layer | Status | Note |", "|---|---|---|", ...ls.map((l) => `| ${l.en} | ${statusLabel[l.status].en} | ${(l.note ?? "").replace(/\|/g, "/")} |`), "");
 }
-lines.push("## Membership layers", "", `Live: ${members.filter((l) => l.status === "live").map((l) => l.en.split(" · ")[0]).join(", ")}.`, "", `Planned (no trustworthy member list yet): ${members.filter((l) => l.status !== "live").map((l) => l.en.split(" · ")[0]).join(", ")}.`, "");
+lines.push("## Membership layers", "", `Live: ${members.filter((l) => l.status === "live").map((l) => l.en.split(" · ")[0]).join(", ")}.`, "", `No list drawn (see each layer's reason): ${members.filter((l) => l.status !== "live").map((l) => l.en.split(" · ")[0]).join(", ")}.`, "");
 lines.push("## Not layers", "", "| Feature | Status | Where / what is missing |", "|---|---|---|",
   ...[
     ["Country dossier (overview, economy, trade, military, UN votes, society, news)", "Live", "Country panel"],

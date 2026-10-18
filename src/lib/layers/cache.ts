@@ -1,5 +1,7 @@
 // Tiny in-memory TTL cache with single-flight, shared by the layer data routes. Per-process, lost on restart (see the architecture notes).
 const store = new Map<string, { exp: number; v: unknown }>(); const inflight = new Map<string, Promise<unknown>>();
+/** Read a cached value without loading it; undefined when absent or expired. */
+export function peek<T>(key: string): T | undefined { const hit = store.get(key); return hit && hit.exp > Date.now() ? (hit.v as T) : undefined; }
 export async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<{ value: T; at: number; fromCache: boolean }> {
   const hit = store.get(key); const now = Date.now();
   if (hit && hit.exp > now) return { value: hit.v as T, at: hit.exp - ttlMs, fromCache: true };

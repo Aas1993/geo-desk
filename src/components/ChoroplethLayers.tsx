@@ -7,6 +7,7 @@ import { loadOrgs } from "@/lib/layers/orgs-client";
 import { allAgreements, has, loadAgreements } from "@/lib/agreements-client";
 import { liveCount, loadFlights } from "@/lib/flights-client";
 import { loadInvestment } from "@/lib/investment-client";
+import { loadToneMap } from "@/lib/media/client";
 export type { Orgs } from "@/lib/layers/orgs-client";
 
 type Sanctions = { built: string; countries: Record<string, { ofac: number; un: number }> };
@@ -20,6 +21,11 @@ const SOURCES: Record<string, (def: LayerDef) => Promise<Painted>> = {
   cepa: async () => { const j = await loadAgreements(); return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, c]) => c.cepa).map(([k, c]) => [k, CEPA_COLOR[c.cepa!.status]])) }; },
   uaeflights: async () => { const j = await loadFlights(); return { built: j.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, c]) => [k, liveCount(c)] as [string, number]).filter(([, n]) => n > 0)) }; },
   uaeinvestment: async () => { const j = await loadInvestment(); return { built: j.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, c]) => [k, c.outward?.usd ?? 0] as [string, number]).filter(([, n]) => n > 0)) }; },
+  mediatone: async () => {
+    const j = await loadToneMap(); if (!j) throw new Error("The world media tone map has not been built yet");
+    const col = (d: number) => (d <= -1.5 ? "#ff5d73" : d <= -0.5 ? "#ffb547" : d < 0.5 ? "#9db0cf" : d < 1.5 ? "#3ddcff" : "#2de39a");
+    return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, v]) => v.avg != null && v.points >= 6).map(([k, v]) => [k, col((v.avg as number) - j.global.avg)])) };
+  },
   dta: (def) => flag(def, "tax"), airagreements: (def) => flag(def, "air"),
   jec: async (def) => { const j = await loadAgreements(); return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, c]) => c.committees.length).map(([k]) => [k, def.color])) }; },
 };

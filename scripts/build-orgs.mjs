@@ -24,8 +24,9 @@ const CURATED = {
   g7: ["CAN", "FRA", "DEU", "ITA", "JPN", "GBR", "USA"],
   fiveeyes: ["AUS", "CAN", "NZL", "GBR", "USA"], aukus: ["AUS", "GBR", "USA"], quad: ["AUS", "IND", "JPN", "USA"],
   gcc: ["ARE", "BHR", "KWT", "OMN", "QAT", "SAU"],
-  opec: ["DZA", "COG", "GNQ", "GAB", "IRN", "IRQ", "KWT", "LBY", "NGA", "SAU", "ARE", "VEN"],
-  opecplus: ["DZA", "COG", "GNQ", "GAB", "IRN", "IRQ", "KWT", "LBY", "NGA", "SAU", "ARE", "VEN", "AZE", "BHR", "BRN", "KAZ", "MYS", "MEX", "OMN", "RUS", "SDN", "SSD"],
+  // the UAE left OPEC and OPEC+ with effect from 1 May 2026 (announced 28 April 2026)
+  opec: ["DZA", "COG", "GNQ", "GAB", "IRN", "IRQ", "KWT", "LBY", "NGA", "SAU", "VEN"],
+  opecplus: ["DZA", "COG", "GNQ", "GAB", "IRN", "IRQ", "KWT", "LBY", "NGA", "SAU", "VEN", "AZE", "BHR", "BRN", "KAZ", "MYS", "MEX", "OMN", "RUS", "SDN", "SSD"],
   brics: ["BRA", "RUS", "IND", "CHN", "ZAF", "EGY", "ETH", "IRN", "ARE", "IDN"],
   g20: ["ARG", "AUS", "BRA", "CAN", "CHN", "FRA", "DEU", "IND", "IDN", "ITA", "JPN", "KOR", "MEX", "RUS", "SAU", "ZAF", "TUR", "GBR", "USA"],
   eurozone: ["AUT", "BEL", "HRV", "CYP", "EST", "FIN", "FRA", "DEU", "GRC", "IRL", "ITA", "LVA", "LTU", "LUX", "MLT", "NLD", "PRT", "SVK", "SVN", "ESP", "BGR"],

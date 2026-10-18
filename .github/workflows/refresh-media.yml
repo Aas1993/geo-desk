@@ -1,0 +1,27 @@
+name: Refresh media tone
+# GDELT limits requests to roughly one every few seconds, so measuring every country takes about an hour. Runs weekly, and opens a PR when the data changed.
+on:
+  schedule: [{ cron: "41 2 * * 1" }]
+  workflow_dispatch:
+permissions: { contents: write, pull-requests: write }
+concurrency: { group: refresh-media, cancel-in-progress: false }
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: node scripts/build-media-tone.mjs
+      - name: Open a PR if the data changed
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          node scripts/data-changed.mjs public/data/media-tone.json || { echo "No data changes"; exit 0; }
+          branch="data/media-tone-$(date -u +%Y%m%d)"
+          git config user.name "geo-desk-bot"; git config user.email "geo-desk-bot@users.noreply.github.com"
+          git checkout -b "$branch"; git add public/data/media-tone.json
+          git commit -m "Refresh media tone data ($(date -u +%F))"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "Refresh media tone data ($(date -u +%F))" --body "Automated weekly rebuild of how each country's media cover the UAE (GDELT average tone, 30 days). Tone of coverage, not stance."

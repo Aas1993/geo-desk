@@ -13,5 +13,7 @@ for (const l of LAYERS.filter((x) => x.kind === "members")) {
 }
 // spot-check lists a diplomat would notice being wrong
 assert.equal(orgs.orgs.eu.length, 27); assert.equal(orgs.orgs.nato.length, 32); assert.equal(orgs.orgs.gcc.length, 6); assert.equal(orgs.orgs.unsc.length, 15); assert.equal(orgs.orgs.unga.length, 193);
-assert.ok(orgs.orgs.gcc.includes("ARE") && orgs.orgs.opec.includes("ARE") && orgs.orgs.brics.includes("ARE") && !orgs.orgs.nato.includes("ARE"));
+assert.ok(orgs.orgs.gcc.includes("ARE") && orgs.orgs.brics.includes("ARE") && !orgs.orgs.nato.includes("ARE"));
+// the UAE left OPEC and OPEC+ on 1 May 2026
+assert.ok(!orgs.orgs.opec.includes("ARE") && !orgs.orgs.opecplus.includes("ARE")); assert.equal(orgs.orgs.opec.length, 11);
 console.log("registry: all assertions passed");

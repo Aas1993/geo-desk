@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { rejectCrossSite } from "@/lib/guard";
 import { gather, renderFacts } from "@/lib/research/gather";
 import { SYSTEM, userMessage } from "@/lib/research/prompt";
 import { findListing } from "@/lib/markets/universe";
@@ -26,6 +27,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ exchange: string; symbol: string }> }) {
+  const bad = rejectCrossSite(req); if (bad) return bad;
   if (process.env.RESEARCH_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const { exchange, symbol } = await params; const l = await findListing(exchange, symbol);
   if (!l) return Response.json({ error: "not_found" }, { status: 404 });

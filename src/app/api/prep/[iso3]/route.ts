@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { rejectCrossSite, safeMessage } from "@/lib/guard";
 import { countryFacts, renderFacts } from "@/lib/ask/facts";
 import { PREP_SCHEMA, PREP_SYSTEM, prepMessage, type Prep } from "@/lib/ask/prep";
 
@@ -13,15 +14,16 @@ export async function GET() { const recent = store.runs.filter((t) => Date.now()
 
 export async function POST(req: Request, { params }: { params: Promise<{ iso3: string }> }) {
   if (process.env.PREP_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
+  const bad = rejectCrossSite(req); if (bad) return bad;
   const { iso3: raw } = await params; const iso3 = raw.toUpperCase(); if (!/^[A-Z]{3}$/.test(iso3) || iso3 === "ARE") return Response.json({ error: "bad_request" }, { status: 400 });
   const body = (await req.json().catch(() => ({}))) as { lang?: string; refresh?: boolean }; const ar = body.lang === "ar"; const key = `${iso3}:${ar ? "ar" : "en"}`;
   const hit = store.cache.get(key); if (hit && !body.refresh && Date.now() - Date.parse(hit.at) < TTL) return Response.json({ ...hit, cached: true });
   if (store.running.has(key)) return Response.json({ error: "busy", message: "A prep pack for this country is already being written." }, { status: 409 });
   store.runs = store.runs.filter((t) => Date.now() - t < 3600_000); if (store.runs.length >= MAX_PER_HOUR) return Response.json({ error: "rate_limited", message: `Limit of ${MAX_PER_HOUR} new prep packs per hour reached (PREP_MAX_PER_HOUR). Cached packs are still free.` }, { status: 429 });
-  store.running.add(key);
+  const slot = Date.now(); store.runs.push(slot); store.running.add(key); // reserved before any await so parallel requests cannot all pass the cap
+  const refund = () => { const rs = store.runs as number[]; const i = rs.indexOf(slot); if (i >= 0) rs.splice(i, 1); };
   try {
-    const c = await countryFacts(iso3); if (!c) return Response.json({ error: "not_found" }, { status: 404 }); if (c.facts.length < 6) return Response.json({ error: "thin", message: "Not enough data on this country yet." }, { status: 422 });
-    store.runs.push(Date.now());
+    const c = await countryFacts(iso3); if (!c) { refund(); return Response.json({ error: "not_found" }, { status: 404 }); } if (c.facts.length < 6) { refund(); return Response.json({ error: "thin", message: "Not enough data on this country yet." }, { status: 422 }); }
     const msg = await new Anthropic().messages.create({ model: MODEL, max_tokens: 4500, system: [{ type: "text", text: PREP_SYSTEM, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: prepMessage({ facts: renderFacts(c.facts, c.gaps), country: c.name, arabic: ar }) }], output_config: { effort: "low", format: { type: "json_schema", schema: PREP_SCHEMA as unknown as Record<string, unknown> } } }, { signal: req.signal });
     if (msg.stop_reason === "max_tokens" || msg.stop_reason === "refusal") return Response.json({ error: msg.stop_reason, message: msg.stop_reason === "refusal" ? "The model declined to write this pack." : "The pack was cut off. Try again." }, { status: 502 });
     let prep: Prep; try { prep = JSON.parse(msg.content.map((b) => (b.type === "text" ? b.text : "")).join("")) as Prep; } catch { return Response.json({ error: "bad_output", message: "The model returned an unreadable pack. Try again." }, { status: 502 }); }
@@ -33,6 +35,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
   } catch (e) {
     if (req.signal.aborted) return Response.json({ error: "aborted" }, { status: 499 });
     const status = e instanceof Anthropic.APIError ? e.status : undefined;
-    return Response.json({ error: "upstream", message: status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : status === 400 && /credit/i.test(String((e as Error).message)) ? "Your Anthropic credit balance is too low." : e instanceof Error ? e.message : "error" }, { status: 502 });
+    return Response.json({ error: "upstream", message: status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : status === 400 && /credit/i.test(String((e as Error).message)) ? "Your Anthropic credit balance is too low." : safeMessage(e) }, { status: 502 });
   } finally { store.running.delete(key); }
 }

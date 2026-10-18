@@ -2,7 +2,7 @@
 // Transparent by design: six components, fixed weights, every raw value kept so the app can show exactly why a country scores what it does. Scores are percentile ranks
 // among all countries (a country with no data on a component scores 0 there), except UN alignment, which is scaled linearly between the least and most aligned country.
 // This is an analytical convenience, not an official assessment: it measures activity and ties, not friendship, and says nothing about direction of influence.
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { writeFileSync } from "node:fs";
 const D = (f) => JSON.parse(readFileSync(new URL(`../public/data/${f}`, import.meta.url), "utf8"));
 const countries = D("countries.json").filter((c) => c.iso3 !== "ARE").map((c) => c.iso3);

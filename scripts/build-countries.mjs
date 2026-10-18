@@ -1,5 +1,5 @@
 // Builds public/data/countries.json from World Bank (basics) + Wikidata (numeric id, Arabic name, currency, languages, borders).
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync, renameSync, existsSync } from "node:fs";
 const UA = { "User-Agent": "geo-desk/0.1 (local dev build script)" };
 const j = async (u, h = {}) => { const r = await fetch(u, { headers: { ...UA, ...h } }); if (!r.ok) throw new Error(u + " " + r.status); return r.json(); };
 
@@ -45,5 +45,8 @@ const out = wb.map((c) => {
     ...(SPECIAL[c.id] ?? {}),
   };
 }).filter((c) => c.num);
-writeFileSync(new URL("../public/data/countries.json", import.meta.url), JSON.stringify(out));
+// Refuse to overwrite a good file with a thin one: a partial Wikidata answer leaves most countries without a numeric code and they would all be filtered out above.
+const target = new URL("../public/data/countries.json", import.meta.url); const prev = existsSync(target) ? JSON.parse(readFileSync(target, "utf8")).length : 0;
+if (out.length < 190 || (prev && out.length < prev * 0.95)) { console.error(`REFUSING TO WRITE: ${out.length} countries (existing file has ${prev})`); process.exit(1); }
+writeFileSync(new URL("../public/data/countries.json.tmp", import.meta.url), JSON.stringify(out)); renameSync(new URL("../public/data/countries.json.tmp", import.meta.url), target);
 console.log("countries:", out.length, "of wb", wb.length, "| with ar:", out.filter((c) => c.nameAr).length, "| with borders:", out.filter((c) => c.borders.length).length);

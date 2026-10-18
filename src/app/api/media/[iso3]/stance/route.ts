@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { rejectCrossSite } from "@/lib/guard";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { peekArticles } from "@/lib/media/gdelt";
@@ -20,6 +21,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ iso3: string }> }) {
+  const bad = rejectCrossSite(req); if (bad) return bad;
   if (process.env.MEDIA_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const { iso3: raw } = await params; const iso3 = raw.toUpperCase(); if (!/^[A-Z]{3}$/.test(iso3) || iso3 === "ARE") return Response.json({ error: "bad_request" }, { status: 400 });
   const body = (await req.json().catch(() => ({}))) as { lang?: string; refresh?: boolean }; const arabic = body.lang === "ar"; const key = `${iso3}:${arabic ? "ar" : "en"}`;

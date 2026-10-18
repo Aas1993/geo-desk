@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { rejectCrossSite } from "@/lib/guard";
 import { WORLD_SYSTEM } from "@/lib/ask/prompt";
 import { renderFacts, worldFacts } from "@/lib/ask/facts";
 
@@ -9,6 +10,7 @@ type Done = { brief: string; facts: { id: string; text: string; src: string; url
 const g = globalThis as unknown as { __gdWorld?: { cache: Map<string, Done>; running: boolean; runs: number[] } }; const store = (g.__gdWorld ??= { cache: new Map(), running: false, runs: [] });
 
 export async function POST(req: Request) {
+  const bad = rejectCrossSite(req); if (bad) return bad;
   const body = (await req.json().catch(() => ({}))) as { lang?: string; refresh?: boolean }; const ar = body.lang === "ar"; const key = ar ? "ar" : "en";
   const hit = store.cache.get(key); if (hit && !body.refresh && Date.now() - Date.parse(hit.at) < TTL) return Response.json({ ...hit, cached: true });
   if (store.running) return Response.json({ error: "busy", message: "A world brief is already being written." }, { status: 409 });

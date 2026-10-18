@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { rejectCrossSite, safeMessage } from "@/lib/guard";
 import { countryFacts, renderFacts } from "@/lib/ask/facts";
 import { SCHEMA, SYSTEM, userMessage } from "@/lib/brief/prompt";
 
@@ -23,6 +24,7 @@ export async function GET() {
 
 export async function POST(req: Request, { params }: { params: Promise<{ iso3: string }> }) {
   if (process.env.BRIEF_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
+  const bad = rejectCrossSite(req); if (bad) return bad;
   const { iso3: raw } = await params; const iso3 = raw.toUpperCase(); if (!/^[A-Z]{3}$/.test(iso3)) return Response.json({ error: "bad_request" }, { status: 400 });
   const body = (await req.json().catch(() => ({}))) as { lang?: string; refresh?: boolean }; const arabic = body.lang === "ar"; const key = `${iso3}:${arabic ? "ar" : "en"}`;
   const hit = store.cache.get(key);
@@ -30,10 +32,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
   if (store.running.has(key)) return Response.json({ error: "busy", message: "A brief for this country is already being written." }, { status: 409 });
   store.runs = store.runs.filter((t) => Date.now() - t < 3600_000);
   if (store.runs.length >= MAX_PER_HOUR) return Response.json({ error: "rate_limited", message: `Limit of ${MAX_PER_HOUR} new briefs per hour reached (BRIEF_MAX_PER_HOUR). Cached briefs are still free.` }, { status: 429 });
-  store.running.add(key);
+  const slot = Date.now(); store.runs.push(slot); store.running.add(key); // reserved before any await so parallel requests cannot all pass the cap
+  const refund = () => { const rs = store.runs as number[]; const i = rs.indexOf(slot); if (i >= 0) rs.splice(i, 1); };
   try {
-    const gathered = await countryFacts(iso3); if (!gathered) return Response.json({ error: "not_found" }, { status: 404 });
-    store.runs.push(Date.now());
+    const gathered = await countryFacts(iso3); if (!gathered) { refund(); return Response.json({ error: "not_found" }, { status: 404 }); }
     const client = new Anthropic(); // credentials: ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login` profile
     const msg = await client.messages.create({
       model: MODEL, max_tokens: 3000, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],

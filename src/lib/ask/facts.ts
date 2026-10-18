@@ -4,6 +4,7 @@ import { gatherCountryFacts, type Fact } from "@/lib/brief/facts";
 import { buildAlerts } from "@/lib/alerts";
 import { cached } from "@/lib/layers/cache";
 import { parseRss } from "@/lib/rss";
+import { oneLine } from "@/lib/guard";
 import { cepaEffect, outlookRank, tradeSummary, usdM, type OutlookData, type PartnershipData, type TradeData } from "@/lib/intel";
 
 type Dict = Record<string, unknown>;
@@ -46,4 +47,4 @@ export async function worldFacts(): Promise<{ facts: Fact[] }> {
   for (const x of (vs?.items ?? []).filter((v) => v.l >= 2).slice(0, 12)) facts.push({ id: `F${++n}`, kind: "engagement", text: `${x.d} · ${x.k}: ${x.t}`, src: "WAM headline (auto-classified)", url: `https://www.wam.ae/en/article/${x.u}`, t: Date.parse(x.d) });
   return { facts };
 }
-export const renderFacts = (facts: Fact[], gaps: string[] = []) => facts.map((x) => `[${x.id}] (${x.kind}, ${x.src}${x.t ? ", " + new Date(x.t).toISOString().slice(0, 10) : ""}) ${x.text}`).join("\n") + (gaps.length ? `\nGAPS: ${gaps.join(" ")}` : "");
+export const renderFacts = (facts: Fact[], gaps: string[] = []) => facts.map((x) => `[${x.id}] (${oneLine(x.kind, 40)}, ${oneLine(x.src, 80)}${x.t ? ", " + new Date(x.t).toISOString().slice(0, 10) : ""}) ${oneLine(x.text, 1800)}`).join("\n") + (gaps.length ? `\nGAPS: ${gaps.join(" ")}` : "");

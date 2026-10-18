@@ -23,7 +23,7 @@ const T = {
     positions: "Approved UAE positions and guidance", previous: "Previous meetings, outcomes and commitments", objectives: "Objectives for this meeting",
     go: "Generate briefing", regen: "Regenerate", again: "New briefing", close: "Close", running: "Researching and writing…", facts: "UAE-side record collected", p1: "Executive brief", p2: "Intelligence dossier", p3: "Talking points", all: "Whole document",
     cost: "Each run reads the web and bills your Anthropic account: the cap per run is set by the depth, and a typical run costs about", costTail: "(model tokens plus about 1 cent per web search; the actual cost is shown afterwards). Results are cached for 6 hours.", left: "new briefings left this hour",
-    copy: "Copy", copied: "Copied", pdf: "PDF", word: "Word", pptx: "PowerPoint export is not built yet", sources: "Sources", cited: "cited", other: "also found", usage: "Usage", searches: "Web searches", pages: "Pages read", tokens: "Tokens in / out", costL: "Estimated cost",
+    copy: "Copy", copied: "Copied", pdf: "PDF", word: "Word", ppt: "PowerPoint", pptx: "The deck has one slide per section; check layout before presenting.", deckFail: "The deck could not be built:", confirmClose: "A briefing is still being written. Closing now stops it and discards the result, and the cost so far is still charged. Close anyway?", sources: "Sources", cited: "cited", other: "also found", usage: "Usage", searches: "Web searches", pages: "Pages read", tokens: "Tokens in / out", costL: "Estimated cost",
     classification: "DRAFT FOR MINISTERIAL REVIEW · AI-GENERATED FROM PUBLIC SOURCES AND THE APP'S DATASETS", foot: "AI-generated from public sources and the app's own datasets; every figure should be verified before use. Items marked DESK INPUT REQUIRED need approved UAE positions, internal records or mandates that this application does not hold. Not legal, sanctions-compliance, investment or travel advice, and not an intelligence assessment.",
     disabled: "Detailed briefings are switched off on this server.", errCred: "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`.", errCredits: "Your Anthropic credit balance is too low.", errGeneric: "The briefing failed:", trunc: "The briefing hit its length ceiling and may be cut off. Regenerate at a deeper setting or with a narrower focus.", stale: "Written more than 6 hours ago. Regenerate before the meeting to pick up the latest developments.", est: { executive: "$0.45 (measured)", standard: "$0.80 (measured)", comprehensive: "$1.80 (measured)" } },
   ar: { title: "موجز الوزير التفصيلي", sub: "موجز استراتيجي عن الدولة لوزير دولة إماراتي: موجز تنفيذي وملف استخباري ونقاط حديث للقاء.",
@@ -32,7 +32,7 @@ const T = {
     positions: "المواقف والتوجيهات الإماراتية المعتمدة", previous: "اللقاءات السابقة ونتائجها والالتزامات", objectives: "أهداف هذا اللقاء",
     go: "إنشاء الموجز", regen: "إعادة الإنشاء", again: "موجز جديد", close: "إغلاق", running: "جارٍ البحث والكتابة…", facts: "تم جمع السجل الإماراتي", p1: "الموجز التنفيذي", p2: "الملف الاستخباري", p3: "نقاط الحديث", all: "المستند كاملًا",
     cost: "كل تشغيل يقرأ الويب ويُحتسب على حساب Anthropic: سقف التشغيل يحدده العمق، وتبلغ تكلفة التشغيل المعتاد نحو", costTail: "(رموز النموذج مع نحو سنت لكل بحث ويب؛ وتظهر التكلفة الفعلية بعد ذلك). النتائج مخزّنة 6 ساعات.", left: "موجزات جديدة متبقية هذه الساعة",
-    copy: "نسخ", copied: "تم النسخ", pdf: "PDF", word: "Word", pptx: "التصدير إلى PowerPoint غير متاح بعد", sources: "المصادر", cited: "مستشهد بها", other: "عُثر عليها أيضًا", usage: "الاستخدام", searches: "عمليات بحث", pages: "صفحات مقروءة", tokens: "الرموز دخل / خرج", costL: "التكلفة التقديرية",
+    copy: "نسخ", copied: "تم النسخ", pdf: "PDF", word: "Word", ppt: "PowerPoint", pptx: "العرض شريحة لكل قسم؛ راجع التنسيق قبل التقديم.", deckFail: "تعذّر إنشاء العرض:", confirmClose: "ما زال الموجز قيد الكتابة. الإغلاق الآن يوقفه ويتجاهل النتيجة، وتبقى التكلفة المتكبدة محتسبة. هل تغلق على أي حال؟", sources: "المصادر", cited: "مستشهد بها", other: "عُثر عليها أيضًا", usage: "الاستخدام", searches: "عمليات بحث", pages: "صفحات مقروءة", tokens: "الرموز دخل / خرج", costL: "التكلفة التقديرية",
     classification: "مسودة للمراجعة الوزارية · مُولَّدة بالذكاء الاصطناعي من مصادر عامة وبيانات التطبيق", foot: "مُولَّد بالذكاء الاصطناعي من مصادر عامة وبيانات التطبيق؛ يجب التحقق من كل رقم قبل استخدامه. البنود الموسومة «مطلوب مدخل من المكتب» تحتاج إلى مواقف إماراتية معتمدة أو سجلات داخلية أو تفويضات لا يملكها التطبيق. ليس نصيحة قانونية أو امتثالًا للعقوبات أو استثمارية أو سفر، وليس تقييمًا استخباريًا.",
     disabled: "الموجزات التفصيلية متوقفة على هذا الخادم.", errCred: "بيانات اعتماد Anthropic مفقودة أو منتهية.", errCredits: "رصيدك في Anthropic منخفض جدًا.", errGeneric: "تعذّر إنشاء الموجز:", trunc: "بلغ الموجز سقف الطول وقد يكون مقطوعًا. أعد الإنشاء بعمق أكبر أو بتركيز أضيق.", stale: "كُتب قبل أكثر من 6 ساعات. أعد الإنشاء قبل اللقاء لإدراج آخر التطورات.", est: { executive: "0.45 دولار (مقيس)", standard: "0.8 دولار (مقيس)", comprehensive: "1.8 دولار (مقيس)" } },
 } as const;
@@ -50,15 +50,19 @@ export function DossierWorkspace({ c, onClose }: { c: Country; onClose: () => vo
   const [counterpart, setCounterpart] = useState<Counterpart>("foreign-minister"); const [cname, setCname] = useState(""); const [meeting, setMeeting] = useState<Meeting>("bilateral"); const [date, setDate] = useState(""); const [depth, setDepth] = useState<Depth>("standard"); const [focus, setFocus] = useState<Focus[]>(["comprehensive"]);
   const [notes, setNotes] = useState({ positions: "", previous: "", objectives: "" });
   const [phase, setPhase] = useState<"form" | "running" | "done" | "error">("form"); const [text, setText] = useState(""); const [steps, setSteps] = useState<Step[]>([]); const [sources, setSources] = useState<Source[]>([]); const [tiles, setTiles] = useState<Tile[]>([]);
-  const [saved, setSaved] = useState<Saved | null>(null); const [err, setErr] = useState<{ error: string; message?: string } | null>(null); const [status, setStatus] = useState<Status | null>(null); const [part, setPart] = useState(0); const [copied, setCopied] = useState(false); const [now, setNow] = useState(0);
-  const abort = useRef<AbortController | null>(null); const stepId = useRef(0); const [mounted, setMounted] = useState(false);
+  const [saved, setSaved] = useState<Saved | null>(null); const [err, setErr] = useState<{ error: string; message?: string } | null>(null); const [status, setStatus] = useState<Status | null>(null); const [part, setPart] = useState(0); const [copied, setCopied] = useState(false); const [now, setNow] = useState(0); const [deckBusy, setDeckBusy] = useState(false); const [deckErr, setDeckErr] = useState("");
+  const abort = useRef<AbortController | null>(null); const stepId = useRef(0); const [mounted, setMounted] = useState(false); const phaseRef = useRef(phase); const closeRef = useRef(onClose);
+  useEffect(() => { phaseRef.current = phase; closeRef.current = onClose; });
+  /** Closing mid-run stops the model call and discards the result, but the money already spent is gone: ask first. */
+  const requestClose = () => { if (phaseRef.current === "running" && !window.confirm(T[lang].confirmClose)) return; closeRef.current(); };
+  const closeFn = useRef(requestClose); useEffect(() => { closeFn.current = requestClose; });
 
   useEffect(() => {
     const t0 = setTimeout(() => { setMounted(true); setNow(Date.now()); try { const s = localStorage.getItem(storeKey); if (s) { const v = JSON.parse(s) as Saved; setSaved(v); setText(v.report); setSources(v.sources); setTiles(v.tiles ?? []); setPhase("done"); } } catch { /* none saved */ } }, 0);
     fetch("/api/dossier/" + c.iso3).then((r) => r.json()).then(setStatus).catch(() => {});
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; document.addEventListener("keydown", esc); const prev = document.body.style.overflow; document.body.style.overflow = "hidden";
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") closeFn.current(); }; document.addEventListener("keydown", esc); const prev = document.body.style.overflow; document.body.style.overflow = "hidden";
     return () => { clearTimeout(t0); abort.current?.abort(); document.removeEventListener("keydown", esc); document.body.style.overflow = prev; };
-  }, [c.iso3, storeKey, onClose]);
+  }, [c.iso3, storeKey]);
 
   const push = (kind: Step["kind"], t: string) => setSteps((s) => { const last = s[s.length - 1]; if (kind === "analyse" && last?.kind === "analyse") return [...s.slice(0, -1), { ...last, text: String((Number(last.text) || 1) + 1) }]; return [...s.slice(-40), { id: ++stepId.current, kind, text: kind === "analyse" ? "1" : t }]; });
   async function run(refresh: boolean) {
@@ -88,6 +92,12 @@ export function DossierWorkspace({ c, onClose }: { c: Country; onClose: () => vo
   const cited = phase === "done" ? sources.filter((s) => text.includes(s.url) || text.includes(decodeURI(s.url))) : []; const rest = sources.filter((s) => !cited.includes(s));
   const name = rtl && c.nameAr ? c.nameAr : c.name; const fileBase = `${c.iso3}-ministerial-briefing`;
   const pdfHtml = () => briefingHtml(text, { title: `${u.title}: ${name}`, rtl, foot: `${u.foot} ${saved?.model ?? ""} · ${saved?.at ?? ""}`, classification: u.classification });
+  const makeDeck = async () => {
+    setDeckBusy(true); setDeckErr("");
+    try { const { buildDeck } = await import("@/lib/dossier/deck"); const blob = await buildDeck(text, { title: `${u.title}: ${name}`, subtitle: `${name} · ${(saved?.at ?? "").slice(0, 10)}`, rtl, classification: u.classification, foot: `${u.foot} ${saved?.model ?? ""} · ${saved?.at ?? ""}`, sources: (cited.length ? cited : sources).slice(0, 42).map((x) => ({ url: x.url, title: x.title })) });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${fileBase}.pptx`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } catch (e) { setDeckErr(`${u.deckFail} ${(e as Error).message}`); } finally { setDeckBusy(false); }
+  };
   const toggleFocus = (f: Focus) => setFocus((cur) => { if (f === "comprehensive") return ["comprehensive"]; const n = cur.filter((x) => x !== "comprehensive"); const next = n.includes(f) ? n.filter((x) => x !== f) : [...n, f]; return next.length ? next : ["comprehensive"]; });
   const errText = !err ? "" : err.error === "no_credits" ? u.errCredits : err.error === "no_credentials" ? u.errCred : err.error === "disabled" ? u.disabled : err.message ? err.message : `${u.errGeneric} ${err.error}`;
   const stale = phase === "done" && saved && now > 0 && now - Date.parse(saved.at) > 6 * 3600_000;
@@ -98,10 +108,10 @@ export function DossierWorkspace({ c, onClose }: { c: Country; onClose: () => vo
     <div role="dialog" aria-modal="true" aria-label={u.title} dir={rtl ? "rtl" : "ltr"} className="fixed inset-0 z-[100] flex flex-col bg-bg0 text-t0">
       <header className="flex shrink-0 items-center gap-3 border-b border-line bg-bg1 px-4 py-3">
         <div className="min-w-0 flex-1"><div className="display truncate text-[17px] font-semibold">{c.flag} {name} · {u.title}</div><p className="hidden truncate text-[12px] text-t2 sm:block">{u.sub}</p></div>
-        <button onClick={onClose} aria-label={u.close} className="grid size-9 place-items-center rounded-[8px] bg-bg3 text-t1 hover:text-t0"><X size={16} /></button>
+        <button onClick={requestClose} aria-label={u.close} className="grid size-9 place-items-center rounded-[8px] bg-bg3 text-t1 hover:text-t0"><X size={16} /></button>
       </header>
-      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto grid max-w-[1280px] gap-5 p-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="scroll-thin min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+        <div className="mx-auto grid max-w-[1280px] grid-cols-[minmax(0,1fr)] gap-5 p-4 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="min-w-0 space-y-4">
             {(phase === "form" || phase === "error") && (
               <section className="rounded-[12px] border border-line bg-bg1 p-4">
@@ -148,9 +158,11 @@ export function DossierWorkspace({ c, onClose }: { c: Country; onClose: () => vo
                       <button onClick={() => saveBlob(`${fileBase}.md`, "text/markdown", text)} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Download size={13} />.md</button>
                       <button onClick={() => printBriefing(pdfHtml())} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Printer size={13} />{u.pdf}</button>
                       <button onClick={() => saveBlob(`${fileBase}.doc`, "application/msword", briefingHtml(text, { title: `${u.title}: ${name}`, rtl, foot: `${u.foot} ${saved?.model ?? ""} · ${saved?.at ?? ""}`, classification: u.classification }, true))} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><FileText size={13} />{u.word}</button>
+                      <button onClick={makeDeck} disabled={deckBusy} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0 disabled:opacity-50"><FileText size={13} />{deckBusy ? "…" : u.ppt}</button>
                       <button onClick={() => setPhase("form")} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-accent hover:text-t0"><RefreshCw size={13} />{u.again}</button>
                     </div>
                   </div>)}
+                {deckErr && <p role="alert" className="mb-3 rounded-[8px] border border-down/40 bg-down/10 p-2 text-[12px]">{deckErr}</p>}
                 {stale && <p role="status" className="mb-3 rounded-[8px] border border-warn/40 bg-warn/10 p-2 text-[12px]">{u.stale}</p>}
                 <article dir={rtl ? "rtl" : "ltr"}><Markdown source={phase === "done" ? body : text} />{phase === "running" && <span className="ms-0.5 inline-block h-4 w-1.5 animate-pulse bg-accent align-middle" />}</article>
                 {saved?.truncated && <p className="mt-4 text-[12px] text-warn">{u.trunc}</p>}
@@ -158,7 +170,7 @@ export function DossierWorkspace({ c, onClose }: { c: Country; onClose: () => vo
               </section>
             )}
           </div>
-          <aside className="space-y-4">
+          <aside className="min-w-0 space-y-4">
             <section className="rounded-[12px] border border-line bg-bg1 p-3.5"><h3 className="label mb-2">{u.sources} ({cited.length ? `${cited.length} ${u.cited} · ${rest.length} ${u.other}` : sources.length})</h3>
               {!sources.length ? <p className="text-[12.5px] text-t2">—</p> : <ol className="scroll-thin max-h-[480px] space-y-2 overflow-y-auto text-[12.5px]">{[...cited, ...rest].map((s, i) => <li key={s.url} className="flex gap-2"><span className="num w-5 shrink-0 text-end text-t2">{i + 1}</span><a href={s.url} target="_blank" rel="noreferrer noopener" className="min-w-0 break-words text-t1 hover:text-accent"><span className="block truncate text-t0" title={s.title} dir="auto">{s.title}</span><span className="num text-[11px] text-t2">{host(s.url)}</span></a></li>)}</ol>}
             </section>

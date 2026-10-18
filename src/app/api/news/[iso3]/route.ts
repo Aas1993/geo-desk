@@ -1,10 +1,14 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { parseRss } from "@/lib/rss";
 import type { Headline } from "@/lib/types";
 
 export async function GET(req: Request, { params }: { params: Promise<{ iso3: string }> }) {
-  await params;
-  const sp = new URL(req.url).searchParams; const name = sp.get("name")?.slice(0, 80); const uae = sp.get("uae") === "1";
-  if (!name) return Response.json({ items: [] });
+  const { iso3: raw } = await params; const iso3 = raw.toUpperCase(); if (!/^[A-Z]{3}$/.test(iso3)) return Response.json({ items: [] }, { status: 400 });
+  const uae = new URL(req.url).searchParams.get("uae") === "1";
+  // the search phrase is the country's own name from the dataset, so the query string cannot inject search operators or turn this into an open query proxy
+  const list = JSON.parse(await readFile(path.join(process.cwd(), "public/data/countries.json"), "utf8")) as { iso3: string; name: string }[]; const name = list.find((c) => c.iso3 === iso3)?.name;
+  if (!name) return Response.json({ items: [] }, { status: 404 });
   try {
     // "uae=1" asks for coverage that links the country and the UAE; both queries are re-fetched at most every 5 minutes
     const q = uae ? `"${name}" (UAE OR Emirates OR Emirati OR "Abu Dhabi" OR Dubai)` : `"${name}"`;

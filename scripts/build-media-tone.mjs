@@ -5,7 +5,7 @@
 // What it measures: tone of event coverage, not stance. War and crime news reads negative whatever the attitude. Outlets on generic domains (.com) that are not in the
 // outlet list cannot be attributed to a country and are left out of the per-country figures (they still count towards the world baseline).
 // Usage: node scripts/build-media-tone.mjs [--days=21]
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { unzipSync } from "fflate";
 const UA = { "User-Agent": "geo-desk research (https://github.com/Aas1993/geo-desk)" };
 const DAYS = +(process.argv.find((a) => a.startsWith("--days="))?.split("=")[1] ?? 21);
@@ -42,6 +42,8 @@ const MIN = 20; const out = {};
 for (const [iso, e] of acc) { if (e.n < MIN) { out[iso] = { avg: null, points: e.n }; continue; } const days = [...e.d.keys()].sort(); const third = Math.max(1, Math.floor(days.length / 3)); const mean = (ds) => { let n = 0, s = 0; for (const d of ds) { n += e.d.get(d).n; s += e.d.get(d).s; } return n ? s / n : 0; };
   out[iso] = { avg: +(e.s / e.n).toFixed(2), points: e.n, trend: days.length >= 6 ? +(mean(days.slice(-third)) - mean(days.slice(0, third))).toFixed(2) : undefined, at: new Date().toISOString().slice(0, 10) }; }
 const measured = Object.values(out).filter((v) => v.avg != null).length; if (measured < 25) { console.error(`REFUSING TO WRITE: only ${measured} countries reach ${MIN} events`); process.exit(1); }
-writeFileSync(new URL("../public/data/media-tone.json", import.meta.url), JSON.stringify({ built: new Date().toISOString(), days: DAYS, minEvents: MIN, source: { name: "GDELT 2.0 Events: tone of events involving UAE actors, attributed to the reporting outlet's country", url: "https://www.gdeltproject.org/", note: "Tone of event coverage, not stance. Attribution is by known outlet or country-code domain, so outlets on generic domains are not attributed. Countries with fewer than 20 events are left empty." }, coverage: { measured, total: countries.length - 1 }, global: { avg: +(all.s / all.n).toFixed(2), points: all.n }, countries: out }));
+const prevFile = new URL("../public/data/media-tone.json", import.meta.url); const prevTone = existsSync(prevFile) ? JSON.parse(readFileSync(prevFile, "utf8")) : null; const world = all.s / all.n;
+if (prevTone?.global?.avg != null && Math.abs(world - prevTone.global.avg) > 3) { console.error(`REFUSING TO WRITE: world tone moved from ${prevTone.global.avg} to ${world.toFixed(2)}`); process.exit(1); }
+writeFileSync(prevFile, JSON.stringify({ built: new Date().toISOString(), days: DAYS, minEvents: MIN, source: { name: "GDELT 2.0 Events: tone of events involving UAE actors, attributed to the reporting outlet's country", url: "https://www.gdeltproject.org/", note: "Tone of event coverage, not stance. Attribution is by known outlet or country-code domain, so outlets on generic domains are not attributed. Countries with fewer than 20 events are left empty." }, coverage: { measured, total: countries.length - 1 }, global: { avg: +(all.s / all.n).toFixed(2), points: all.n }, countries: out }));
 const ranked = Object.entries(out).filter(([, v]) => v.avg != null).sort((a, b) => a[1].avg - b[1].avg); console.log(`measured ${measured} countries | world avg ${(all.s / all.n).toFixed(2)}`);
 console.log("coolest:", ranked.slice(0, 8).map(([k, v]) => `${k} ${v.avg} (n${v.points})`).join(" ")); console.log("warmest:", ranked.slice(-8).map(([k, v]) => `${k} ${v.avg} (n${v.points})`).join(" ")); console.log("most events:", Object.entries(out).sort((a, b) => b[1].points - a[1].points).slice(0, 8).map(([k, v]) => `${k} n${v.points}`).join(" "));

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ExternalLink, LayoutDashboard, Plus, Sparkles, Star, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, LayoutDashboard, Plus, Sparkles, Star, X } from "lucide-react";
 import { useStore, useT } from "@/lib/store";
 import { PRESETS, WIDGETS, useDashboard, type WidgetId } from "@/lib/dashboard-store";
 import { useAlerts } from "@/lib/alerts-client";

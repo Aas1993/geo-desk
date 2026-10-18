@@ -1,5 +1,5 @@
 name: Refresh media tone
-# Reads GDELT's raw 15-minute event files (static downloads, no rate limit): about 4,300 small files, three minutes. Runs daily and opens a PR when the data changed.
+# Reads GDELT's raw 15-minute event files (static downloads, no rate limit): about 2,000 small files (21 days), a few minutes. Runs daily and opens a PR when the data changed.
 on:
   schedule: [{ cron: "41 2 * * *" }]
   workflow_dispatch:
@@ -24,4 +24,4 @@ jobs:
           git checkout -b "$branch"; git add public/data/media-tone.json
           git commit -m "Refresh media tone data ($(date -u +%F))"
           git push origin "$branch"
-          gh pr create --base main --head "$branch" --title "Refresh media tone data ($(date -u +%F))" --body "Automated daily rebuild of how each country's media report on the UAE (GDELT event tone, 45 days). Tone of coverage, not stance."
+          gh pr create --base main --head "$branch" --title "Refresh media tone data ($(date -u +%F))" --body "Automated daily rebuild of how each country's media report on the UAE (GDELT event tone, 21 days). Tone of coverage, not stance."

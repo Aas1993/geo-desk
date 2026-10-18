@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { rejectCrossSite } from "@/lib/guard";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { ASK_SYSTEM, askMessage } from "@/lib/ask/prompt";
@@ -14,6 +15,7 @@ const g = globalThis as unknown as { __gdAsk?: { cache: Map<string, Done>; runni
 export async function GET() { const recent = store.runs.filter((t) => Date.now() - t < 3600_000).length; return Response.json({ enabled: process.env.ASK_ENABLED !== "0", model: MODEL, remainingThisHour: Math.max(0, MAX_PER_HOUR - recent) }, { headers: { "Cache-Control": "no-store" } }); }
 
 export async function POST(req: Request) {
+  const bad = rejectCrossSite(req); if (bad) return bad;
   if (process.env.ASK_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const body = (await req.json().catch(() => ({}))) as { q?: string; iso3?: string }; const q = (body.q ?? "").replace(/\s+/g, " ").trim().slice(0, 400); if (q.length < 6) return Response.json({ error: "bad_request", message: "Ask a fuller question." }, { status: 400 });
   // which country is it about? a country named in the question wins, then the one open in the app, else the world picture

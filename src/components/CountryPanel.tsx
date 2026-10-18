@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Star, X, ArrowLeftRight, Bookmark } from "lucide-react";
+import { Star, X, ArrowLeftRight, Bookmark, Printer } from "lucide-react";
 import { useStore, useT } from "@/lib/store";
 import { displayName } from "@/lib/countries";
 import { useCountries } from "./SearchBox";
@@ -12,6 +12,7 @@ import { MediaTab } from "./MediaTab";
 import { DiplomacyTab } from "./DiplomacyTab";
 import { IconBtn } from "./ui";
 import { useDashboard } from "@/lib/dashboard-store";
+import { printOnePager } from "@/lib/one-pager";
 import type { Country, CountryDetail, TabId } from "@/lib/types";
 
 const TABS: TabId[] = ["overview", "brief", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
@@ -68,6 +69,7 @@ export function CountryPanel() {
           <p className="truncate text-[12px] text-t2">{c.region}</p>
         </div>
         <WatchBtn iso3={c.iso3} />
+        <IconBtn label={lang === "ar" ? "موجز من صفحة واحدة (طباعة)" : "One-page brief (print / PDF)"} onClick={() => void printOnePager(c, lang)}><Printer size={16} /></IconBtn>
         <IconBtn label={isDesk ? t("yourDesk") : t("setDesk")} active={isDesk} onClick={() => setDesk(isDesk ? null : c.iso3)}><Star size={17} fill={isDesk ? "currentColor" : "none"} /></IconBtn>
         <IconBtn label={t("compare")} onClick={() => openCompare(cmp && cmp !== c.iso3 ? cmp : desk && desk !== c.iso3 ? desk : c.iso3 !== "ARE" ? "ARE" : null)}><ArrowLeftRight size={16} /></IconBtn>
         <IconBtn label={t("close")} onClick={() => select(null)}><X size={18} /></IconBtn>

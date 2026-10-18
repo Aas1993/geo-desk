@@ -32,6 +32,9 @@ const SOURCES: Record<string, (def: LayerDef) => Promise<Painted>> = {
     const colors: Record<string, string> = {}; for (const c of list) { const hit = order.find(([l]) => c.languages.some((x) => x.toLowerCase().includes(l))); colors[c.iso3] = hit?.[1] ?? "#9db0cf"; }
     return { built: new Date().toISOString(), colors };
   },
+  aid: async () => { const j = (await (await fetch("/data/layers/aid.json")).json()) as { meta: { built: string }; countries: Record<string, { usd: number }> }; return { built: j.meta.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, v]) => [k, v.usd] as [string, number]).filter(([, n]) => n > 0)) }; },
+  regions: async (def) => { const j = (await (await fetch("/data/regions.json")).json()) as { meta: { built: string }; countries: Record<string, { subregion: string }> }; const color = Object.fromEntries((def.legend ?? []).map((l) => [l.label, l.color])); return { built: j.meta.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, v]) => color[v.subregion]).map(([k, v]) => [k, color[v.subregion]])) }; },
+  cyber: async () => { const j = (await (await fetch("/data/ransomware.json")).json()) as { built: string; countries: Record<string, { n30: number }> }; return { built: j.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, v]) => [k, v.n30] as [string, number]).filter(([, n]) => n > 0)) }; },
   dta: (def) => flag(def, "tax"), airagreements: (def) => flag(def, "air"),
   jec: async (def) => { const j = await loadAgreements(); return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, c]) => c.committees.length).map(([k]) => [k, def.color])) }; },
 };

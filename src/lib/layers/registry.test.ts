@@ -16,4 +16,7 @@ assert.equal(orgs.orgs.eu.length, 27); assert.equal(orgs.orgs.nato.length, 32); 
 assert.ok(orgs.orgs.gcc.includes("ARE") && orgs.orgs.brics.includes("ARE") && !orgs.orgs.nato.includes("ARE"));
 // the UAE left OPEC and OPEC+ on 1 May 2026
 assert.ok(!orgs.orgs.opec.includes("ARE") && !orgs.orgs.opecplus.includes("ARE")); assert.equal(orgs.orgs.opec.length, 11);
+// official lists reconciled with each organisation's own published count
+assert.ok(orgs.orgs.icc.length >= 120 && orgs.orgs.imf.length >= 185 && orgs.orgs.unesco.length >= 180 && orgs.orgs.fao.length >= 180, "official member lists look short");
+assert.equal(orgs.orgs.icj.length, orgs.orgs.unga.length);
 console.log("registry: all assertions passed");

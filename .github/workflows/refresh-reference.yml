@@ -1,0 +1,30 @@
+name: Refresh reference data
+# Slow-moving datasets (heritage sites, bases, exchanges, think tanks, outlets, channels, ports, power plants, aid, regions, member lists). Monthly; each builder runs on its own,
+# so one source being down does not block the others, and a builder refuses to overwrite its file on a thin result. A PR is opened only if something changed.
+on:
+  schedule: [{ cron: "23 4 1 * *" }]
+  workflow_dispatch:
+permissions: { contents: write, pull-requests: write }
+concurrency: { group: refresh-reference, cancel-in-progress: false }
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Rebuild each dataset (failures are reported, not fatal)
+        run: |
+          for s in ports power infra-supplements heritage bases exchanges thinktanks outlets channels aid regions members-extra orgs; do
+            echo "::group::build-$s"; node "scripts/build-$s.mjs" || echo "::warning::build-$s failed; keeping the committed file"; echo "::endgroup::"
+          done
+      - name: Open a PR if anything changed
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          git add -A public/data
+          git diff --cached --quiet && { echo "No data changes"; exit 0; }
+          branch="data/reference-$(date -u +%Y%m)"; git config user.name "geo-desk-bot"; git config user.email "geo-desk-bot@users.noreply.github.com"
+          git checkout -b "$branch"; git commit -m "Refresh reference data ($(date -u +%F))"; git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "Refresh reference data ($(date -u +%F))" --body "Automated monthly rebuild of the slow-moving datasets. Review the diff, especially member lists and any large changes in feature counts."

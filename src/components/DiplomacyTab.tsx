@@ -5,7 +5,6 @@ import { useT } from "@/lib/store";
 import { TYPE_LABEL, useMissions, useVisits, wamUrl, type Visit } from "@/lib/diplomacy-client";
 import { Card, Skeleton, StatTile } from "./ui";
 import { useStore } from "@/lib/store";
-import { PrepPack } from "./PrepPack";
 import { useCountries } from "./SearchBox";
 import type { Country } from "@/lib/types";
 
@@ -47,7 +46,6 @@ function CountryDiplomacy({ c }: { c: Country }) {
         <StatTile label={u.last12} value={last12 || "—"} sub={`${items.filter((x) => x.d >= cutoff && x.l === 3).length} ${u.senior.toLowerCase()}`} />
         <StatTile label={u.lastSenior} value={lastSenior ? day(lastSenior.d, lang) : u.never} />
       </div>
-      <PrepPack c={c} />
       <Card title={u.missions} icon="🏛">
         {!list.length ? <p className="text-[12.5px] text-t1">{u.none}</p> : (
           <ul className="space-y-3">{list.map((x) => (

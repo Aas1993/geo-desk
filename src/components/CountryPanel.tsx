@@ -7,6 +7,7 @@ import { useCountries } from "./SearchBox";
 import { OverviewTab, EconomyTab, TradeTab, MilitaryTab, SocietyTab, NewsTab } from "./tabs";
 import { UNTab } from "./tabs2";
 import { BriefTab } from "./BriefTab";
+import { PrepPack } from "./PrepPack";
 import { AgreementsTab } from "./AgreementsTab";
 import { MediaTab } from "./MediaTab";
 import { DiplomacyTab } from "./DiplomacyTab";
@@ -15,7 +16,7 @@ import { useDashboard } from "@/lib/dashboard-store";
 import { printOnePager } from "@/lib/one-pager";
 import type { Country, CountryDetail, TabId } from "@/lib/types";
 
-const TABS: TabId[] = ["overview", "brief", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
+const TABS: TabId[] = ["overview", "brief", "minister", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
 const cache = new Map<string, CountryDetail>();
 
 export function useDetail(c: Country | undefined) {
@@ -69,11 +70,15 @@ export function CountryPanel() {
           <p className="truncate text-[12px] text-t2">{c.region}</p>
         </div>
         <WatchBtn iso3={c.iso3} />
-        <IconBtn label={lang === "ar" ? "موجز من صفحة واحدة (طباعة)" : "One-page brief (print / PDF)"} onClick={() => void printOnePager(c, lang)}><Printer size={16} /></IconBtn>
+        <IconBtn label={lang === "ar" ? "موجز من صفحة واحدة (طباعة)" : "One-page brief (print / PDF)"} onClick={() => void printOnePager(c, lang)} className="max-sm:hidden"><Printer size={16} /></IconBtn>
         <IconBtn label={isDesk ? t("yourDesk") : t("setDesk")} active={isDesk} onClick={() => setDesk(isDesk ? null : c.iso3)}><Star size={17} fill={isDesk ? "currentColor" : "none"} /></IconBtn>
-        <IconBtn label={t("compare")} onClick={() => openCompare(cmp && cmp !== c.iso3 ? cmp : desk && desk !== c.iso3 ? desk : c.iso3 !== "ARE" ? "ARE" : null)}><ArrowLeftRight size={16} /></IconBtn>
+        <IconBtn label={t("compare")} onClick={() => openCompare(cmp && cmp !== c.iso3 ? cmp : desk && desk !== c.iso3 ? desk : c.iso3 !== "ARE" ? "ARE" : null)} className="max-sm:hidden"><ArrowLeftRight size={16} /></IconBtn>
         <IconBtn label={t("close")} onClick={() => select(null)}><X size={18} /></IconBtn>
       </header>
+      <div className="flex gap-2 px-4 pb-2 sm:hidden">
+        <button onClick={() => openCompare(cmp && cmp !== c.iso3 ? cmp : desk && desk !== c.iso3 ? desk : c.iso3 !== "ARE" ? "ARE" : null)} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-3 text-[12px] text-t1"><ArrowLeftRight size={13} />{t("compare")}</button>
+        <button onClick={() => void printOnePager(c, lang)} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-3 text-[12px] text-t1"><Printer size={13} />{lang === "ar" ? "موجز (طباعة)" : "Brief (PDF)"}</button>
+      </div>
       <div className="relative border-b border-line">
         <div ref={bar} role="tablist" aria-label="Sections" onKeyDown={onKey} className="no-scrollbar flex overflow-x-auto px-2">
           {TABS.map((id) => (
@@ -86,6 +91,7 @@ export function CountryPanel() {
       <div ref={body} role="tabpanel" className="scroll-thin flex-1 space-y-3 overflow-y-auto p-4" style={{ overscrollBehavior: "contain" }}>
         {tab === "overview" && <OverviewTab c={c} detail={detail} />}
         {tab === "brief" && <BriefTab c={c} />}
+        {tab === "minister" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "موجز الوزير يخص الدول التي تلتقي بها الإمارات." : "The ministerial brief covers the countries the UAE meets with."}</p> : <PrepPack c={c} />)}
         {tab === "economy" && <EconomyTab c={c} detail={detail} />}
         {tab === "agreements" && <AgreementsTab c={c} />}
         {tab === "diplomacy" && <DiplomacyTab c={c} />}

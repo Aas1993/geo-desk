@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useStore, useT } from "@/lib/store";
+import { useNow } from "@/lib/use-now";
 import { Card, Row, StatTile, Skeleton, EmptyState, Source, Sparkline, ShareBar } from "./ui";
 import { ago, compact, int, last, pct, usd, wmoLabel } from "@/lib/format";
 import { useCountries } from "./SearchBox";
@@ -167,27 +168,45 @@ export function SocietyTab({ detail }: { detail: D }) {
   </>)}</Gate>;
 }
 
-export function NewsTab({ c }: { c: Country }) {
-  const { t, lang } = useT();
-  const [s, set] = useState<{ iso: string; items: Headline[]; err: boolean } | null>(null); const [n, setN] = useState(0);
+/** Fetches one news feed and re-fetches it every 5 minutes while the tab is visible (and straight away when the tab becomes visible again). */
+function useNews(c: Country, uae: boolean) {
+  const [s, set] = useState<{ key: string; items: Headline[]; err: boolean; at: number } | null>(null); const [n, setN] = useState(0); const key = `${c.iso3}:${uae}`;
   useEffect(() => {
-    let dead = false;
-    fetch(`/api/news/${c.iso3}?name=${encodeURIComponent(c.name)}`).then((r) => r.json()).then((j) => { if (!dead) set({ iso: c.iso3, items: j.items ?? [], err: !!j.error }); }).catch(() => { if (!dead) set({ iso: c.iso3, items: [], err: true }); });
-    return () => { dead = true; };
-  }, [c, n]);
-  if (!s || s.iso !== c.iso3) return <div className="space-y-2"><Skeleton h={64} /><Skeleton h={64} /><Skeleton h={64} /></div>;
-  if (s.err || !s.items.length) return <EmptyState title={s.err ? t("loadFail") : t("noData")} why={s.err ? "" : t("noDataWhy")} onRetry={s.err ? () => { set(null); setN((x) => x + 1); } : undefined} />;
+    let dead = false; let last = 0;
+    const load = () => { last = Date.now(); fetch(`/api/news/${c.iso3}?name=${encodeURIComponent(c.name)}${uae ? "&uae=1" : ""}`).then((r) => r.json()).then((j) => { if (!dead) set({ key, items: j.items ?? [], err: !!j.error, at: Date.now() }); }).catch(() => { if (!dead) set((p) => (p && p.key === key && p.items.length ? { ...p, err: true } : { key, items: [], err: true, at: Date.now() })); }); };
+    load(); const i = setInterval(() => { if (document.visibilityState === "visible") load(); }, 300_000);
+    const vis = () => { if (document.visibilityState === "visible" && Date.now() - last > 300_000) load(); }; document.addEventListener("visibilitychange", vis);
+    return () => { dead = true; clearInterval(i); document.removeEventListener("visibilitychange", vis); };
+  }, [c.iso3, c.name, uae, key, n]);
+  return { s: s && s.key === key ? s : null, retry: () => { set(null); setN((x) => x + 1); } };
+}
+function NewsList({ items, lang }: { items: Headline[]; lang: "en" | "ar" }) {
+  return (
+    <ul className="space-y-2">
+      {items.map((h, i) => (
+        <li key={i}><a href={h.link} target="_blank" rel="noreferrer" className="block rounded-[8px] border border-line bg-bg1/60 p-3 hover:border-accent">
+          <div className="text-[13.5px] leading-snug text-t0">{h.title}</div>
+          <div className="mt-1.5 flex items-center gap-2 text-[11px] text-t2"><span className="font-semibold uppercase tracking-wide">{h.outlet}</span><span>·</span><span>{ago(h.ts, lang)}</span></div>
+        </a></li>
+      ))}
+    </ul>
+  );
+}
+export function NewsTab({ c }: { c: Country }) {
+  const { t, lang } = useT(); const all = useNews(c, false); const uae = useNews(c, true); const now = useNow(30_000);
+  if (!all.s) return <div className="space-y-2"><Skeleton h={64} /><Skeleton h={64} /><Skeleton h={64} /></div>;
+  if (all.s.err && !all.s.items.length) return <EmptyState title={t("loadFail")} why="" onRetry={all.retry} />;
+  const mins = Math.max(0, Math.round(((now || all.s.at) - all.s.at) / 60000)); const ar = lang === "ar";
+  const withUae = (uae.s?.items ?? []).slice(0, 8);
   return (
     <>
+      <div className="flex items-center justify-between gap-2 text-[11px] text-t2">
+        <span className="inline-flex items-center gap-1.5"><span className={`inline-block h-1.5 w-1.5 rounded-full ${all.s.err ? "bg-warn" : "bg-up"}`} />{all.s.err ? (ar ? "تعذّر التحديث، يُعرض آخر ما وصل" : "Refresh failed, showing the last results") : ar ? "يتحدّث تلقائيًا كل 5 دقائق" : "Updates itself every 5 minutes"}</span>
+        <span className="num">{ar ? `آخر تحديث منذ ${mins} د` : mins < 1 ? "updated just now" : `updated ${mins} min ago`}</span>
+      </div>
       <h3 className="label">{t("latestNews")}</h3>
-      <ul className="space-y-2">
-        {s.items.map((h, i) => (
-          <li key={i}><a href={h.link} target="_blank" rel="noreferrer" className="block rounded-[8px] border border-line bg-bg1/60 p-3 hover:border-accent">
-            <div className="text-[13.5px] leading-snug text-t0">{h.title}</div>
-            <div className="mt-1.5 flex items-center gap-2 text-[11px] text-t2"><span className="font-semibold uppercase tracking-wide">{h.outlet}</span><span>·</span><span>{ago(h.ts, lang)}</span></div>
-          </a></li>
-        ))}
-      </ul>
+      {all.s.items.length ? <NewsList items={all.s.items} lang={lang} /> : <EmptyState title={t("noData")} why={t("noDataWhy")} />}
+      {withUae.length > 0 && (<><h3 className="label mt-4">{ar ? `${c.nameAr ?? c.name} والإمارات في الأخبار` : `${c.name} and the UAE in the news`}</h3><NewsList items={withUae} lang={lang} /></>)}
       <Source name="Google News RSS" />
     </>
   );

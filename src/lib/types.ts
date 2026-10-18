@@ -15,6 +15,6 @@ export type CountryDetail = {
   weather: Weather | null;
 };
 export type Headline = { outlet: string; title: string; link: string; ts: number };
-export type TabId = "overview" | "brief" | "economy" | "trade" | "agreements" | "diplomacy" | "media" | "military" | "un" | "society" | "news";
+export type TabId = "overview" | "brief" | "minister" | "economy" | "trade" | "agreements" | "diplomacy" | "media" | "military" | "un" | "society" | "news";
 export type BilateralData = { year: number; mirror: boolean; exports: number | null; imports: number | null; topExports: { code: string; value: number }[]; topImports: { code: string; value: number }[] };
 export const HOME_ISO3 = "ARE";

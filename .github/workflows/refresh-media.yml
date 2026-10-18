@@ -1,14 +1,14 @@
 name: Refresh media tone
-# GDELT limits requests to roughly one every few seconds, so measuring every country takes about an hour. Runs weekly, and opens a PR when the data changed.
+# Reads GDELT's raw 15-minute event files (static downloads, no rate limit): about 4,300 small files, three minutes. Runs daily and opens a PR when the data changed.
 on:
-  schedule: [{ cron: "41 2 * * 1" }]
+  schedule: [{ cron: "41 2 * * *" }]
   workflow_dispatch:
 permissions: { contents: write, pull-requests: write }
 concurrency: { group: refresh-media, cancel-in-progress: false }
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,4 +24,4 @@ jobs:
           git checkout -b "$branch"; git add public/data/media-tone.json
           git commit -m "Refresh media tone data ($(date -u +%F))"
           git push origin "$branch"
-          gh pr create --base main --head "$branch" --title "Refresh media tone data ($(date -u +%F))" --body "Automated weekly rebuild of how each country's media cover the UAE (GDELT average tone, 30 days). Tone of coverage, not stance."
+          gh pr create --base main --head "$branch" --title "Refresh media tone data ($(date -u +%F))" --body "Automated daily rebuild of how each country's media report on the UAE (GDELT event tone, 45 days). Tone of coverage, not stance."

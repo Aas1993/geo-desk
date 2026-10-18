@@ -60,6 +60,7 @@ for (const [id, label, expected] of WD) {
 for (const [id, list] of Object.entries(CURATED)) { const bad = list.filter((x) => !valid.has(x)); if (bad.length) report.push(`curated ${id}: not in country list ${bad.join(",")}`); out[id] = list.filter((x) => valid.has(x)); source[id] = "curated"; }
 // organisations whose own published member lists were parsed and reconciled against their stated counts (scripts/build-members-extra.mjs)
 try { const extra = JSON.parse((await import("node:fs")).readFileSync(new URL("../public/data/layers/members-extra.json", import.meta.url), "utf8")); for (const [id, v] of Object.entries(extra.orgs)) { out[id] = v.members.filter((c) => valid.has(c)); source[id] = "official"; } } catch { console.warn("members-extra.json not found; skipping"); }
+try { const more = JSON.parse((await import("node:fs")).readFileSync(new URL("../public/data/layers/members-more.json", import.meta.url), "utf8")); for (const [id, v] of Object.entries(more.orgs)) { out[id] = v.members.filter((c) => valid.has(c)); source[id] = "official"; } } catch { console.warn("members-more.json not found; skipping"); }
 // every UN member is ipso facto a party to the Statute of the International Court of Justice
 if (out.unga) { out.icj = [...out.unga]; source.icj = "derived (UN members)"; }
 writeFileSync(new URL("../public/data/orgs.json", import.meta.url), JSON.stringify({ built: new Date().toISOString(), source, note: "Wikidata (current member-of statements) for large bodies; curated lists for small clubs. UNSC as of 2026.", orgs: out }));

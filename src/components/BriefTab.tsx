@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, RefreshCw, Copy, Download, ExternalLink } from "lucide-react";
 import { useT } from "@/lib/store";
+import { useNow } from "@/lib/use-now";
 import type { Country } from "@/lib/types";
 
 type Fact = { id: string; kind: string; text: string; src: string; url?: string };
@@ -10,16 +11,15 @@ type Saved = { brief: Brief; facts: Fact[]; gaps: string[]; at: string; model: s
 type Status = { enabled: boolean; model: string; ttlHours: number; remainingThisHour: number };
 
 const LABEL: Record<string, { en: string; ar: string }> = {
-  political: { en: "Political", ar: "سياسي" }, military: { en: "Military", ar: "عسكري" }, security: { en: "Security", ar: "أمني" },
-  intel: { en: "Intel", ar: "استخباري" }, conflict: { en: "Conflict", ar: "نزاع" }, outlook: { en: "Outlook", ar: "التوقعات" },
+  status: { en: "Status", ar: "الوضع" }, indicators: { en: "Indicators", ar: "المؤشرات" }, events: { en: "Current events", ar: "الأحداث الجارية" }, uae: { en: "Relationship with the UAE", ar: "العلاقة مع الإمارات" }, outlook: { en: "Outlook", ar: "التوقعات" },
 };
 const UI = {
   en: { run: "Generate brief", rerun: "Regenerate", running: "Writing the brief…", gathering: "Collecting facts and drafting. This takes about 10–20 seconds.",
-    intro: "A one-page brief on this country written by AI from today's headlines, GDELT events, hazards, outbreaks and sanctions data. It starts only when you click, and each new run bills your Anthropic account.",
+    intro: "One-page country brief: where the country stands, its key economic indicators, what is happening there now, and its engagement and relationship with the UAE. Written by AI from the latest headlines, GDELT events, hazards, outbreaks, sanctions, IMF and World Bank figures, and the UAE agreements, trade, flights, investment and visits data. For talking points use the Minister brief tab. It starts only when you click, and each new run bills your Anthropic account.",
     cost: "Cost", cached: "cached", background: "background, not from today's sources", based: "Facts used", gaps: "Not covered", copy: "Copy", copied: "Copied", download: "Download .md",
     disclaimer: "AI-generated from public sources for information only. Verify before relying on it; cited facts are listed below. Not an intelligence assessment or advice.", conf: "Confidence", left: "new briefs left this hour", disabled: "AI briefs are switched off on this server." },
   ar: { run: "إنشاء الموجز", rerun: "إعادة الإنشاء", running: "جارٍ كتابة الموجز…", gathering: "جمع الوقائع وكتابة المسودة. يستغرق نحو 10–20 ثانية.",
-    intro: "موجز من صفحة واحدة عن هذه الدولة يكتبه الذكاء الاصطناعي من عناوين اليوم وأحداث GDELT والكوارث والأوبئة وبيانات العقوبات. لا يبدأ إلا بضغطتك، وكل تشغيل جديد يُحتسب على حساب Anthropic الخاص بك.",
+    intro: "موجز من صفحة واحدة: وضع الدولة ومؤشراتها الاقتصادية وما يجري فيها الآن وعلاقتها وتفاعلها مع الإمارات. يكتبه الذكاء الاصطناعي من أحدث العناوين وأحداث GDELT والكوارث والأوبئة والعقوبات وأرقام صندوق النقد والبنك الدولي وبيانات الاتفاقيات والتجارة والرحلات والاستثمار والزيارات مع الإمارات. لنقاط الحديث استخدم تبويب موجز الوزير. لا يبدأ إلا بضغطتك، وكل تشغيل جديد يُحتسب على حساب Anthropic الخاص بك.",
     cost: "التكلفة", cached: "مخزّن", background: "خلفية عامة، ليست من مصادر اليوم", based: "الوقائع المستخدمة", gaps: "غير مغطّى", copy: "نسخ", copied: "تم النسخ", download: "تنزيل .md",
     disclaimer: "مُولَّد بالذكاء الاصطناعي من مصادر عامة للاطلاع فقط. تحقق قبل الاعتماد عليه؛ الوقائع المستشهد بها مدرجة أدناه. ليس تقييمًا استخباريًا ولا نصيحة.", conf: "الثقة", left: "موجزات جديدة متبقية هذه الساعة", disabled: "موجزات الذكاء الاصطناعي متوقفة على هذا الخادم." },
 } as const;
@@ -33,7 +33,7 @@ const toMarkdown = (c: Country, s: Saved, lang: "en" | "ar") => {
 
 /** AI country brief. Never starts on its own: a click runs one cheap model call (no web tools) over a fact pack built from the app's own feeds. */
 export function BriefTab({ c }: { c: Country }) {
-  const { lang } = useT(); const u = UI[lang]; const storeKey = `gd-brief:${c.iso3}:${lang}`;
+  const { lang } = useT(); const now = useNow(60_000); const u = UI[lang]; const storeKey = `gd-brief2:${c.iso3}:${lang}`;
   const [phase, setPhase] = useState<"idle" | "running" | "done" | "error">("idle"); const [saved, setSaved] = useState<Saved | null>(null);
   const [err, setErr] = useState(""); const [status, setStatus] = useState<Status | null>(null); const [copied, setCopied] = useState(false); const abort = useRef<AbortController | null>(null);
 
@@ -93,6 +93,7 @@ export function BriefTab({ c }: { c: Country }) {
             <button onClick={() => run(true)} className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><RefreshCw size={13} />{u.rerun}</button>
           </div>
           <p className="num text-[11px] text-t2">{saved.model} · {u.cost} {saved.usage.usd != null ? `$${saved.usage.usd.toFixed(saved.usage.usd < 0.1 ? 3 : 2)}` : "n/a"}{saved.cached ? ` · ${u.cached}` : ""} · {saved.at.slice(0, 16).replace("T", " ")} UTC</p>
+          {now > 0 && now - Date.parse(saved.at) > 3 * 3600_000 && <p role="status" className="rounded-[8px] border border-warn/40 bg-warn/10 p-2 text-[12px] text-t0">{lang === "ar" ? `كُتب هذا الموجز قبل ${Math.round((now - Date.parse(saved.at)) / 3600_000)} ساعة؛ أعد الإنشاء لإدراج آخر الأخبار.` : `This brief was written ${Math.round((now - Date.parse(saved.at)) / 3600_000)} h ago. Regenerate to include the latest news.`}</p>}
           <p className="text-[11px] leading-snug text-t2">{u.disclaimer}</p>
         </article>)}
     </div>

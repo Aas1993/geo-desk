@@ -1,6 +1,6 @@
 "use client";
 import { usePathname } from "next/navigation";
-import { ALargeSmall, Crosshair, LayoutDashboard, Sparkles, Globe, Languages, LocateFixed, Map as MapIcon, Minus, Moon, Plus, Satellite, Sun, SunMoon } from "lucide-react";
+import { ALargeSmall, Crosshair, LayoutDashboard, Sparkles, HelpCircle, Globe, Languages, LocateFixed, Map as MapIcon, Minus, Moon, Plus, Satellite, Sun, SunMoon } from "lucide-react";
 import { IconBtn } from "./ui";
 import { useStore, useT } from "@/lib/store";
 import { useDashboard } from "@/lib/dashboard-store";
@@ -18,6 +18,7 @@ export function RightRail() {
       {world && <>
         {sep}
         <IconBtn label="Dashboard" active={dashOpen} onClick={() => { if (!dashOpen) useStore.getState().select(null); setDash(!dashOpen); }}><LayoutDashboard size={18} /></IconBtn>
+        <IconBtn label="Guided tour" onClick={() => window.dispatchEvent(new Event("gd-tour"))}><HelpCircle size={18} /></IconBtn>
         <IconBtn label="Ask" onClick={() => { useStore.getState().select(null); setAsk(true); }}><Sparkles size={18} /></IconBtn>
         {sep}
         <IconBtn label={terminator ? t("hideNight") : t("showNight")} active={terminator} onClick={toggleTerminator}><SunMoon size={18} /></IconBtn>

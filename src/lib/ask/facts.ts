@@ -3,6 +3,7 @@ import path from "node:path";
 import { gatherCountryFacts, type Fact } from "@/lib/brief/facts";
 import { buildAlerts } from "@/lib/alerts";
 import { cached } from "@/lib/layers/cache";
+import { parseRss } from "@/lib/rss";
 import { cepaEffect, outlookRank, tradeSummary, usdM, type OutlookData, type PartnershipData, type TradeData } from "@/lib/intel";
 
 type Dict = Record<string, unknown>;
@@ -26,6 +27,15 @@ export async function countryFacts(iso3: string): Promise<{ name: string; facts:
   if (ts && tr) { const ce = a?.cepa?.inForce ? cepaEffect(tr, iso3, a.cepa.inForce) : null; add("trade", `UAE goods trade with ${base.country.name} in ${ts.year} (UAE customs data via the IMF, includes re-exports): US$${usdM(ts.total).slice(1)} in total, exports ${usdM(ts.x)}, imports ${usdM(ts.m)}, balance ${usdM(ts.balance)}; ${ts.share.toFixed(1)}% of UAE goods trade, #${ts.rank} partner of ${ts.of}${ts.yoy != null ? `; ${ts.yoy >= 0 ? "+" : ""}${ts.yoy.toFixed(1)}% on ${ts.year - 1}` : ""}${ts.ttm ? `; last 12 months ${usdM(ts.ttm.total)} (${ts.ttm.growth >= 0 ? "+" : ""}${ts.ttm.growth.toFixed(1)}% on the 12 before)` : ""}.${ce ? ` Since the CEPA entered into force (${a!.cepa!.inForce}), trade is ${ce.partnerGrowth >= 0 ? "+" : ""}${ce.partnerGrowth.toFixed(0)}% against ${ce.worldGrowth >= 0 ? "+" : ""}${ce.worldGrowth.toFixed(0)}% for UAE trade overall (${ce.effect >= 0 ? "ahead by" : "behind by"} ${Math.abs(ce.effect).toFixed(0)} points; correlation, not proof).` : ""}`, "IMF International Trade in Goods by partner"); }
   const oe = ol?.countries[iso3]; if (oe?.growth) { const g = (y: number) => (oe.growth?.[y] != null ? `${oe.growth[y].toFixed(1)}%` : "n/a"); const rk = ol ? outlookRank(ol, iso3, "growth", 2026) : null; add("outlook", `IMF outlook for ${base.country.name} (live World Economic Outlook database): real GDP growth ${g(2025)} in 2025, ${g(2026)} in 2026F, ${g(2027)} in 2027F${rk ? ` (2026 rank ${rk.rank} of ${rk.of})` : ""}; inflation ${oe.inflation?.[2026] ?? "n/a"}% in 2026F; current account ${oe.ca?.[2026] ?? "n/a"}% of GDP; government debt ${oe.debt?.[2026] ?? "n/a"}% of GDP.`, "IMF World Economic Outlook"); }
   const pr = pi?.countries[iso3]; if (pr) add("index", `UAE Partnership Index for ${base.country.name}: ${pr.score}/100, rank ${pr.rank} of ${pi!.n}. Component scores: trade ${pr.c.trade}, engagement ${pr.c.engagement}, agreements ${pr.c.agreements}, flights and embassy ${pr.c.connectivity}, investment ${pr.c.investment}, UN voting alignment ${pr.c.alignment}${pr.raw.alignment != null ? ` (${Math.round(pr.raw.alignment * 100)}% of votes shared)` : ""}. The index measures ties and activity, not friendship.`, "Geo Desk composite of the datasets above");
+  // the newest coverage that links the country and the UAE, so both briefs see the relationship in the news and not only in the datasets
+  try {
+    const items = (await cached(`brief:uaenews:${iso3}`, 300_000, async () => {
+      const r = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(`"${base.country.name}" (UAE OR Emirates OR Emirati OR "Abu Dhabi" OR Dubai)`)}+when:14d&hl=en&gl=US&ceid=US:en`, { headers: { "User-Agent": "geo-desk/0.1" }, signal: AbortSignal.timeout(12_000), cache: "no-store" });
+      if (!r.ok) throw new Error("news " + r.status); return parseRss(await r.text(), "", 8);
+    })).value;
+    const seen = new Set(facts.filter((x) => x.kind === "headline").map((x) => x.text.toLowerCase()));
+    for (const h of items) { const i = h.title.lastIndexOf(" - "); const title = i > 0 ? h.title.slice(0, i) : h.title; if (seen.has(title.toLowerCase())) continue; add("uae-news", title, i > 0 ? h.title.slice(i + 3) : "News", h.link, h.ts); }
+  } catch { base.gaps.push("UAE-related headline search unavailable."); }
   return { name: base.country.name, facts, gaps: base.gaps };
 }
 

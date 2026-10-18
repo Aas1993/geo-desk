@@ -119,7 +119,7 @@ function FlightsCard({ data, iso3, lang }: { data: FlightData | null; iso3: stri
           </div>
           {f.counts.suspended + f.counts.future + f.counts.charter > 0 && <p className="mt-1 text-[12px] text-t1">{[f.counts.suspended && `${f.counts.suspended} ${u.suspended.toLowerCase()}`, f.counts.future && `${f.counts.future} ${u.future.toLowerCase()}`, f.counts.charter && `${f.counts.charter} ${u.charter.toLowerCase()}`].filter(Boolean).join(" · ")} — {u.notLive}. {f.counts.suspended ? u.suspendedNote : ""}</p>}
           <ul className="mt-2 divide-y divide-line/60">{shown.map((d) => (
-            <li key={d.iata} className="py-1.5 text-[12.5px]"><div className="flex items-baseline justify-between gap-2"><span className="text-t0"><span className="num me-1.5 text-t2">{d.iata}</span>{d.name.replace(/ (International )?Airport$/i, "")}</span><span className={`shrink-0 text-[11px] ${FLIGHT_COLOR[d.status]}`}>{u[d.status]}</span></div>
+            <li key={d.iata} className="py-1.5 text-[12.5px]"><div className="flex items-baseline justify-between gap-2"><span className="text-t0" dir="ltr"><span className="num me-1.5 text-t2">{d.iata}</span>{d.name.replace(/ (International )?Airport$/i, "")}</span><span className={`shrink-0 text-[11px] ${FLIGHT_COLOR[d.status]}`}>{u[d.status]}</span></div>
               <div className="num text-[10.5px] text-t2">{d.from.join("/")} · {d.airlines.map((a) => a.name).join(", ")}</div></li>))}</ul>
           {dests.length > 8 && <button onClick={() => setOpen(!open)} className="mt-2 text-[12.5px] text-accent hover:underline">{open ? u.fewer : `${u.showAllF} (${dests.length})`}</button>}
         </>

@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { gatherCountryFacts, renderFacts } from "@/lib/brief/facts";
+import { countryFacts, renderFacts } from "@/lib/ask/facts";
 import { SCHEMA, SYSTEM, userMessage } from "@/lib/brief/prompt";
 
 export const maxDuration = 120;
@@ -32,12 +32,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
   if (store.runs.length >= MAX_PER_HOUR) return Response.json({ error: "rate_limited", message: `Limit of ${MAX_PER_HOUR} new briefs per hour reached (BRIEF_MAX_PER_HOUR). Cached briefs are still free.` }, { status: 429 });
   store.running.add(key);
   try {
-    const gathered = await gatherCountryFacts(iso3); if (!gathered) return Response.json({ error: "not_found" }, { status: 404 });
+    const gathered = await countryFacts(iso3); if (!gathered) return Response.json({ error: "not_found" }, { status: 404 });
     store.runs.push(Date.now());
     const client = new Anthropic(); // credentials: ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login` profile
     const msg = await client.messages.create({
       model: MODEL, max_tokens: 3000, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: userMessage({ facts: renderFacts(gathered), asOf: new Date(gathered.asOf).toISOString(), arabic }) }],
+      messages: [{ role: "user", content: userMessage({ facts: renderFacts(gathered.facts, gathered.gaps), asOf: new Date().toISOString(), arabic }) }],
       output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA as unknown as Record<string, unknown> } },
     }, { signal: req.signal });
     if (msg.stop_reason === "max_tokens" || msg.stop_reason === "refusal") return Response.json({ error: msg.stop_reason, message: msg.stop_reason === "refusal" ? "The model declined to write this brief." : "The brief was cut off. Try again." }, { status: 502 });

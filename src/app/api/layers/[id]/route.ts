@@ -11,6 +11,7 @@ import { events } from "@/lib/layers/sources/events";
 import { gpsjam } from "@/lib/layers/sources/gpsjam";
 import { missions, visits } from "@/lib/layers/sources/diplomacy";
 import { staticLayer, STATIC_LAYERS } from "@/lib/layers/sources/static";
+import { cameras, NeedsKey, vessels } from "@/lib/layers/sources/keyed";
 import { radar, weather } from "@/lib/layers/sources/weather";
 
 type Loader = (q: URLSearchParams) => Promise<object>;
@@ -25,6 +26,9 @@ const LOADERS: Record<string, { ttlSec: number; load: Loader; keyed?: (q: URLSea
   weather: { ttlSec: 1800, load: () => weather() },
   missions: { ttlSec: 3600, load: () => missions() },
   visits: { ttlSec: 3600, load: () => visits() },
+  // key-gated: they work as soon as the key is in .env.local, and say which key until then. Cached per ~1 degree cell like flights.
+  vessels: { ttlSec: 25, load: (q) => vessels(q), keyed: (q) => `${Math.round(+(q.get("lat") ?? 0))},${Math.round(+(q.get("lon") ?? 0))},${q.get("dist") ?? 0}` },
+  cameras: { ttlSec: 1800, load: (q) => cameras(q), keyed: (q) => `${Math.round(+(q.get("lat") ?? 0))},${Math.round(+(q.get("lon") ?? 0))},${q.get("dist") ?? 0}` },
   events: { ttlSec: 600, load: () => events() },
   gpsjam: { ttlSec: 21600, load: () => gpsjam() },
   radar: { ttlSec: 120, load: () => radar() },
@@ -39,5 +43,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const r = await cached(key, src.ttlSec * 1000, () => src.load(q));
     return NextResponse.json({ ...r.value, meta: { layer: id, fetchedAt: r.at, cached: r.fromCache, count: (r.value as { features?: unknown[] }).features?.length ?? null } }, { headers: { "Cache-Control": `public, s-maxage=${Math.min(src.ttlSec, 60)}` } });
-  } catch (e) { return NextResponse.json({ error: "upstream", message: e instanceof Error ? e.message : "error" }, { status: 502 }); }
+  } catch (e) { if (e instanceof NeedsKey) return NextResponse.json({ error: "needs_key", message: e.message, envVar: e.envVar }, { status: 503 }); return NextResponse.json({ error: "upstream", message: e instanceof Error ? e.message : "error" }, { status: 502 }); }
 }

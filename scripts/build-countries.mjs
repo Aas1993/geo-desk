@@ -30,6 +30,8 @@ for (const b of wd) {
   if (b.lang) m.languages.add(b.lang.value); if (b.nb) m.borders.add(b.nb.value);
 }
 const flag = (iso2) => [...iso2.toUpperCase()].map((c) => String.fromCodePoint(127397 + c.charCodeAt(0))).join("");
+// Hong Kong and Macao are not "countries" in Wikidata (no numeric code on the item), but the atlas has their shapes and the UAE has agreements and a consulate with each, so they are added by hand.
+const SPECIAL = { HKG: { num: "344", qid: "Q8646", name: "Hong Kong", nameAr: "هونغ كونغ", languages: ["Chinese", "English"], currencies: ["Hong Kong dollar (HKD)"], borders: ["CHN"] }, MAC: { num: "446", qid: "Q14773", name: "Macao", nameAr: "ماكاو", languages: ["Chinese", "Portuguese"], currencies: ["Macanese pataca (MOP)"], borders: ["CHN"] } };
 const out = wb.map((c) => {
   const m = meta[c.id] ?? {};
   return {
@@ -40,6 +42,7 @@ const out = wb.map((c) => {
     population: pop[c.id] ?? null, areaKm2: area[c.id]?.v ?? null,
     currencies: [...(m.currency ?? [])].slice(0, 2), languages: [...(m.languages ?? [])].slice(0, 4),
     borders: [...(m.borders ?? [])],
+    ...(SPECIAL[c.id] ?? {}),
   };
 }).filter((c) => c.num);
 writeFileSync(new URL("../public/data/countries.json", import.meta.url), JSON.stringify(out));

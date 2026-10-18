@@ -18,7 +18,7 @@ function Row({ def }: { def: LayerDef }) {
         className={`flex w-full items-center gap-3 rounded-[9px] px-2.5 py-2 text-start text-[13px] transition-colors ${live ? "text-t0 hover:bg-bg3" : "cursor-not-allowed text-t2"} ${on ? "bg-bg3/70" : ""}`}>
         <i className="size-3 shrink-0 rounded-full border-2 transition-all" style={{ borderColor: def.color, background: on ? def.color : "transparent", boxShadow: on ? `0 0 8px ${def.color}` : "none", opacity: live ? 1 : 0.4 }} />
         <span className="min-w-0 flex-1 truncate">{name}</span>
-        {on && def.kind !== "base" && st && (st.state === "loading" && !st.total ? <span className="text-[10.5px] text-t2">{t("feedLoading")}</span> : st.state === "error" ? <span className="text-[10.5px] text-down">{t("feedError")}</span> : st.total ? <span className="num text-[11px] text-t1">{st.shown}{st.shown !== st.total ? <span className="text-t2">/{st.total}</span> : null}</span> : null)}
+        {on && def.kind !== "base" && st && (st.state === "loading" && !st.total ? <span className="text-[10.5px] text-t2">{t("feedLoading")}</span> : st.state === "error" ? <span title={st.error} className="text-[10.5px] text-down">{/ to \.env\.local/.test(st.error ?? "") ? (st.error ?? "").replace(/^.*?: add /, "Add ").replace(/ to \.env\.local.*$/, " to .env.local") : t("feedError")}</span> : st.total ? <span className="num text-[11px] text-t1">{st.shown}{st.shown !== st.total ? <span className="text-t2">/{st.total}</span> : null}</span> : null)}
         {!live && <span className="shrink-0 rounded-full border border-line-2 px-1.5 text-[9.5px] uppercase tracking-wide text-t2" style={{ borderColor: "var(--line-2)" }}>{lang === "ar" ? tag.ar : tag.en}</span>}
       </button>
       {on && def.sub && (

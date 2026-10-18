@@ -87,7 +87,7 @@ function WatchlistW({ lang }: { lang: L }) {
 }
 function BriefsW({ lang }: { lang: L }) {
   const u = T[lang]; const cs = useCountries(); const watch = useDashboard((s) => s.watch); const select = useStore((s) => s.select); const [cache, setCache] = useState<Record<string, string>>({});
-  useEffect(() => { const t = setTimeout(() => { const o: Record<string, string> = {}; for (const iso of watch) { try { const s = localStorage.getItem(`gd-brief:${iso}:${lang}`); if (s) o[iso] = (JSON.parse(s) as { brief: { headline: string } }).brief.headline; } catch { /* skip */ } } setCache(o); }, 0); return () => clearTimeout(t); }, [watch, lang]);
+  useEffect(() => { const t = setTimeout(() => { const o: Record<string, string> = {}; for (const iso of watch) { try { const s = localStorage.getItem(`gd-brief2:${iso}:${lang}`); if (s) o[iso] = (JSON.parse(s) as { brief: { headline: string } }).brief.headline; } catch { /* skip */ } } setCache(o); }, 0); return () => clearTimeout(t); }, [watch, lang]);
   if (!watch.length) return <p className="text-[12.5px] text-t2">{u.noWatch}</p>;
   return <ul className="divide-y divide-line/60">{watch.map((iso) => { const c = cs?.byIso.get(iso); return <Li key={iso}><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><div className="font-medium">{c?.flag} {c?.name ?? iso}</div><div className="text-[12px] text-t1">{cache[iso] ?? u.noBrief}</div></div><button onClick={() => select(iso, "brief")} className="shrink-0 rounded-md bg-bg3 px-2 py-1 text-[11px] text-t1 hover:text-t0">{cache[iso] ? u.openBrief : u.genBrief}</button></div></Li>; })}</ul>;
 }
@@ -108,7 +108,7 @@ type Items = { uae?: { id: string; title: string; url: string; outlet: string; t
 function ThinkW({ lang }: { lang: L }) { const { data, err } = useJson<Items>("/api/media/ARE?part=tanks", 1_800_000); const now = useNow(); return !data ? (err ? <p className="text-[12px] text-t2">{T[lang].noData}</p> : <Skeleton h={90} />) : <ul className="divide-y divide-line/60">{(data.uae ?? []).slice(0, 7).map((x) => <Li key={x.id}><A href={x.url}>{x.title}</A><Meta>{x.outlet}{now ? ` · ${ago(x.ts, now)}` : ""}</Meta></Li>)}</ul>; }
 function ToneW({ lang }: { lang: L }) {
   const u = T[lang]; const map = useToneMap(); const cs = useCountries(); const select = useStore((s) => s.select); if (map === undefined) return <Skeleton h={70} />; if (!map) return <p className="text-[12.5px] text-t2">{u.building}</p>;
-  const rows = Object.entries(map.countries).filter(([, v]) => v.avg != null && v.points >= 6).sort((a, b) => (a[1].avg as number) - (b[1].avg as number)); const nm = (k: string) => cs?.byIso.get(k)?.name ?? k;
+  const rows = Object.entries(map.countries).filter(([, v]) => v.avg != null).sort((a, b) => (a[1].avg as number) - (b[1].avg as number)); const nm = (k: string) => cs?.byIso.get(k)?.name ?? k;
   const col = (title: string, r: typeof rows) => <div><div className="label mb-1">{title}</div><ul className="space-y-1 text-[12.5px]">{r.map(([k, v]) => <li key={k} className="flex justify-between gap-2"><button onClick={() => select(k, "media")} className="truncate hover:text-accent">{cs?.byIso.get(k)?.flag} {nm(k)}</button><span className="num text-t1">{(v.avg as number).toFixed(1)}</span></li>)}</ul></div>;
   return <><div className="grid grid-cols-2 gap-3">{col(u.cool, rows.slice(0, 5))}{col(u.warm, rows.slice(-5).reverse())}</div><Meta>{lang === "ar" ? "المتوسط العالمي" : "World average"} {map.global.avg.toFixed(1)} · GDELT</Meta></>;
 }

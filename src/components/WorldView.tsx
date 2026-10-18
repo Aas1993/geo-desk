@@ -10,12 +10,13 @@ import { Legend } from "./Legend";
 import { MarketsPanel } from "./MarketsPanel";
 import { Dashboard } from "./Dashboard";
 import { AskPanel } from "./AskPanel";
+import { Tour } from "./Tour";
 import { useStore } from "@/lib/store";
 import { BY_ID, LAYERS } from "@/lib/layers/registry";
 import type { TabId } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas"), { ssr: false, loading: () => <div className="absolute inset-0 grid place-items-center text-[13px] text-t2">Loading map…</div> });
-const TABS = ["overview", "brief", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
+const TABS = ["overview", "brief", "minister", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
 
 /** Reads ?sel / ?tab / ?cmp on load and keeps them in the URL afterwards. */
 function useUrlSync() {
@@ -51,6 +52,7 @@ export function WorldView() {
       <MarketsPanel />
       <Dashboard />
       <AskPanel />
+      <Tour />
       <LayersDrawer />
       <CountryPanel />
       <CompareView />

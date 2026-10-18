@@ -25,7 +25,7 @@ const SOURCES: Record<string, (def: LayerDef) => Promise<Painted>> = {
   mediatone: async () => {
     const j = await loadToneMap(); if (!j) throw new Error("The world media tone map has not been built yet");
     const col = (d: number) => (d <= -1.5 ? "#ff5d73" : d <= -0.5 ? "#ffb547" : d < 0.5 ? "#9db0cf" : d < 1.5 ? "#3ddcff" : "#2de39a");
-    return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, v]) => v.avg != null && v.points >= 6).map(([k, v]) => [k, col((v.avg as number) - j.global.avg)])) };
+    return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, v]) => v.avg != null).map(([k, v]) => [k, col((v.avg as number) - j.global.avg)])) };
   },
   languages: async () => {
     const list = (await (await fetch("/data/countries.json")).json()) as { iso3: string; languages: string[] }[];

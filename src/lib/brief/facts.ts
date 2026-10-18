@@ -27,7 +27,7 @@ export async function gatherCountryFacts(iso3: string): Promise<CountryFacts | n
 
   const [wb, news, hz, who, ev, sanc] = await Promise.allSettled([
     Promise.all(WB.map(async ([, label, code]) => { try { const j = await getJson<[unknown, { date: string; value: number | null }[] | null]>(`https://api.worldbank.org/v2/country/${iso3}/indicator/${code}?format=json&per_page=1&mrnev=1`, {}, 12_000); const r = j[1]?.[0]; /* skip stale readings: the API returns the latest non-empty year, which can be decades old */ return r?.value != null && +r.date >= new Date().getFullYear() - 3 ? { label, v: r.value, y: r.date } : null; } catch { return null; } })),
-    cached(`brief:news:${iso3}`, 600_000, async () => {
+    cached(`brief:news:${iso3}`, 300_000, async () => {
       const r = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent('"' + country.name + '"')}+when:7d&hl=en&gl=US&ceid=US:en`, { headers: { "User-Agent": "geo-desk/0.1" }, signal: AbortSignal.timeout(12_000), cache: "no-store" });
       if (!r.ok) throw new Error("news " + r.status); return parseRss(await r.text(), "", 14);
     }).then((r) => r.value),

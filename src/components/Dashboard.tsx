@@ -11,6 +11,8 @@ import { useCountries } from "./SearchBox";
 import { Markdown } from "./Markdown";
 import { TvWidget } from "./TradingView";
 import { Skeleton } from "./ui";
+import { ClosestPartners } from "./Partnership";
+import { ExportDemand } from "./OutlookCard";
 import type { CountryDetail } from "@/lib/types";
 
 type L = "en" | "ar";
@@ -140,7 +142,7 @@ function TvW({ lang }: { lang: L }) { const [i, setI] = useState(0); const [go, 
   {go ? <iframe title={CHANNELS[i][0]} className="aspect-video w-full rounded-[8px]" src={`https://www.youtube-nocookie.com/embed/live_stream?channel=${CHANNELS[i][1]}&autoplay=0`} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" /> : <button onClick={() => setGo(true)} className="grid aspect-video w-full place-items-center rounded-[8px] bg-bg2 text-[12.5px] text-t1 hover:text-t0">▶ {CHANNELS[i][0]}</button>}
   <Meta>{T[lang].tv}</Meta></>); }
 
-const RENDER: Record<WidgetId, (p: { lang: L }) => React.ReactNode> = { brief: BriefW, alerts: AlertsW, watchlist: WatchlistW, briefs: BriefsW, world: WorldW, visits: VisitsW, thinktanks: ThinkW, mediatone: ToneW, headlines: HeadlinesW, news: NewsW, markets: MarketsW, commodities: CommoditiesW, economy: EconomyW, odds: OddsW, cyber: CyberW, weather: WeatherW, launches: LaunchesW, livetv: TvW };
+const RENDER: Record<WidgetId, (p: { lang: L }) => React.ReactNode> = { partners: () => <ClosestPartners limit={10} compact />, demand: () => <ExportDemand />, brief: BriefW, alerts: AlertsW, watchlist: WatchlistW, briefs: BriefsW, world: WorldW, visits: VisitsW, thinktanks: ThinkW, mediatone: ToneW, headlines: HeadlinesW, news: NewsW, markets: MarketsW, commodities: CommoditiesW, economy: EconomyW, odds: OddsW, cyber: CyberW, weather: WeatherW, launches: LaunchesW, livetv: TvW };
 
 /** DiploMaps-style personal workspace: role presets, widgets you can add, move, fold and remove, saved layouts, and a watchlist. */
 export function Dashboard() {

@@ -37,7 +37,7 @@ for (const b of rows) {
   const hq = v(b, "hq"); const p = point(v(b, "own")) ?? point(hq) ?? point(v(b, "loc"));
   if (!p || (p[0] === 0 && p[1] === 0) || !title || /^Q\d+$/.test(title) || /\bbuilding$/i.test(title) || !(mic || sl >= 3) || seen.has(qid)) { dropped++; continue; }
   seen.add(qid);
-  const c = byQid.get(v(b, "cq")?.split("/").pop()); const city = (point(v(b, "own")) ? +v(b, "nh") === 1 : !!point(hq)) ? hq?.split("~")[0] || undefined : undefined; // city label only when it belongs to the coordinates used
+  const c = byQid.get(v(b, "cq")?.split("/").pop()); /* city label only when it belongs to the coordinates used */ const city = (point(v(b, "own")) ? +v(b, "nh") === 1 : !!point(hq)) ? hq?.split("~")[0] || undefined : undefined;
   const desc = [[city, c?.name].filter(Boolean).join(", ") || null, mic ? `MIC ${mic}` : null].filter(Boolean).join(" · ") || "Stock exchange";
   const url = https(v(b, "w"));
   features.push({ type: "Feature", geometry: { type: "Point", coordinates: [r4(p[0]), r4(p[1])] },

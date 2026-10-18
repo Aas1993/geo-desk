@@ -3,6 +3,7 @@ import path from "node:path";
 import { gatherCountryFacts, type Fact } from "@/lib/brief/facts";
 import { buildAlerts } from "@/lib/alerts";
 import { cached } from "@/lib/layers/cache";
+import { cepaEffect, outlookRank, tradeSummary, usdM, type OutlookData, type PartnershipData, type TradeData } from "@/lib/intel";
 
 type Dict = Record<string, unknown>;
 const rd = async <T,>(f: string): Promise<T | null> => { try { return JSON.parse(await readFile(path.join(process.cwd(), "public/data", f), "utf8")) as T; } catch { return null; } };
@@ -19,6 +20,12 @@ export async function countryFacts(iso3: string): Promise<{ name: string; facts:
   const f = fl?.countries[iso3]; if (f) add("flights", `Direct flights from UAE airports to ${base.country.name}: ${f.counts.active + f.counts.seasonal} destinations active or seasonal, ${f.counts.suspended} suspended; airlines: ${f.airlines.slice(0, 8).join(", ")}.`, "Wikipedia airport tables via Wikidata");
   const o = inv?.countries[iso3]?.outward; if (o) add("investment", `UAE direct-investment position in ${base.country.name}: US$${(o.usd / 1e9).toFixed(1)}bn (${o.year})${o.rank ? `, #${o.rank} destination` : ""}.`, "IMF Direct Investment Positions (mirror data)");
   const r = rw?.countries[iso3]; if (r) add("cyber", `Ransomware leak-site postings naming organisations in ${base.country.name}: ${r.n30} in the last 30 days, ${r.n90} in 90 days; most affected sectors: ${r.sectors.map((s) => s.name).join(", ")}.`, "ransomware.live");
+  // trade, outlook, CEPA effect and the Partnership Index
+  const [tr, ol, pi] = await Promise.all([rd<TradeData>("trade.json"), rd<OutlookData>("outlook.json"), rd<PartnershipData>("partnership.json")]);
+  const ts = tr ? tradeSummary(tr, iso3) : null;
+  if (ts && tr) { const ce = a?.cepa?.inForce ? cepaEffect(tr, iso3, a.cepa.inForce) : null; add("trade", `UAE goods trade with ${base.country.name} in ${ts.year} (UAE customs data via the IMF, includes re-exports): US$${usdM(ts.total).slice(1)} in total, exports ${usdM(ts.x)}, imports ${usdM(ts.m)}, balance ${usdM(ts.balance)}; ${ts.share.toFixed(1)}% of UAE goods trade, #${ts.rank} partner of ${ts.of}${ts.yoy != null ? `; ${ts.yoy >= 0 ? "+" : ""}${ts.yoy.toFixed(1)}% on ${ts.year - 1}` : ""}${ts.ttm ? `; last 12 months ${usdM(ts.ttm.total)} (${ts.ttm.growth >= 0 ? "+" : ""}${ts.ttm.growth.toFixed(1)}% on the 12 before)` : ""}.${ce ? ` Since the CEPA entered into force (${a!.cepa!.inForce}), trade is ${ce.partnerGrowth >= 0 ? "+" : ""}${ce.partnerGrowth.toFixed(0)}% against ${ce.worldGrowth >= 0 ? "+" : ""}${ce.worldGrowth.toFixed(0)}% for UAE trade overall (${ce.effect >= 0 ? "ahead by" : "behind by"} ${Math.abs(ce.effect).toFixed(0)} points; correlation, not proof).` : ""}`, "IMF International Trade in Goods by partner"); }
+  const oe = ol?.countries[iso3]; if (oe?.growth) { const g = (y: number) => (oe.growth?.[y] != null ? `${oe.growth[y].toFixed(1)}%` : "n/a"); const rk = ol ? outlookRank(ol, iso3, "growth", 2026) : null; add("outlook", `IMF outlook for ${base.country.name} (live World Economic Outlook database): real GDP growth ${g(2025)} in 2025, ${g(2026)} in 2026F, ${g(2027)} in 2027F${rk ? ` (2026 rank ${rk.rank} of ${rk.of})` : ""}; inflation ${oe.inflation?.[2026] ?? "n/a"}% in 2026F; current account ${oe.ca?.[2026] ?? "n/a"}% of GDP; government debt ${oe.debt?.[2026] ?? "n/a"}% of GDP.`, "IMF World Economic Outlook"); }
+  const pr = pi?.countries[iso3]; if (pr) add("index", `UAE Partnership Index for ${base.country.name}: ${pr.score}/100, rank ${pr.rank} of ${pi!.n}. Component scores: trade ${pr.c.trade}, engagement ${pr.c.engagement}, agreements ${pr.c.agreements}, flights and embassy ${pr.c.connectivity}, investment ${pr.c.investment}, UN voting alignment ${pr.c.alignment}${pr.raw.alignment != null ? ` (${Math.round(pr.raw.alignment * 100)}% of votes shared)` : ""}. The index measures ties and activity, not friendship.`, "Geo Desk composite of the datasets above");
   return { name: base.country.name, facts, gaps: base.gaps };
 }
 

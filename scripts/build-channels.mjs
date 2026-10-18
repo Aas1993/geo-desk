@@ -56,7 +56,7 @@ for (const [qid, sl] of cand) {
   if (!/\bnews|\bnewscast|\bnews channel/.test(text)) { notNews++; continue; }
   const hq = v(b, "hq"); const p = point(v(b, "own")) ?? point(hq) ?? point(v(b, "loc"));
   if (!p || (p[0] === 0 && p[1] === 0) || !title || /^Q\d+$/.test(title)) { noLoc++; continue; }
-  const c = (v(b, "cqs") ?? "").split(",").map((q) => byQid.get(q)).find(Boolean); const city = (point(v(b, "own")) ? +v(b, "nh") === 1 : !!point(hq)) ? hq?.split("~")[0] || undefined : undefined; // city label only when it belongs to the coordinates used const yr = v(b, "founded"); const url = https(v(b, "site"));
+  const c = (v(b, "cqs") ?? "").split(",").map((q) => byQid.get(q)).find(Boolean); /* city label only when it belongs to the coordinates used */ const city = (point(v(b, "own")) ? +v(b, "nh") === 1 : !!point(hq)) ? hq?.split("~")[0] || undefined : undefined; const yr = v(b, "founded"); const url = https(v(b, "site"));
   const desc = [[city, c?.name].filter((x, i, a) => x && a.indexOf(x) === i).join(", ") || null, yr && +yr > 0 ? `launched ${yr}` : null].filter(Boolean).join(" · ") || "News channel";
   features.push({ type: "Feature", geometry: { type: "Point", coordinates: [r4(p[0]), r4(p[1])] },
     properties: { id: `channel:${qid}`, layer: "channels", type: "channel", title, sev: sl >= 30 ? 3 : sl >= 15 ? 2 : sl >= 8 ? 1 : 0, desc, ...(url ? { url } : {}), src: "Wikidata (CC0)", ...(c ? { iso3: c.iso3 } : {}) } });
@@ -65,7 +65,7 @@ features.sort((a, b) => a.properties.id.localeCompare(b.properties.id, "en", { n
 const body = JSON.stringify({ type: "FeatureCollection", meta: { built: new Date().toISOString(), source: `Wikidata Query Service (TV channels/stations with news metadata, >=${MIN_SITELINKS} sitelinks)`, licence: "CC0 1.0", count: features.length }, features });
 const nCtry = new Set(features.map((f) => f.properties.iso3).filter(Boolean)).size; const titles = new Set(features.map((f) => f.properties.title));
 const must = ["CNN", "France 24", "Al Arabiya", "Sky News"].filter((t) => !titles.has(t));
-if (features.length < 150 || features.length > 1000 || nCtry < 40 || body.length > 1_200_000 || must.length) { console.error(`REFUSING TO WRITE: ${features.length} features, ${nCtry} countries, missing ${JSON.stringify(must)}`); process.exit(1); }
+if (features.length < 200 || features.length > 1000 || nCtry < 40 || body.length > 1_200_000 || must.length) { console.error(`REFUSING TO WRITE: ${features.length} features, ${nCtry} countries, missing ${JSON.stringify(must)}`); process.exit(1); }
 mkdirSync(new URL("../public/data/layers/", import.meta.url), { recursive: true });
 writeFileSync(new URL("../public/data/layers/channels.geojson", import.meta.url), body);
 console.log(`features ${features.length}, not news ${notNews}, news but no coordinates ${noLoc}, countries ${nCtry}, bytes ${body.length}, sev tiers ${[0, 1, 2, 3].map((s) => features.filter((f) => f.properties.sev === s).length)}, with url ${features.filter((f) => f.properties.url).length}, no iso3 ${features.filter((f) => !f.properties.iso3).length}`);

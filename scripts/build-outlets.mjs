@@ -39,7 +39,7 @@ SELECT ?item ?itemLabel (SAMPLE(?c1) AS ?own) (SAMPLE(?hx) AS ?hq) (COUNT(DISTIN
   VALUES ?item { ${ids.slice(i, i + 80).map((q) => "wd:" + q).join(" ")} }
   ?item rdfs:label ?itemLabel FILTER(lang(?itemLabel)='en')
   FILTER NOT EXISTS { ?item wdt:P576 [] }
-  OPTIONAL { ?item wdt:P625 ?c1 } OPTIONAL { ?item wdt:P159 ?h . ?h wdt:P625 ?c2 } OPTIONAL { ?item wdt:P291 ?pl . ?pl wdt:P625 ?c3 . OPTIONAL { ?pl rdfs:label ?pll FILTER(lang(?pll)='en') } BIND(CONCAT(COALESCE(?pll, ""), "~", STR(?c3)) AS ?px) } OPTIONAL { ?item wdt:P131/wdt:P625 ?c4 }
+  OPTIONAL { ?item wdt:P625 ?c1 } OPTIONAL { ?item wdt:P159 ?h . ?h wdt:P625 ?c2 . OPTIONAL { ?h rdfs:label ?hl FILTER(lang(?hl)='en') } BIND(CONCAT(COALESCE(?hl, ""), "~", STR(?c2)) AS ?hx) } OPTIONAL { ?item wdt:P291 ?pl . ?pl wdt:P625 ?c3 . OPTIONAL { ?pl rdfs:label ?pll FILTER(lang(?pll)='en') } BIND(CONCAT(COALESCE(?pll, ""), "~", STR(?c3)) AS ?px) } OPTIONAL { ?item wdt:P131/wdt:P625 ?c4 }
   OPTIONAL { ?item wdt:P856 ?w } OPTIONAL { ?item wdt:P571 ?inc . BIND(YEAR(?inc) AS ?yr) }
   OPTIONAL { { ?item wdt:P17 ?ctry } UNION { ?item wdt:P495 ?ctry } UNION { ?item wdt:P159/wdt:P17 ?ctry } UNION { ?item wdt:P291/wdt:P17 ?ctry } }
 } GROUP BY ?item ?itemLabel`);
@@ -52,7 +52,7 @@ for (const [qid, { sl, kind }] of cand) {
   const b = det.get(qid); if (!b) continue; const title = v(b, "itemLabel").replace(/\s+/g, " ").trim();
   const hq = v(b, "hq"), pub = v(b, "pub"); const p = point(v(b, "own")) ?? point(hq) ?? point(pub) ?? point(v(b, "loc"));
   if (!p || (p[0] === 0 && p[1] === 0) || !title || /^Q\d+$/.test(title)) { noLoc++; continue; }
-  const c = (v(b, "cqs") ?? "").split(",").map((q) => byQid.get(q)).find(Boolean); const own = point(v(b, "own")); const place = own ? (+v(b, "nh") === 1 ? hq : +v(b, "np") === 1 ? pub : null) : point(hq) ? hq : point(pub) ? pub : null; const city = place?.split("~")[0] || undefined; // city label only when it belongs to the coordinates used const yr = v(b, "founded"); const url = https(v(b, "site"));
+  const c = (v(b, "cqs") ?? "").split(",").map((q) => byQid.get(q)).find(Boolean); /* city label only when it belongs to the coordinates used */ const own = point(v(b, "own")); const place = own ? (+v(b, "nh") === 1 ? hq : +v(b, "np") === 1 ? pub : null) : point(hq) ? hq : point(pub) ? pub : null; const city = place?.split("~")[0] || undefined; const yr = v(b, "founded"); const url = https(v(b, "site"));
   const desc = [[city, c?.name].filter((x, i, a) => x && a.indexOf(x) === i).join(", ") || null, yr && +yr > 0 ? `founded ${yr}` : null].filter(Boolean).join(" · ") || (kind === "agency" ? "News agency" : "Newspaper");
   features.push({ type: "Feature", geometry: { type: "Point", coordinates: [r4(p[0]), r4(p[1])] },
     properties: { id: `outlet:${qid}`, layer: "outlets", type: kind, title, sev: sl >= 40 ? 3 : sl >= 25 ? 2 : sl >= 15 ? 1 : 0, desc, ...(url ? { url } : {}), src: "Wikidata (CC0)", ...(c ? { iso3: c.iso3 } : {}) } });

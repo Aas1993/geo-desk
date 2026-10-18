@@ -86,7 +86,7 @@ export function CountryPanel() {
       <div ref={body} role="tabpanel" className="scroll-thin flex-1 space-y-3 overflow-y-auto p-4" style={{ overscrollBehavior: "contain" }}>
         {tab === "overview" && <OverviewTab c={c} detail={detail} />}
         {tab === "brief" && <BriefTab c={c} />}
-        {tab === "economy" && <EconomyTab detail={detail} />}
+        {tab === "economy" && <EconomyTab c={c} detail={detail} />}
         {tab === "agreements" && <AgreementsTab c={c} />}
         {tab === "diplomacy" && <DiplomacyTab c={c} />}
         {tab === "media" && <MediaTab c={c} />}

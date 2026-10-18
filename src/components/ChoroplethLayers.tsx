@@ -8,6 +8,7 @@ import { allAgreements, has, loadAgreements } from "@/lib/agreements-client";
 import { liveCount, loadFlights } from "@/lib/flights-client";
 import { loadInvestment } from "@/lib/investment-client";
 import { loadToneMap } from "@/lib/media/client";
+import { loadOutlook, loadPartnership, loadTrade } from "@/lib/intel-client";
 export type { Orgs } from "@/lib/layers/orgs-client";
 
 type Sanctions = { built: string; countries: Record<string, { ofac: number; un: number }> };
@@ -35,6 +36,12 @@ const SOURCES: Record<string, (def: LayerDef) => Promise<Painted>> = {
   aid: async () => { const j = (await (await fetch("/data/layers/aid.json")).json()) as { meta: { built: string }; countries: Record<string, { usd: number }> }; return { built: j.meta.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, v]) => [k, v.usd] as [string, number]).filter(([, n]) => n > 0)) }; },
   regions: async (def) => { const j = (await (await fetch("/data/regions.json")).json()) as { meta: { built: string }; countries: Record<string, { subregion: string }> }; const color = Object.fromEntries((def.legend ?? []).map((l) => [l.label, l.color])); return { built: j.meta.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, v]) => color[v.subregion]).map(([k, v]) => [k, color[v.subregion]])) }; },
   cyber: async () => { const j = (await (await fetch("/data/ransomware.json")).json()) as { built: string; countries: Record<string, { n30: number }> }; return { built: j.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, v]) => [k, v.n30] as [string, number]).filter(([, n]) => n > 0)) }; },
+  uaepi: async () => { const j = await loadPartnership(); return { built: j.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, v]) => [k, v.score] as [string, number]).filter(([, n]) => n > 0)) }; },
+  uaetrade: async () => { const j = await loadTrade(); return { built: j.built, values: Object.fromEntries(Object.entries(j.countries).map(([k, v]) => [k, (v.a.at(-1)?.[1] ?? 0) + (v.a.at(-1)?.[2] ?? 0)] as [string, number]).filter(([, n]) => n > 0)) }; },
+  tradegrowth: async () => { const j = await loadTrade(); const col = (g: number) => (g > 15 ? "#2de39a" : g > 5 ? "#9be15d" : g >= -5 ? "#9db0cf" : g >= -15 ? "#ffb547" : "#ff5d73");
+    return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, v]) => v.ttm && v.prev && v.prev.x + v.prev.m > 50).map(([k, v]) => [k, col(((v.ttm!.x + v.ttm!.m) / (v.prev!.x + v.prev!.m) - 1) * 100)])) }; },
+  outlook: async () => { const j = await loadOutlook(); const y = new Date().getFullYear(); const col = (g: number) => (g < 0 ? "#ff5d73" : g < 2 ? "#ffb547" : g < 4 ? "#9db0cf" : g < 6 ? "#3ddcff" : "#2de39a");
+    return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, v]) => typeof v.growth?.[y] === "number").map(([k, v]) => [k, col(v.growth![y])])) }; },
   dta: (def) => flag(def, "tax"), airagreements: (def) => flag(def, "air"),
   jec: async (def) => { const j = await loadAgreements(); return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, c]) => c.committees.length).map(([k]) => [k, def.color])) }; },
 };

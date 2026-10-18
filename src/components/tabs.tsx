@@ -6,6 +6,9 @@ import { ago, compact, int, last, pct, usd, wmoLabel } from "@/lib/format";
 import { useCountries } from "./SearchBox";
 import { useOrgs } from "@/lib/layers/orgs-client";
 import { LAYERS } from "@/lib/layers/registry";
+import { PartnershipCard, ClosestPartners } from "./Partnership";
+import { UaeTradeCard } from "./TradeIntel";
+import { OutlookCard, ExportDemand } from "./OutlookCard";
 import { BilateralCard } from "./tabs2";
 import type { Country, CountryDetail, Headline, Series } from "@/lib/types";
 
@@ -63,6 +66,7 @@ export function OverviewTab({ c, detail }: { c: Country; detail: D }) {
         </div>
         <Source name={`${t("wb")} · ${t("wikidata")} · ${t("openmeteo")}`} />
       </div>
+      {c.iso3 === "ARE" ? <ClosestPartners /> : <PartnershipCard iso3={c.iso3} />}
       <Card title={t("leadership")} icon="👤">
         {detail.loading ? <Skeleton h={80} /> : leaders && leaders.length ? (
           <ul className="space-y-2">
@@ -106,9 +110,9 @@ function Metric({ title, s, fmt, spark = true, pctAxis }: { title: string; s?: S
   );
 }
 
-export function EconomyTab({ detail }: { detail: D }) {
+export function EconomyTab({ c, detail }: { c: Country; detail: D }) {
   const { t, lang } = useT();
-  return <Gate d={detail}>{({ indicators: i }) => (<>
+  return <><OutlookCard iso3={c.iso3} />{c.iso3 === "ARE" && <ExportDemand />}<Gate d={detail}>{({ indicators: i }) => (<>
     <div className="grid grid-cols-2 gap-2">
       <StatTile label={t("gdp")} value={usd(last(i.gdp)?.v, lang)} sub={last(i.gdp)?.y} />
       <StatTile label={t("gdpGrowth")} value={pct(last(i.gdpGrowth)?.v, lang)} sub={last(i.gdpGrowth)?.y} />
@@ -119,12 +123,12 @@ export function EconomyTab({ detail }: { detail: D }) {
     <Metric title={t("unemployment")} s={i.unemployment} fmt={(n) => pct(n, lang)} />
     <Metric title={t("debt")} s={i.debt} fmt={(n) => pct(n, lang)} />
     <Source name={t("wb")} url={WB} /><p className="text-[11px] text-t2">{t("wbNote")}</p>
-  </>)}</Gate>;
+  </>)}</Gate></>;
 }
 
 export function TradeTab({ c, detail }: { c: Country; detail: D }) {
   const { t, lang } = useT();
-  return <><BilateralCard c={c} /><Gate d={detail}>{({ indicators: i }) => {
+  return <>{c.iso3 !== "ARE" && <UaeTradeCard c={c} />}<BilateralCard c={c} /><Gate d={detail}>{({ indicators: i }) => {
     const ex = last(i.exports), im = last(i.imports); const y = ex && im && ex.y === im.y;
     return (<>
       <div className="grid grid-cols-3 gap-2">

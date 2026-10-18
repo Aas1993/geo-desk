@@ -6,12 +6,13 @@ export const WIDGETS = [
   { id: "briefs", en: "Country briefs (AI)", ar: "موجزات الدول (ذكاء اصطناعي)", ico: "🗂" }, { id: "world", en: "World brief (AI)", ar: "موجز العالم (ذكاء اصطناعي)", ico: "🌍" }, { id: "visits", en: "Latest official visits", ar: "آخر الزيارات الرسمية", ico: "🤝" },
   { id: "thinktanks", en: "Think-tank publications", ar: "منشورات مراكز الفكر", ico: "🏛" }, { id: "mediatone", en: "Media tone", ar: "نبرة الإعلام", ico: "📰" }, { id: "headlines", en: "World headlines", ar: "عناوين العالم", ico: "🌐" },
   { id: "news", en: "News about the UAE", ar: "أخبار الإمارات", ico: "📰" }, { id: "markets", en: "Markets", ar: "الأسواق", ico: "📈" }, { id: "commodities", en: "Commodities", ar: "السلع", ico: "📦" }, { id: "economy", en: "Economic pulse", ar: "النبض الاقتصادي", ico: "💹" },
+  { id: "partners", en: "Closest partners", ar: "أقرب الشركاء", ico: "🧭" }, { id: "demand", en: "Export demand outlook", ar: "توقعات الطلب على الصادرات", ico: "🌐" },
   { id: "odds", en: "Market odds", ar: "احتمالات الأسواق", ico: "📊" }, { id: "cyber", en: "Cyber pulse", ar: "النبض السيبراني", ico: "🛡" }, { id: "weather", en: "Capitals weather", ar: "طقس العواصم", ico: "🌤" }, { id: "launches", en: "Upcoming launches", ar: "عمليات الإطلاق القادمة", ico: "🚀" }, { id: "livetv", en: "Live TV", ar: "بث مباشر", ico: "📺" },
 ] as const;
 export type WidgetId = (typeof WIDGETS)[number]["id"];
 export const PRESETS: Record<string, { en: string; ar: string; ico: string; widgets: WidgetId[] }> = {
-  desk: { en: "Desk Officer", ar: "مسؤول المكتب", ico: "💼", widgets: ["brief", "alerts", "watchlist", "visits", "markets", "headlines"] },
-  un: { en: "UN desk", ar: "مكتب الأمم المتحدة", ico: "🇺🇳", widgets: ["world", "alerts", "thinktanks", "visits", "odds", "headlines"] },
+  desk: { en: "Desk Officer", ar: "مسؤول المكتب", ico: "💼", widgets: ["brief", "partners", "alerts", "watchlist", "visits", "markets", "headlines"] },
+  un: { en: "UN desk", ar: "مكتب الأمم المتحدة", ico: "🇺🇳", widgets: ["world", "alerts", "demand", "thinktanks", "visits", "odds", "headlines"] },
   media: { en: "Media", ar: "الإعلام", ico: "📡", widgets: ["mediatone", "headlines", "thinktanks", "livetv", "alerts", "news"] },
 };
 type S = {

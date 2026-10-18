@@ -6,6 +6,7 @@ import { allAgreements, has, TYPE_LABEL, TYPE_ORDER, useAgreements, type AgData 
 import { useFlights, liveCount, type FlightData, type Status } from "@/lib/flights-client";
 import { useInvestment, usd, type InvestmentData } from "@/lib/investment-client";
 import { Card, Skeleton, StatTile } from "./ui";
+import { CepaImpactTable } from "./TradeIntel";
 import { useStore } from "@/lib/store";
 import { useCountries } from "./SearchBox";
 import type { Country } from "@/lib/types";
@@ -165,6 +166,7 @@ function UaeAgreements() {
         <li key={iso} className="flex items-baseline justify-between gap-2 py-1.5 text-[13px]"><button onClick={() => select(iso, "agreements")} className="truncate text-start hover:text-accent">{nm(iso)}</button>
           <span className="num shrink-0 text-[11.5px]"><span className={STATUS_COLOR[ce.status]}>{u[ce.status === "in-force" ? "inForce" : ce.status]}</span><span className="text-t2"> · {day(ce.inForce ?? ce.signed, lang)}</span></span></li>))}</ul>
         <p className="mt-2 text-[11px] leading-snug text-t2">{u.lag} {data.cepaSummary.signed} {u.signedN} / {data.cepaSummary.inForce} {u.forceN} ({data.cepaSummary.asOf}).</p></Card>
+      <CepaImpactTable />
       <Sources data={data} lang={lang} />
     </div>
   );

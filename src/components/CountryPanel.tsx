@@ -7,7 +7,7 @@ import { useCountries } from "./SearchBox";
 import { OverviewTab, EconomyTab, TradeTab, MilitaryTab, SocietyTab, NewsTab } from "./tabs";
 import { UNTab } from "./tabs2";
 import { BriefTab } from "./BriefTab";
-import { PrepPack } from "./PrepPack";
+import { MinisterTab } from "./MinisterTab";
 import { AgreementsTab } from "./AgreementsTab";
 import { MediaTab } from "./MediaTab";
 import { DiplomacyTab } from "./DiplomacyTab";
@@ -91,7 +91,7 @@ export function CountryPanel() {
       <div ref={body} role="tabpanel" className="scroll-thin flex-1 space-y-3 overflow-y-auto p-4" style={{ overscrollBehavior: "contain" }}>
         {tab === "overview" && <OverviewTab c={c} detail={detail} />}
         {tab === "brief" && <BriefTab c={c} />}
-        {tab === "minister" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "موجز الوزير يخص الدول التي تلتقي بها الإمارات." : "The ministerial brief covers the countries the UAE meets with."}</p> : <PrepPack c={c} />)}
+        {tab === "minister" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "موجز الوزير يخص الدول التي تلتقي بها الإمارات." : "The ministerial brief covers the countries the UAE meets with."}</p> : <MinisterTab c={c} />)}
         {tab === "economy" && <EconomyTab c={c} detail={detail} />}
         {tab === "agreements" && <AgreementsTab c={c} />}
         {tab === "diplomacy" && <DiplomacyTab c={c} />}

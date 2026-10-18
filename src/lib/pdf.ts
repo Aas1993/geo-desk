@@ -1,7 +1,11 @@
 // Builds a real PDF file in the browser and downloads it. The document is rendered by the browser itself (so Arabic shaping and right-to-left layout are right), turned into images
 // page by page, and cut between lines rather than through them. The pages are pictures: the text is not selectable and links are not clickable. For selectable text use the Word file.
 const PX = 794; // A4 width at 96 dpi
-const BOOST = `html,body{margin:0!important;background:#fff!important}body{padding:0 8px;font-size:13px!important;line-height:1.5!important}h1{font-size:23px!important}h2{font-size:17px!important}h3{font-size:14px!important}table{font-size:11.5px!important;width:100%}.m,.c,.foot,.cls{font-size:10.5px!important}`;
+const BOOST = `html,body{margin:0!important;background:#fff!important}body{padding:0 8px;font-size:13px!important;line-height:1.5!important}h1{font-size:23px!important}h2{font-size:17px!important}h3{font-size:14px!important}table{font-size:11.5px!important;width:100%}.m,.c,.foot,.cls{font-size:10.5px!important}[dir=rtl] .cls{letter-spacing:0!important}
+/* html2canvas draws list markers on the wrong side in right-to-left text, so markers are drawn as pseudo-elements on the correct side */
+ul,ol{list-style:none!important;padding-inline-start:20px!important}li{position:relative}ol{counter-reset:pdfli}ol>li{counter-increment:pdfli}
+ul>li::before{content:"\\2022";position:absolute;top:0}ol>li::before{content:counter(pdfli) ".";position:absolute;top:0}
+[dir=ltr] ul>li::before,[dir=ltr] ol>li::before,html:not([dir=rtl]) ul>li::before,html:not([dir=rtl]) ol>li::before{left:-17px}[dir=rtl] ul>li::before,[dir=rtl] ol>li::before{right:-17px;left:auto}`;
 
 export type PdfOptions = { filename: string; onProgress?: (done: number, total: number) => void };
 

@@ -7,12 +7,13 @@ import { CompareView } from "./CompareView";
 import { Onboarding } from "./Onboarding";
 import { DataLayers } from "./DataLayers";
 import { Legend } from "./Legend";
+import { MarketsPanel } from "./MarketsPanel";
 import { useStore } from "@/lib/store";
 import { BY_ID, LAYERS } from "@/lib/layers/registry";
 import type { TabId } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas"), { ssr: false, loading: () => <div className="absolute inset-0 grid place-items-center text-[13px] text-t2">Loading map…</div> });
-const TABS = ["overview", "brief", "economy", "trade", "agreements", "media", "military", "un", "society", "news"];
+const TABS = ["overview", "brief", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
 
 /** Reads ?sel / ?tab / ?cmp on load and keeps them in the URL afterwards. */
 function useUrlSync() {
@@ -45,6 +46,7 @@ export function WorldView() {
       <MapCanvas />
       <DataLayers />
       <Legend />
+      <MarketsPanel />
       <LayersDrawer />
       <CountryPanel />
       <CompareView />

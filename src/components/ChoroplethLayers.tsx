@@ -26,6 +26,12 @@ const SOURCES: Record<string, (def: LayerDef) => Promise<Painted>> = {
     const col = (d: number) => (d <= -1.5 ? "#ff5d73" : d <= -0.5 ? "#ffb547" : d < 0.5 ? "#9db0cf" : d < 1.5 ? "#3ddcff" : "#2de39a");
     return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, v]) => v.avg != null && v.points >= 6).map(([k, v]) => [k, col((v.avg as number) - j.global.avg)])) };
   },
+  languages: async () => {
+    const list = (await (await fetch("/data/countries.json")).json()) as { iso3: string; languages: string[] }[];
+    const order: [string, string][] = [["arabic", "#2de39a"], ["english", "#5aa9ff"], ["french", "#b693ff"], ["spanish", "#ff8a4c"], ["portuguese", "#ffc247"], ["russian", "#ff5d73"], ["chinese", "#f27fcb"], ["german", "#67e8f9"]];
+    const colors: Record<string, string> = {}; for (const c of list) { const hit = order.find(([l]) => c.languages.some((x) => x.toLowerCase().includes(l))); colors[c.iso3] = hit?.[1] ?? "#9db0cf"; }
+    return { built: new Date().toISOString(), colors };
+  },
   dta: (def) => flag(def, "tax"), airagreements: (def) => flag(def, "air"),
   jec: async (def) => { const j = await loadAgreements(); return { built: j.built, colors: Object.fromEntries(Object.entries(j.countries).filter(([, c]) => c.committees.length).map(([k]) => [k, def.color])) }; },
 };

@@ -9,16 +9,22 @@ import { flights } from "@/lib/layers/sources/flights";
 import { satellites } from "@/lib/layers/sources/satellites";
 import { events } from "@/lib/layers/sources/events";
 import { gpsjam } from "@/lib/layers/sources/gpsjam";
+import { missions, visits } from "@/lib/layers/sources/diplomacy";
+import { staticLayer, STATIC_LAYERS } from "@/lib/layers/sources/static";
 import { radar, weather } from "@/lib/layers/sources/weather";
 
 type Loader = (q: URLSearchParams) => Promise<object>;
+const statics = Object.fromEntries(STATIC_LAYERS.map((n) => [n, { ttlSec: 3600, load: () => staticLayer(n) }]));
 const LOADERS: Record<string, { ttlSec: number; load: Loader; keyed?: (q: URLSearchParams) => string }> = {
+  ...statics,
   hazards: { ttlSec: 600, load: () => hazards() },
   fires: { ttlSec: 1800, load: () => fires() },
   epidemics: { ttlSec: 3600, load: () => epidemics() },
   launches: { ttlSec: 1800, load: () => launches() },
   satellites: { ttlSec: 7200, load: () => satellites() },
   weather: { ttlSec: 1800, load: () => weather() },
+  missions: { ttlSec: 3600, load: () => missions() },
+  visits: { ttlSec: 3600, load: () => visits() },
   events: { ttlSec: 600, load: () => events() },
   gpsjam: { ttlSec: 21600, load: () => gpsjam() },
   radar: { ttlSec: 120, load: () => radar() },

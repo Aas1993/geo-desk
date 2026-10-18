@@ -64,6 +64,19 @@ function DataLayer({ def, map }: { def: LayerDef; map: MLMap }) {
       const byType = colors.length ? ["match", ["get", "type"], ...colors, def.color] : def.color;
       const color = def.colorProp ? ["coalesce", ["get", def.colorProp], byType] : byType;
       const r = ["interpolate", ["linear"], ["coalesce", ["get", "sev"], 0], 0, 3.5, 1, 5.5, 2, 8, 3, 11];
+      if (def.kind === "lines") { // routes: a wide faint line is the click target (halo id), a crisp line on top (dot id)
+        const w = ["interpolate", ["linear"], ["coalesce", ["get", "sev"], 0], 0, 1, 3, 2.6];
+        map.addLayer({ id: halo, type: "line", source: src, paint: { "line-color": color as never, "line-width": 9, "line-opacity": 0.08 } }, "border");
+        map.addLayer({ id: dot, type: "line", source: src, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": color as never, "line-width": w as never, "line-opacity": 0.85 } }, "border");
+        dataLayerIds.add(halo);
+        map.on("click", halo, (e) => {
+          const f = e.features?.[0]; if (!f) return; const p = f.properties as Feat & Record<string, unknown>; const sub = def.sub?.find((x) => x.key === p.type);
+          new Popup({ closeButton: true, maxWidth: "320px", className: "gd-popup" }).setLngLat(e.lngLat)
+            .setHTML(`<div class="gd-pop"><div class="gd-pop-k" style="color:${esc(sub?.color ?? def.color)}">${esc(sub?.en ?? def.en)}</div><div class="gd-pop-t">${esc(p.title)}</div>${p.desc ? `<div class="gd-pop-d">${esc(p.desc)}</div>` : ""}<div class="gd-pop-m">${p.src ? esc(p.src) : ""}</div>${typeof p.url === "string" && /^https?:/.test(p.url) ? `<a class="gd-pop-a" href="${esc(p.url)}" target="_blank" rel="noreferrer noopener">Source ↗</a>` : ""}</div>`).addTo(map);
+        });
+        map.on("mouseenter", halo, () => { map.getCanvas().style.cursor = "pointer"; }); map.on("mouseleave", halo, () => { map.getCanvas().style.cursor = ""; });
+        return;
+      }
       if (def.kind === "polygons") { // areas: translucent fill (halo id) + outline (dot id)
         map.addLayer({ id: halo, type: "fill", source: src, paint: { "fill-color": color as never, "fill-opacity": 0.32 } }, "border");
         map.addLayer({ id: dot, type: "line", source: src, paint: { "line-color": color as never, "line-width": 0.8, "line-opacity": 0.7 } }, "border");
@@ -118,5 +131,5 @@ export function DataLayers() {
   const on = useStore((s) => s.layers); const [map, setM] = useState<MLMap | null>(null); const alive = useRef(true);
   useEffect(() => { alive.current = true; const off = onMap((m) => alive.current && setM(m)); return () => { alive.current = false; off(); }; }, []);
   if (!map) return null;
-  return <><RasterLayers map={map} />{LAYERS.filter((l) => isData(l) && on[l.id] && (l.kind === "points" || l.kind === "viewport" || l.kind === "moving" || l.kind === "client" || l.kind === "polygons" || l.id === "weather")).map((l) => <DataLayer key={l.id} def={l} map={map} />)}{LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "choropleth").map((l) => <ChoroplethLayer key={l.id} def={l} map={map} />)}{LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "members").map((l) => <MembershipLayer key={l.id} def={l} map={map} />)}</>;
+  return <><RasterLayers map={map} />{LAYERS.filter((l) => isData(l) && on[l.id] && (l.kind === "points" || l.kind === "viewport" || l.kind === "moving" || l.kind === "client" || l.kind === "polygons" || l.kind === "lines" || l.id === "weather")).map((l) => <DataLayer key={l.id} def={l} map={map} />)}{LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "choropleth").map((l) => <ChoroplethLayer key={l.id} def={l} map={map} />)}{LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "members").map((l) => <MembershipLayer key={l.id} def={l} map={map} />)}</>;
 }

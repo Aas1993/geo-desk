@@ -2,7 +2,7 @@
 // `status` is honest: "live" works today, "soon" is planned, "needs-key" works once you add a free key, "unavailable" has no compliant source.
 export type GroupId = "map" | "live" | "diplomacy" | "security" | "economy" | "infra" | "un" | "regional" | "security-orgs" | "economic-orgs" | "energy-orgs" | "regions" | "seas" | "culture";
 export type Status = "live" | "soon" | "needs-key" | "unavailable";
-export type Kind = "points" | "moving" | "viewport" | "raster" | "client" | "choropleth" | "members" | "lines" | "polygons" | "base";
+export type Kind = "panel" | "points" | "moving" | "viewport" | "raster" | "client" | "choropleth" | "members" | "lines" | "polygons" | "base";
 export type Sub = { key: string; en: string; ar: string; color: string; children?: { key: string; en: string; ar: string }[] };
 export type LayerDef = {
   id: string; group: GroupId; en: string; ar: string; color: string; kind: Kind; status: Status; note?: string;
@@ -78,8 +78,10 @@ export const LAYERS: LayerDef[] = [
   L("dta", "diplomacy", "Double-taxation treaties", "اتفاقيات تجنب الازدواج الضريبي", "#5aa9ff", "choropleth", "live", { note: "Countries with a double-taxation agreement listed by MOFA or the Ministry of Foreign Trade.", legend: [{ label: "Treaty listed", ar: "اتفاقية مدرجة", color: "#5aa9ff" }] }),
   L("airagreements", "diplomacy", "Air services agreements", "اتفاقيات النقل الجوي", "#b693ff", "choropleth", "live", { note: "Countries with an air transport / air services agreement or MoU listed by MOFA.", legend: [{ label: "Agreement listed", ar: "اتفاقية مدرجة", color: "#b693ff" }] }),
   L("jec", "diplomacy", "Joint economic committees", "اللجان الاقتصادية المشتركة", "#ff8a4c", "choropleth", "live", { note: "Joint economic committees with a recorded meeting history (Ministry of Foreign Trade).", legend: [{ label: "Committee", ar: "لجنة", color: "#ff8a4c" }] }),
-  L("missions", "diplomacy", "UAE missions", "البعثات الإماراتية", "#3ddcff", "points", "soon", { note: "Needs a curated embassy dataset." }),
-  L("visits", "diplomacy", "Official visits", "الزيارات الرسمية", "#2de39a", "lines", "soon", { note: "Needs curated visit records." }),
+  L("missions", "diplomacy", "UAE missions abroad", "البعثات الإماراتية", "#3ddcff", "points", "live", { api: "missions", refreshSec: 3600, note: "UAE embassies, consulates-general and permanent missions with the ambassador's name and contacts (MOFA directory).", sub: [
+    { key: "embassy", en: "Embassies", ar: "سفارات", color: "#3ddcff" }, { key: "consulate-general", en: "Consulates-general", ar: "قنصليات عامة", color: "#2de39a" }, { key: "permanent-mission", en: "Permanent missions", ar: "بعثات دائمة", color: "#ffb547" } ] }),
+  L("visits", "diplomacy", "Official visits & meetings (12 months)", "الزيارات واللقاءات الرسمية (12 شهرًا)", "#2de39a", "points", "live", { api: "visits", refreshSec: 3600, note: "Countries with UAE visits, meetings, calls and signings reported by WAM in the last 12 months; larger dot means more activity. Auto-classified from headlines.", sub: [
+    { key: "senior", en: "Very active (3+ senior engagements)", ar: "نشاط كبير (3+ لقاءات رفيعة)", color: "#2de39a" }, { key: "regular", en: "Engagements reported", ar: "تفاعلات مُبلَّغ عنها", color: "#5aa9ff" } ] }),
   L("thinktanks", "diplomacy", "Think tanks", "مراكز الفكر", "#b693ff", "points", "soon"),
   L("outlets", "diplomacy", "News outlets", "المنافذ الإخبارية", "#ff8a4c", "points", "soon"),
   L("channels", "diplomacy", "News channels", "القنوات الإخبارية", "#ff5d73", "points", "soon"),
@@ -94,14 +96,15 @@ export const LAYERS: LayerDef[] = [
   // ───────────── Economy ─────────────
   L("aid", "economy", "Foreign aid", "المساعدات الخارجية", "#2de39a", "choropleth", "soon", { note: "World Bank ODA received, latest year." }),
   L("exchanges", "economy", "Stock exchanges", "البورصات", "#ffc247", "points", "soon"),
-  L("indices", "economy", "Indices & ETFs", "المؤشرات وصناديق المؤشرات", "#3ddcff", "points", "soon"),
-  L("fx", "economy", "Currencies (FX)", "العملات", "#2de39a", "points", "soon"),
-  L("crypto", "economy", "Cryptocurrencies", "العملات المشفرة", "#ffb547", "points", "soon"),
-  L("commodities", "economy", "Commodities", "السلع", "#c9a26b", "points", "soon"),
+  L("indices", "economy", "Indices & ETFs", "المؤشرات وصناديق المؤشرات", "#3ddcff", "panel", "live", { note: "Opens a live markets panel (TradingView widget, display-only; prices belong to TradingView and its data providers)." }),
+  L("fx", "economy", "Currencies (FX)", "العملات", "#2de39a", "panel", "live", { note: "Opens a live markets panel (TradingView widget, display-only; prices belong to TradingView and its data providers)." }),
+  L("crypto", "economy", "Cryptocurrencies", "العملات المشفرة", "#ffb547", "panel", "live", { note: "Opens a live markets panel (TradingView widget, display-only; prices belong to TradingView and its data providers)." }),
+  L("commodities", "economy", "Commodities", "السلع", "#c9a26b", "panel", "live", { note: "Opens a live markets panel (TradingView widget, display-only; prices belong to TradingView and its data providers)." }),
   // ───────────── Infrastructure ─────────────
-  L("ports", "infra", "Ports", "الموانئ", "#5aa9ff", "points", "soon"),
-  L("energy", "infra", "Energy & nuclear", "الطاقة والنووي", "#ffc247", "points", "soon", { sub: [{ key: "nuclear", en: "Nuclear", ar: "نووي", color: "#2de39a" }, { key: "fossil", en: "Coal, oil & gas", ar: "فحم ونفط وغاز", color: "#ff7a45" }, { key: "renew", en: "Renewables & hydro", ar: "متجددة ومائية", color: "#3ddcff" }] }),
-  L("cables", "infra", "Submarine cables", "الكابلات البحرية", "#3ddcff", "lines", "soon"),
+  L("ports", "infra", "Ports", "الموانئ", "#5aa9ff", "points", "live", { api: "ports", note: "Large and medium harbours: NGA World Port Index (public domain), plus Gulf ports missing from it added from Wikidata.", sub: [{ key: "large", en: "Large ports", ar: "موانئ كبرى", color: "#5aa9ff" }, { key: "medium", en: "Medium ports", ar: "موانئ متوسطة", color: "#67e8f9" }] }),
+  L("power", "infra", "Energy & nuclear", "الطاقة والنووي", "#ffb547", "points", "live", { api: "power", note: "Power plants of 1 GW or more and all nuclear plants: WRI Global Power Plant Database (CC BY 4.0, frozen in 2022) plus newer nuclear plants added from Wikidata (Barakah and others).", sub: [
+    { key: "nuclear", en: "Nuclear", ar: "نووي", color: "#2de39a" }, { key: "gas", en: "Gas", ar: "غاز", color: "#ffb547" }, { key: "coal", en: "Coal", ar: "فحم", color: "#9db0cf" }, { key: "oil", en: "Oil", ar: "نفط", color: "#ff8a4c" }, { key: "hydro", en: "Hydro", ar: "كهرومائية", color: "#3ddcff" }, { key: "wind", en: "Wind", ar: "رياح", color: "#b693ff" }, { key: "solar", en: "Solar", ar: "شمسي", color: "#ffc247" }, { key: "other", en: "Other", ar: "أخرى", color: "#5aa9ff" } ] }),
+  L("cables", "infra", "Submarine cables", "الكابلات البحرية", "#3ddcff", "lines", "unavailable", { note: "No open dataset with cable routes can be redistributed: TeleGeography's public map data is licensed CC BY-SA but its underlying database is restricted to paying subscribers. See submarinecablemap.com." }),
   L("pipelines", "infra", "Strategic pipelines", "خطوط الأنابيب الاستراتيجية", "#ffb547", "lines", "soon"),
   L("straits", "infra", "Straits & chokepoints", "المضائق ونقاط الاختناق", "#ff5d73", "points", "soon"),
   // ───────────── Memberships · UN ─────────────
@@ -117,7 +120,9 @@ export const LAYERS: LayerDef[] = [
   L("regions", "regions", "UN geoscheme regions", "المناطق الجغرافية للأمم المتحدة", "#3ddcff", "choropleth", "soon"),
   L("seas", "seas", "Seas & waters", "البحار والمياه", "#3ddcff", "points", "soon"),
   L("heritage", "culture", "UNESCO sites", "مواقع اليونسكو", "#ffc247", "points", "soon", { api: "heritage" }),
-  L("languages", "culture", "Official languages", "اللغات الرسمية", "#b693ff", "choropleth", "soon"),
+  L("languages", "culture", "Official languages", "اللغات الرسمية", "#b693ff", "choropleth", "live", { note: "Which major language is official, from Wikidata. Countries with several take the first match in the order Arabic, English, French, Spanish, Portuguese, Russian, Chinese, German.", legend: [
+    { label: "Arabic", ar: "العربية", color: "#2de39a" }, { label: "English", ar: "الإنجليزية", color: "#5aa9ff" }, { label: "French", ar: "الفرنسية", color: "#b693ff" }, { label: "Spanish", ar: "الإسبانية", color: "#ff8a4c" },
+    { label: "Portuguese", ar: "البرتغالية", color: "#ffc247" }, { label: "Russian", ar: "الروسية", color: "#ff5d73" }, { label: "Chinese", ar: "الصينية", color: "#f27fcb" }, { label: "German", ar: "الألمانية", color: "#67e8f9" }, { label: "Other", ar: "أخرى", color: "#9db0cf" } ] }),
 ];
 export const BY_ID = new Map(LAYERS.map((l) => [l.id, l]));
 export const isData = (l: LayerDef) => l.status === "live" && l.kind !== "base";

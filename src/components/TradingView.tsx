@@ -8,7 +8,7 @@ import type { Listing } from "@/lib/markets/types";
  * Terms (tradingview.com/policies): display-only, TradingView attribution must stay visible as designed, personal/non-commercial use
  * unless you have an agreement. The widgets run in the visitor's browser; their data can't be read by, or processed in, our code.
  */
-export type TvKind = "advanced-chart" | "symbol-info" | "technical-analysis" | "financials" | "symbol-profile" | "ticker-tape" | "screener" | "mini-symbol-overview" | "events";
+export type TvKind = "advanced-chart" | "symbol-info" | "technical-analysis" | "financials" | "symbol-profile" | "ticker-tape" | "screener" | "mini-symbol-overview" | "events" | "market-overview";
 
 /** TradingView uses the exchanges' official tickers; for DFM that is the disclosure-feed ticker (e.g. EMIRATESNBD, not the vendor's ENBD). */
 export const tvSymbol = (l: Pick<Listing, "exchange" | "symbol" | "feedSymbol">) => `${l.exchange}:${l.feedSymbol ?? l.symbol}`;

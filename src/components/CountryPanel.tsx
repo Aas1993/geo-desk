@@ -9,10 +9,11 @@ import { UNTab } from "./tabs2";
 import { BriefTab } from "./BriefTab";
 import { AgreementsTab } from "./AgreementsTab";
 import { MediaTab } from "./MediaTab";
+import { DiplomacyTab } from "./DiplomacyTab";
 import { IconBtn } from "./ui";
 import type { Country, CountryDetail, TabId } from "@/lib/types";
 
-const TABS: TabId[] = ["overview", "brief", "economy", "trade", "agreements", "media", "military", "un", "society", "news"];
+const TABS: TabId[] = ["overview", "brief", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
 const cache = new Map<string, CountryDetail>();
 
 export function useDetail(c: Country | undefined) {
@@ -77,6 +78,7 @@ export function CountryPanel() {
         {tab === "brief" && <BriefTab c={c} />}
         {tab === "economy" && <EconomyTab detail={detail} />}
         {tab === "agreements" && <AgreementsTab c={c} />}
+        {tab === "diplomacy" && <DiplomacyTab c={c} />}
         {tab === "media" && <MediaTab c={c} />}
         {tab === "trade" && <TradeTab c={c} detail={detail} />}
         {tab === "un" && <UNTab c={c} />}

@@ -1,0 +1,32 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { gatherCountryFacts, type Fact } from "@/lib/brief/facts";
+import { buildAlerts } from "@/lib/alerts";
+import { cached } from "@/lib/layers/cache";
+
+type Dict = Record<string, unknown>;
+const rd = async <T,>(f: string): Promise<T | null> => { try { return JSON.parse(await readFile(path.join(process.cwd(), "public/data", f), "utf8")) as T; } catch { return null; } };
+const day = (iso?: string | null) => iso ?? "n/a";
+
+/** Facts about one country drawn from every dataset the app holds, each with an id the model must cite. */
+export async function countryFacts(iso3: string): Promise<{ name: string; facts: Fact[]; gaps: string[] } | null> {
+  const base = await gatherCountryFacts(iso3); if (!base) return null; const facts = [...base.facts]; let n = facts.length; const add = (kind: string, text: string, src: string, url?: string, t?: number) => facts.push({ id: `F${++n}`, kind, text, src, url, t });
+  const [ag, ms, vs, fl, inv, rw] = await Promise.all([rd<{ countries: Record<string, Dict> }>("agreements.json"), rd<{ countries: Record<string, Dict[]> }>("missions.json"), rd<{ items: { u: string; d: string; t: string; c: string[]; k: string; l: number }[] }>("visits.json"), rd<{ countries: Record<string, { counts: Record<string, number>; airlines: string[] }> }>("flights.json"), rd<{ world: { usd: number }; countries: Record<string, { outward?: { usd: number; year: number; rank?: number } }> }>("investment.json"), rd<{ countries: Record<string, { n30: number; n90: number; sectors: { name: string }[] }> }>("ransomware.json")]);
+  const a = ag?.countries[iso3] as { mofa: { type: string }[]; moft: { type: string }[]; cepa: { status: string; signed: string | null; inForce: string | null } | null; committees: { meetings: number | null }[] } | undefined;
+  if (a) { const all = [...a.mofa, ...a.moft]; const t = (k: string) => all.filter((x) => x.type === k).length; add("agreements", `UAE agreements with ${base.country.name} in MOFA and Ministry of Foreign Trade lists: ${all.length} in total (${t("tax")} double-taxation, ${t("air")} air-services, ${t("investment")} investment, ${t("legal")} legal/judicial, ${t("security")} defence/security). CEPA: ${a.cepa ? `${a.cepa.status}, signed ${day(a.cepa.signed)}, in force ${day(a.cepa.inForce)}` : "none documented by the Ministry"}. Joint economic committee meetings: ${a.committees[0]?.meetings ?? "none recorded"}.`, "MOFA / Ministry of Foreign Trade"); }
+  const mm = ms?.countries[iso3]; if (mm?.length) add("missions", `UAE missions in ${base.country.name}: ${mm.map((m) => `${m.name} (${(m.head as { role: string; name: string } | null)?.role ?? "head"}: ${(m.head as { name: string } | null)?.name ?? "n/a"})`).join("; ")}.`, "MOFA missions directory");
+  const vv = (vs?.items ?? []).filter((x) => x.c.includes(iso3)).slice(0, 8); for (const x of vv) add("engagement", `${x.d} · ${x.k}${x.l === 3 ? " (head of state/government level)" : x.l === 2 ? " (ministerial)" : ""}: ${x.t}`, "WAM headline (auto-classified)", `https://www.wam.ae/en/article/${x.u}`, Date.parse(x.d));
+  const f = fl?.countries[iso3]; if (f) add("flights", `Direct flights from UAE airports to ${base.country.name}: ${f.counts.active + f.counts.seasonal} destinations active or seasonal, ${f.counts.suspended} suspended; airlines: ${f.airlines.slice(0, 8).join(", ")}.`, "Wikipedia airport tables via Wikidata");
+  const o = inv?.countries[iso3]?.outward; if (o) add("investment", `UAE direct-investment position in ${base.country.name}: US$${(o.usd / 1e9).toFixed(1)}bn (${o.year})${o.rank ? `, #${o.rank} destination` : ""}.`, "IMF Direct Investment Positions (mirror data)");
+  const r = rw?.countries[iso3]; if (r) add("cyber", `Ransomware leak-site postings naming organisations in ${base.country.name}: ${r.n30} in the last 30 days, ${r.n90} in 90 days; most affected sectors: ${r.sectors.map((s) => s.name).join(", ")}.`, "ransomware.live");
+  return { name: base.country.name, facts, gaps: base.gaps };
+}
+
+/** World picture: the merged alerts feed plus the latest senior engagements. */
+export async function worldFacts(): Promise<{ facts: Fact[] }> {
+  const al = (await cached("alerts:all", 120_000, buildAlerts)).value; const vs = await rd<{ items: { u: string; d: string; t: string; c: string[]; k: string; l: number }[] }>("visits.json"); const facts: Fact[] = []; let n = 0;
+  for (const a of al.items.filter((x) => x.sev >= 2 || x.uae).slice(0, 24)) facts.push({ id: `F${++n}`, kind: a.kind, text: a.title, src: a.src, url: a.url, t: a.t });
+  for (const x of (vs?.items ?? []).filter((v) => v.l >= 2).slice(0, 12)) facts.push({ id: `F${++n}`, kind: "engagement", text: `${x.d} · ${x.k}: ${x.t}`, src: "WAM headline (auto-classified)", url: `https://www.wam.ae/en/article/${x.u}`, t: Date.parse(x.d) });
+  return { facts };
+}
+export const renderFacts = (facts: Fact[], gaps: string[] = []) => facts.map((x) => `[${x.id}] (${x.kind}, ${x.src}${x.t ? ", " + new Date(x.t).toISOString().slice(0, 10) : ""}) ${x.text}`).join("\n") + (gaps.length ? `\nGAPS: ${gaps.join(" ")}` : "");

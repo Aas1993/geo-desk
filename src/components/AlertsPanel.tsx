@@ -1,17 +1,19 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { X, ExternalLink, LocateFixed, Newspaper, Activity, HeartPulse, Radio } from "lucide-react";
+import { X, ExternalLink, LocateFixed, Newspaper, Activity, HeartPulse, Radio, Handshake, ShieldAlert } from "lucide-react";
 import { useStore, useT } from "@/lib/store";
 import { useAlerts } from "@/lib/alerts-client";
 import { getMap } from "@/lib/map-bus";
 import type { Alert } from "@/lib/alerts";
 
-type Tab = "uae" | "all" | "flagged" | "security";
+type Tab = "uae" | "all" | "flagged" | "security" | "unrest" | "disasters" | "diplomacy" | "health" | "cyber";
 const SEV = ["text-t2", "text-accent", "text-warn", "text-down"] as const;
-const ICON = { hazard: Activity, health: HeartPulse, event: Radio, news: Newspaper } as const;
-const TABS: { id: Tab; key: "alertsUae" | "alertsAll" | "alertsFlagged" | "alertsSecurity"; test: (a: Alert) => boolean }[] = [
+const ICON = { hazard: Activity, health: HeartPulse, event: Radio, news: Newspaper, diplomacy: Handshake, cyber: ShieldAlert } as const;
+const TABS: { id: Tab; key: "alertsUae" | "alertsAll" | "alertsFlagged" | "alertsSecurity" | "alertsUnrest" | "alertsDisasters" | "alertsDiplomacy" | "alertsHealth" | "alertsCyber"; test: (a: Alert) => boolean }[] = [
   { id: "uae", key: "alertsUae", test: (a) => a.uae }, { id: "all", key: "alertsAll", test: () => true },
   { id: "flagged", key: "alertsFlagged", test: (a) => a.sev >= 2 }, { id: "security", key: "alertsSecurity", test: (a) => a.security },
+  { id: "unrest", key: "alertsUnrest", test: (a) => a.cat === "unrest" }, { id: "disasters", key: "alertsDisasters", test: (a) => a.cat === "disasters" },
+  { id: "diplomacy", key: "alertsDiplomacy", test: (a) => a.cat === "diplomacy" }, { id: "health", key: "alertsHealth", test: (a) => a.cat === "health" }, { id: "cyber", key: "alertsCyber", test: (a) => a.cat === "cyber" },
 ];
 const rel = (now: number, t: number) => { const m = Math.max(0, Math.round((now - t) / 60000)); return m < 1 ? "now" : m < 60 ? `${m} min` : m < 2880 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} d`; };
 
@@ -28,8 +30,8 @@ export function AlertsPanel() {
   return (
     <aside role="dialog" aria-label={t("alerts")} className="glass anim-rise absolute inset-x-2 top-[68px] z-40 flex max-h-[calc(100%-150px)] flex-col overflow-hidden rounded-[16px] sm:inset-x-auto sm:end-3 sm:w-[390px]">
       <div className="flex items-center justify-between px-4 pt-3"><h2 className="display text-[15px] font-semibold">{t("alerts")}</h2><button onClick={() => setOpen(false)} aria-label={t("close")} className="grid size-8 place-items-center rounded-md text-t1 hover:text-t0"><X size={16} /></button></div>
-      <div role="tablist" className="flex gap-1 px-3 pt-2">
-        {TABS.map((x) => <button key={x.id} role="tab" aria-selected={tab === x.id} onClick={() => setTab(x.id)} className={`flex h-8 flex-1 items-center justify-center gap-1.5 rounded-[9px] text-[12px] font-medium transition-colors ${tab === x.id ? "bg-accent text-[var(--accent-ink)]" : "bg-bg3 text-t1 hover:text-t0"}`}>{t(x.key)}<span className="num text-[10.5px] opacity-75">{counts[x.id]}</span></button>)}
+      <div role="tablist" className="no-scrollbar flex gap-1 overflow-x-auto px-3 pt-2">
+        {TABS.map((x) => <button key={x.id} role="tab" aria-selected={tab === x.id} onClick={() => setTab(x.id)} className={`flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-[9px] px-2.5 text-[12px] font-medium transition-colors ${tab === x.id ? "bg-accent text-[var(--accent-ink)]" : "bg-bg3 text-t1 hover:text-t0"}`}>{t(x.key)}<span className="num text-[10.5px] opacity-75">{counts[x.id]}</span></button>)}
       </div>
       <ul className="scroll-thin mt-2 min-h-[80px] flex-1 overflow-y-auto px-2 pb-2">
         {error && !items.length && <li className="px-3 py-6 text-center text-[13px] text-t2">{t("feedError")}</li>}

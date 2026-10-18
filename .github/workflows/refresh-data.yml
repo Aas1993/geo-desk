@@ -9,7 +9,7 @@ concurrency: { group: refresh-data, cancel-in-progress: false }
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,14 +18,16 @@ jobs:
       - run: node scripts/build-agreements.mjs
       - run: node scripts/build-flights.mjs
       - run: node scripts/build-investment.mjs
+      - run: node scripts/build-missions.mjs
+      - run: node scripts/build-visits.mjs --months=24
       - name: Open a PR if the data changed
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           # the "built" timestamp changes every run, so compare everything else
-          node scripts/data-changed.mjs public/data/agreements.json public/data/flights.json public/data/investment.json || { echo "No data changes"; exit 0; }
+          node scripts/data-changed.mjs public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json || { echo "No data changes"; exit 0; }
           branch="data/refresh-$(date -u +%Y%m%d)"
           git config user.name "geo-desk-bot"; git config user.email "geo-desk-bot@users.noreply.github.com"
-          git checkout -b "$branch"; git add public/data/agreements.json public/data/flights.json public/data/investment.json
-          git commit -m "Refresh UAE agreements, flights and investment data ($(date -u +%F))"
+          git checkout -b "$branch"; git add public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json
+          git commit -m "Refresh UAE agreements, flights, investment, missions and visits data ($(date -u +%F))"
           git push origin "$branch"
-          gh pr create --base main --head "$branch" --title "Refresh UAE agreements, flights and investment data ($(date -u +%F))" --body "Automated daily rebuild: agreements from MOFA and the Ministry of Foreign Trade, flights from Wikipedia airport tables via Wikidata. Review the diff for new or removed agreements (especially CEPAs) and routes. Sources are listed in \`scripts/build-agreements.mjs\` and \`scripts/build-flights.mjs\`."
+          gh pr create --base main --head "$branch" --title "Refresh UAE agreements, flights, investment, missions and visits data ($(date -u +%F))" --body "Automated daily rebuild: agreements from MOFA and the Ministry of Foreign Trade, flights from Wikipedia airport tables via Wikidata, investment from the IMF, UAE missions from MOFA, and visits and meetings from WAM headlines. Review the diff for new or removed agreements (especially CEPAs) and routes. Sources are listed in \`scripts/build-agreements.mjs\` and \`scripts/build-flights.mjs\`."

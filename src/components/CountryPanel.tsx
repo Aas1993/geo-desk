@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Star, X, ArrowLeftRight } from "lucide-react";
+import { Star, X, ArrowLeftRight, Bookmark } from "lucide-react";
 import { useStore, useT } from "@/lib/store";
 import { displayName } from "@/lib/countries";
 import { useCountries } from "./SearchBox";
@@ -11,6 +11,7 @@ import { AgreementsTab } from "./AgreementsTab";
 import { MediaTab } from "./MediaTab";
 import { DiplomacyTab } from "./DiplomacyTab";
 import { IconBtn } from "./ui";
+import { useDashboard } from "@/lib/dashboard-store";
 import type { Country, CountryDetail, TabId } from "@/lib/types";
 
 const TABS: TabId[] = ["overview", "brief", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
@@ -32,6 +33,12 @@ export function useDetail(c: Country | undefined) {
   const mine = state && state.iso === iso ? state : null;
   const retry = useCallback(() => { set(null); setN((x) => x + 1); }, []);
   return { data: hit ?? mine?.data ?? null, loading: !hit && !mine, error: !hit && !!mine?.err, retry };
+}
+
+/** Adds or removes the country from the dashboard watchlist. */
+function WatchBtn({ iso3 }: { iso3: string }) {
+  const watched = useDashboard((d) => d.watch.includes(iso3)); const toggle = useDashboard((d) => d.toggleWatch); const { lang } = useT();
+  return <IconBtn label={watched ? (lang === "ar" ? "إزالة من المتابعة" : "Remove from watchlist") : (lang === "ar" ? "متابعة" : "Add to watchlist")} active={watched} onClick={() => toggle(iso3)}><Bookmark size={16} fill={watched ? "currentColor" : "none"} /></IconBtn>;
 }
 
 export function CountryPanel() {
@@ -60,6 +67,7 @@ export function CountryPanel() {
           <p className="truncate text-[13px] text-t1">{lang === "ar" ? c.name : c.nameAr ?? ""}</p>
           <p className="truncate text-[12px] text-t2">{c.region}</p>
         </div>
+        <WatchBtn iso3={c.iso3} />
         <IconBtn label={isDesk ? t("yourDesk") : t("setDesk")} active={isDesk} onClick={() => setDesk(isDesk ? null : c.iso3)}><Star size={17} fill={isDesk ? "currentColor" : "none"} /></IconBtn>
         <IconBtn label={t("compare")} onClick={() => openCompare(cmp && cmp !== c.iso3 ? cmp : desk && desk !== c.iso3 ? desk : c.iso3 !== "ARE" ? "ARE" : null)}><ArrowLeftRight size={16} /></IconBtn>
         <IconBtn label={t("close")} onClick={() => select(null)}><X size={18} /></IconBtn>

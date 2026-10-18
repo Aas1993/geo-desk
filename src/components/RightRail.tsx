@@ -1,12 +1,14 @@
 "use client";
 import { usePathname } from "next/navigation";
-import { ALargeSmall, Crosshair, Globe, Languages, LocateFixed, Map as MapIcon, Minus, Moon, Plus, Satellite, Sun, SunMoon } from "lucide-react";
+import { ALargeSmall, Crosshair, LayoutDashboard, Sparkles, Globe, Languages, LocateFixed, Map as MapIcon, Minus, Moon, Plus, Satellite, Sun, SunMoon } from "lucide-react";
 import { IconBtn } from "./ui";
 import { useStore, useT } from "@/lib/store";
+import { useDashboard } from "@/lib/dashboard-store";
 
 export function RightRail() {
   const { t } = useT(); const world = usePathname() === "/";
   const { theme, toggleTheme, toggleLang, cycleScale, zoom, goHome, projection, setProjection, basemap, setBasemap, terminator, toggleTerminator, locate } = useStore();
+  const dashOpen = useDashboard((d) => d.open); const setDash = useDashboard((d) => d.setOpen); const setAsk = useDashboard((d) => d.setAsk);
   const sep = <div className="mx-1.5 my-0.5 h-px bg-line" />;
   return (
     <nav aria-label="Map controls" className="glass absolute end-3 top-[calc(50%+18px)] z-20 hidden -translate-y-1/2 flex-col gap-0.5 rounded-[12px] p-1 sm:flex">
@@ -14,6 +16,9 @@ export function RightRail() {
       <IconBtn label={t("theme")} onClick={toggleTheme}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</IconBtn>
       <IconBtn label={t("textSize")} onClick={cycleScale}><ALargeSmall size={19} /></IconBtn>
       {world && <>
+        {sep}
+        <IconBtn label="Dashboard" active={dashOpen} onClick={() => { if (!dashOpen) useStore.getState().select(null); setDash(!dashOpen); }}><LayoutDashboard size={18} /></IconBtn>
+        <IconBtn label="Ask" onClick={() => { useStore.getState().select(null); setAsk(true); }}><Sparkles size={18} /></IconBtn>
         {sep}
         <IconBtn label={terminator ? t("hideNight") : t("showNight")} active={terminator} onClick={toggleTerminator}><SunMoon size={18} /></IconBtn>
         <IconBtn label={projection === "globe" ? t("flatMap") : t("globeMap")} active={projection === "mercator"} onClick={() => setProjection(projection === "globe" ? "mercator" : "globe")}>{projection === "globe" ? <MapIcon size={18} /> : <Globe size={18} />}</IconBtn>

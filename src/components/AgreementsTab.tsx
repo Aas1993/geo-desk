@@ -6,6 +6,8 @@ import { allAgreements, has, TYPE_LABEL, TYPE_ORDER, useAgreements, type AgData 
 import { useFlights, liveCount, type FlightData, type Status } from "@/lib/flights-client";
 import { useInvestment, usd, type InvestmentData } from "@/lib/investment-client";
 import { Card, Skeleton, StatTile } from "./ui";
+import { useStore } from "@/lib/store";
+import { useCountries } from "./SearchBox";
 import type { Country } from "@/lib/types";
 
 const UI = {
@@ -27,6 +29,10 @@ const day = (iso: string | null, lang: "en" | "ar") => (iso ? new Date(iso + "T0
 
 /** Everything the UAE has formally agreed with this country, from MOFA and the Ministry of Foreign Trade, with the flights-and-business context in the next release. */
 export function AgreementsTab({ c }: { c: Country }) {
+  return c.iso3 === "ARE" ? <UaeAgreements /> : <CountryAgreements c={c} />;
+}
+
+function CountryAgreements({ c }: { c: Country }) {
   const { lang } = useT(); const u = UI[lang]; const data = useAgreements(); const flights = useFlights(); const inv = useInvestment(); const [type, setType] = useState<string>("all"); const [more, setMore] = useState(false);
   const ag = data?.countries[c.iso3]; const rows = useMemo(() => (ag ? allAgreements(ag) : []), [ag]);
   const counts = useMemo(() => { const m: Record<string, number> = {}; for (const r of rows) m[r.type] = (m[r.type] ?? 0) + 1; return m; }, [rows]);
@@ -135,5 +141,31 @@ function InvestmentCard({ data, iso3, lang }: { data: InvestmentData | null; iso
       {o && data.world?.usd > 0 && <p className="num mt-2 text-[12px] text-t1">{((o.usd / data.world.usd) * 100).toFixed(1)}% {u.ofWorld} ({usd(data.world.usd)}, {data.world.year}).</p>}
       <p className="mt-2 text-[11px] leading-snug text-t2">{u.invNote} <a href={data.source.url} target="_blank" rel="noreferrer noopener" className="underline hover:text-accent">IMF</a> · {u.built} {data.built.slice(0, 10)}.</p>
     </Card>
+  );
+}
+
+/** The UAE's own page: its whole treaty network, CEPA by CEPA, with the counts that matter. */
+function UaeAgreements() {
+  const { lang } = useT(); const u = UI[lang]; const data = useAgreements(); const flights = useFlights(); const inv = useInvestment(); const select = useStore((s) => s.select); const cs = useCountries();
+  if (!data) return <div className="space-y-3"><Skeleton h={90} /><Skeleton h={220} /></div>;
+  const all = Object.entries(data.countries); const cepas = all.filter(([, c]) => c.cepa).map(([k, c]) => [k, c.cepa!] as const).sort((a, b) => (b[1].inForce ?? b[1].signed ?? "").localeCompare(a[1].inForce ?? a[1].signed ?? ""));
+  const n = (type: string) => all.filter(([, c]) => has(c, type)).length; const live = flights ? Object.values(flights.countries).reduce((s, x) => s + liveCount(x), 0) : null;
+  const nm = (iso: string) => { const co = cs?.byIso.get(iso); return co ? `${co.flag ?? ""} ${lang === "ar" && co.nameAr ? co.nameAr : co.name}`.trim() : iso; };
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2">
+        <StatTile label={u.cepa} value={data.cepaSummary.signed} sub={`${data.cepaSummary.inForce} ${u.forceN} · ${data.cepaSummary.asOf}`} />
+        <StatTile label={u.tax} value={n("tax")} sub={lang === "ar" ? "دولة" : "countries"} />
+        <StatTile label={u.air} value={n("air")} sub={live != null ? `${live} ${u.destinations}` : undefined} />
+        <StatTile label={u.invest} value={n("investment")} sub={lang === "ar" ? "دولة" : "countries"} />
+        <StatTile label={u.committee} value={all.filter(([, c]) => c.committees.length).length} />
+        <StatTile label={u.invTitle.split(" & ")[0]} value={inv ? usd(inv.world.usd) : "—"} sub={inv ? String(inv.world.year) : undefined} />
+      </div>
+      <Card title={`${u.cepa} (${cepas.length})`} icon="🤝"><ul className="divide-y divide-line/60">{cepas.map(([iso, ce]) => (
+        <li key={iso} className="flex items-baseline justify-between gap-2 py-1.5 text-[13px]"><button onClick={() => select(iso, "agreements")} className="truncate text-start hover:text-accent">{nm(iso)}</button>
+          <span className="num shrink-0 text-[11.5px]"><span className={STATUS_COLOR[ce.status]}>{u[ce.status === "in-force" ? "inForce" : ce.status]}</span><span className="text-t2"> · {day(ce.inForce ?? ce.signed, lang)}</span></span></li>))}</ul>
+        <p className="mt-2 text-[11px] leading-snug text-t2">{u.lag} {data.cepaSummary.signed} {u.signedN} / {data.cepaSummary.inForce} {u.forceN} ({data.cepaSummary.asOf}).</p></Card>
+      <Sources data={data} lang={lang} />
+    </div>
   );
 }

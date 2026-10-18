@@ -8,6 +8,8 @@ import { Onboarding } from "./Onboarding";
 import { DataLayers } from "./DataLayers";
 import { Legend } from "./Legend";
 import { MarketsPanel } from "./MarketsPanel";
+import { Dashboard } from "./Dashboard";
+import { AskPanel } from "./AskPanel";
 import { useStore } from "@/lib/store";
 import { BY_ID, LAYERS } from "@/lib/layers/registry";
 import type { TabId } from "@/lib/types";
@@ -47,6 +49,8 @@ export function WorldView() {
       <DataLayers />
       <Legend />
       <MarketsPanel />
+      <Dashboard />
+      <AskPanel />
       <LayersDrawer />
       <CountryPanel />
       <CompareView />

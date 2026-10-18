@@ -4,6 +4,8 @@ import { ExternalLink, Mail, MapPin, Phone, Printer } from "lucide-react";
 import { useT } from "@/lib/store";
 import { TYPE_LABEL, useMissions, useVisits, wamUrl, type Visit } from "@/lib/diplomacy-client";
 import { Card, Skeleton, StatTile } from "./ui";
+import { useStore } from "@/lib/store";
+import { useCountries } from "./SearchBox";
 import type { Country } from "@/lib/types";
 
 const UI = {
@@ -24,6 +26,10 @@ type Filter = "all" | "senior" | "ministerial" | "call" | "visit" | "signing" | 
 
 /** UAE missions in the country (ambassador, contacts) and the history of visits, meetings, calls and signings reported by WAM. */
 export function DiplomacyTab({ c }: { c: Country }) {
+  return c.iso3 === "ARE" ? <UaeDiplomacy /> : <CountryDiplomacy c={c} />;
+}
+
+function CountryDiplomacy({ c }: { c: Country }) {
   const { lang } = useT(); const u = UI[lang]; const m = useMissions(); const v = useVisits(); const [f, setF] = useState<Filter>("all"); const [more, setMore] = useState(false);
   const list = m?.countries[c.iso3] ?? []; const items = useMemo(() => (v ? v.items.filter((x) => x.c.includes(c.iso3)) : []), [v, c.iso3]);
   const match = (x: Visit) => f === "all" || (f === "senior" && x.l === 3) || (f === "ministerial" && x.l === 2) || x.k === f || x.dir === f;
@@ -67,6 +73,26 @@ export function DiplomacyTab({ c }: { c: Country }) {
         {shown.length > 12 && <button onClick={() => setMore(!more)} className="mt-2 text-[12.5px] text-accent hover:underline">{more ? u.fewer : `${u.showAll} (${shown.length})`}</button>}
         <p className="mt-2 text-[11px] leading-snug text-t2">{u.source}: <a className="underline hover:text-accent" href={v.source.url} target="_blank" rel="noreferrer noopener">WAM</a> · {u.built} {v.built.slice(0, 10)}.</p>
       </Card>
+    </div>
+  );
+}
+
+/** The UAE's own page: the whole network of missions, the most active partners of the last year, and the latest senior-level engagements. */
+function UaeDiplomacy() {
+  const { lang } = useT(); const u = UI[lang]; const m = useMissions(); const v = useVisits(); const select = useStore((s) => s.select); const cs = useCountries();
+  const cutoff = useMemo(() => { const d = new Date(); d.setUTCFullYear(d.getUTCFullYear() - 1); return d.toISOString().slice(0, 10); }, []);
+  const name = (iso: string) => { const co = cs?.byIso.get(iso); return co ? `${co.flag ?? ""} ${lang === "ar" && co.nameAr ? co.nameAr : co.name}`.trim() : iso; };
+  const partners = useMemo(() => { const n = new Map<string, number>(); for (const x of v?.items ?? []) if (x.d >= cutoff) for (const c of x.c) n.set(c, (n.get(c) ?? 0) + 1); return [...n].sort((a, b) => b[1] - a[1]).slice(0, 12); }, [v, cutoff]);
+  if (!m || !v) return <div className="space-y-3"><Skeleton h={100} /><Skeleton h={180} /></div>;
+  const t = m.totals; const countries = Object.keys(m.countries).length; const senior = v.items.filter((x) => x.l === 3).slice(0, 15);
+  const link = (iso: string, tab: "diplomacy") => <button onClick={() => select(iso, tab)} className="text-start hover:text-accent">{name(iso)}</button>;
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2"><StatTile label={u.embassies} value={t.embassy ?? 0} sub={`${countries} ${lang === "ar" ? "دولة" : "countries"}`} /><StatTile label={u.consulates} value={t["consulate-general"] ?? 0} /><StatTile label={u.last12} value={v.items.filter((x) => x.d >= cutoff).length} sub={`${v.items.filter((x) => x.d >= cutoff && x.l === 3).length} ${u.senior.toLowerCase()}`} /></div>
+      <Card title={lang === "ar" ? "أنشط الشركاء (12 شهرًا)" : "Most active partners (12 months)"} icon="🌐"><ol className="space-y-1 text-[13px]">{partners.map(([iso, n], i) => <li key={iso} className="flex items-center justify-between gap-2"><span className="num w-5 text-t2">{i + 1}</span><span className="flex-1 truncate">{link(iso, "diplomacy")}</span><span className="num text-t1">{n}</span></li>)}</ol></Card>
+      <Card title={lang === "ar" ? "آخر اللقاءات رفيعة المستوى" : "Latest senior-level engagements"} icon="🤝"><ul className="divide-y divide-line/60">{senior.map((x) => (
+        <li key={x.u} className="py-2"><a href={wamUrl(x.u)} target="_blank" rel="noreferrer noopener" className="text-[13px] leading-snug text-t0 hover:text-accent">{x.t}</a><div className="num mt-0.5 text-[10.5px] text-t2">{day(x.d, lang)} · {u.kinds[x.k]} · {x.c.map((c) => cs?.byIso.get(c)?.name ?? c).join(", ")}</div></li>))}</ul>
+        <p className="mt-2 text-[11px] text-t2">{u.intro} {u.source}: <a className="underline hover:text-accent" href={v.source.url} target="_blank" rel="noreferrer noopener">WAM</a> · {u.built} {v.built.slice(0, 10)}.</p></Card>
     </div>
   );
 }

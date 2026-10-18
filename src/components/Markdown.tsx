@@ -6,7 +6,7 @@ const safeUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : null);
 
 function inline(text: string, key: string): ReactNode[] {
   const out: ReactNode[] = []; let i = 0; let n = 0;
-  const re = /(\*\*[^*]+\*\*)|(\*[^*\s][^*]*\*)|(`[^`]+`)|(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\))|(\[\d+(?:[,\s–-]+\d+)*\])/g;
+  const re = /(\*\*[^*]+\*\*)|(\*[^*\s][^*]*\*)|(`[^`]+`)|(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\))|(\[F?\d+(?:[,\s–-]+F?\d+)*\])/g;
   for (let m = re.exec(text); m; m = re.exec(text)) {
     if (m.index > i) out.push(text.slice(i, m.index));
     const k = `${key}-${n++}`;

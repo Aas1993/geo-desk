@@ -50,12 +50,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
     const u = msg.usage; const pr = PRICE[MODEL]; const inTok = u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
     const usd = pr ? (u.input_tokens * pr.in + u.output_tokens * pr.out + (u.cache_read_input_tokens ?? 0) * pr.cacheRead + (u.cache_creation_input_tokens ?? 0) * pr.cacheWrite) / 1e6 : null;
     const done: Done = { brief, facts: gathered.facts.map(({ id, kind, text, src, url }) => ({ id, kind, text, src, url })), gaps: gathered.gaps, at: new Date().toISOString(), model: MODEL, usage: { input: inTok, output: u.output_tokens, usd } };
-    store.cache.set(key, done);
+    store.cache.set(key, done); if (store.cache.size > 100) store.cache.delete(store.cache.keys().next().value as string);
     return Response.json({ ...done, cached: false });
   } catch (e) {
     if (req.signal.aborted) return Response.json({ error: "aborted" }, { status: 499 });
     const status = e instanceof Anthropic.APIError ? e.status : undefined;
-    const message = status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : status === 400 && /credit/i.test(String((e as Error).message)) ? "Your Anthropic credit balance is too low." : e instanceof Error ? e.message : "error";
+    const message = status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : status === 400 && /credit/i.test(String((e as Error).message)) ? "Your Anthropic credit balance is too low." : safeMessage(e);
     return Response.json({ error: "upstream", message }, { status: 502 });
   } finally { store.running.delete(key); }
 }

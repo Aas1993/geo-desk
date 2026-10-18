@@ -12,7 +12,7 @@ export async function vessels(q: URLSearchParams): Promise<GeoJSON.FeatureCollec
   const a = around(q); if (!a) return fc([]); const dLat = a.km / 111, dLon = a.km / (111 * Math.max(0.2, Math.cos((a.lat * Math.PI) / 180)));
   const ships = new Map<number, GeoJSON.Feature>();
   await new Promise<void>((resolve, reject) => {
-    const ws = new WebSocket("wss://stream.aisstream.io/v0/stream"); let done = false; const finish = (err?: Error) => { if (done) return; done = true; clearTimeout(timer); try { ws.close(); } catch { /* already closed */ } err ? reject(err) : resolve(); }; const timer = setTimeout(() => finish(), 7000);
+    const ws = new WebSocket("wss://stream.aisstream.io/v0/stream"); let done = false; const finish = (err?: Error) => { if (done) return; done = true; clearTimeout(timer); try { ws.close(); } catch { /* already closed */ } if (err) reject(err); else resolve(); }; const timer = setTimeout(() => finish(), 7000);
     ws.addEventListener("open", () => ws.send(JSON.stringify({ APIKey: key, BoundingBoxes: [[[a.lat - dLat, a.lon - dLon], [a.lat + dLat, a.lon + dLon]]], FilterMessageTypes: ["PositionReport"] })));
     ws.addEventListener("message", async (ev) => {
       try { const raw = typeof ev.data === "string" ? ev.data : Buffer.from(await (ev.data as Blob).arrayBuffer()).toString("utf8"); const m = JSON.parse(raw) as Pos & { error?: string }; if (m.error) return finish(new Error(`aisstream: ${m.error}`));

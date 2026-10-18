@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
     prep.questions = (prep.questions ?? []).map((x) => ({ ...x, basis: x.basis.filter((b) => ids.has(b)) })); prep.objectives = clean(prep.objectives); prep.talkingPoints = clean(prep.talkingPoints); prep.sensitivities = clean(prep.sensitivities); prep.openItems = clean(prep.openItems);
     const u = msg.usage, pr = PRICE[MODEL], cr = u.cache_read_input_tokens ?? 0, cw = u.cache_creation_input_tokens ?? 0; const used = new Set([...prep.objectives, ...prep.talkingPoints, ...prep.sensitivities, ...prep.openItems, ...prep.questions].flatMap((x) => x.basis));
     const done: Done = { prep, facts: c.facts.filter((f) => used.has(f.id)).map(({ id, kind, text, src, url }) => ({ id, kind, text, src, url })), name: c.name, at: new Date().toISOString(), model: MODEL, usage: { usd: pr ? (u.input_tokens * pr.in + u.output_tokens * pr.out + cr * pr.cacheRead + cw * pr.cacheWrite) / 1e6 : null } };
-    store.cache.set(key, done); return Response.json({ ...done, cached: false });
+    store.cache.set(key, done); if (store.cache.size > 100) store.cache.delete(store.cache.keys().next().value as string); return Response.json({ ...done, cached: false });
   } catch (e) {
     if (req.signal.aborted) return Response.json({ error: "aborted" }, { status: 499 });
     const status = e instanceof Anthropic.APIError ? e.status : undefined;

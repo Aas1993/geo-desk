@@ -90,3 +90,22 @@ assert.notEqual(minKey("EGY", cleanMin({ audience: "leader" })), minKey("EGY", c
 assert.ok(CP_SYSTEM.includes("# 1. Profile and Priorities") && CP_SYSTEM.includes("# 2. Handling the Meeting") && /public official/.test(CP_SYSTEM) && /rumour/.test(CP_SYSTEM), "counterpart prompt");
 assert.ok(cpMessage({ facts: "[F1] x", asOf: "2026-10-24T00:00:00Z", country: "Egypt", options: cleanMin({ counterpartName: "A B" }) }).includes("verify it") && CP_BUDGET.searches >= 6);
 console.log("tradecraft: all assertions passed");
+
+// the illustrated view reads the markdown a briefing already has: likelihood bands map to a position, tables and lists become cards, nothing is invented
+import { bandOf, confidenceOf, parseBrief, plain } from "./visual";
+assert.equal(bandOf("Very likely (80–95%)")?.pct, 88); assert.equal(bandOf("likely")?.pct, 68); assert.equal(bandOf("Unlikely (20–45%)")?.pct, 32); assert.equal(bandOf("very unlikely")?.pct, 12); assert.equal(bandOf("Roughly even chance")?.pct, 50); assert.equal(bandOf("almost certain")?.pct, 97); assert.equal(bandOf("almost no chance")?.pct, 3); assert.equal(bandOf("محتمل"), null);
+assert.equal(confidenceOf("Moderate: headlines only"), "moderate"); assert.equal(confidenceOf("High"), "high"); assert.equal(confidenceOf("Low, one source"), "low"); assert.equal(confidenceOf(""), null);
+assert.equal(plain("A **bold** [link](https://x.org) claim [F12] and [F3, F4] done."), "A bold link claim and done.");
+const sampleMd = `# Title\n\n# 1. Ministerial Executive Brief\n\n## BLUF\nEgypt is **close** [F1]. Act now.\n\n## Key Judgments\n\n| # | We judge | Likelihood | Confidence and reason | Basis | So what for the UAE |\n|---|---|---|---|---|---|\n| 1 | Egypt stays aligned | Very likely (80–95%) | High: dense contact | [F1] | Use it. |\n| 2 | Egypt deploys | Unlikely (20–45%) | Low: headlines | [F2] | Watch. |\n\n## The UAE Play\n**(e) Recommended play**\n1. **Align on Yemen.** Tags: diplomatic. Outcome: one line. Timing: at the meeting. Owner: MoFA.\n2. **Open CEPA talks.** Tags: economic, diplomatic. Timing: 90 days.\n\n**(f) Gives**\n\n## Assumptions, Alternatives and Warning\n- Tripwires: x\n`;
+const pb = parseBrief(sampleMd);
+assert.equal(pb.bluf, "Egypt is close. Act now."); assert.equal(pb.judgments.length, 2); assert.equal(pb.judgments[0].band?.pct, 88); assert.equal(pb.judgments[0].confidence, "high"); assert.equal(pb.judgments[1].band?.pct, 32); assert.equal(pb.judgments[0].so, "Use it.");
+assert.equal(pb.moves.length, 2); assert.ok(pb.moves[0].tags.includes("diplomatic") && pb.moves[0].when === "at the meeting" && pb.moves[1].tags.includes("economic") && pb.moves[1].tags.includes("diplomatic"));
+assert.deepEqual(parseBrief("nothing useful here"), { bluf: "", judgments: [], moves: [], signals: [], decisions: [] });
+console.log("visual: all assertions passed");
+
+// per-audience prompts: each keeps what its product needs and drops what it does not
+import { LEADER_SYSTEM, MINISTER_SYSTEM } from "./dossier/prompt";
+assert.ok(LEADER_SYSTEM.includes("# 1. Leader's Brief") && LEADER_SYSTEM.includes(TRADECRAFT) && LEADER_SYSTEM.includes(STATECRAFT) && LEADER_SYSTEM.includes("# Evidence rules") && LEADER_SYSTEM.includes("# Cost discipline and research effort"), "leader prompt keeps its parts");
+assert.ok(!LEADER_SYSTEM.includes("# 2. Strategic Country Intelligence Dossier") && LEADER_SYSTEM.length < MIN_SYSTEM.length * 0.7, "leader prompt is lean");
+assert.ok(MINISTER_SYSTEM.includes("# 2. Strategic Country Intelligence Dossier") && MINISTER_SYSTEM.includes(TRADECRAFT) && !MINISTER_SYSTEM.includes("# 1. Leader's Brief") && MINISTER_SYSTEM.length < MIN_SYSTEM.length, "ministerial prompt drops the leader format");
+console.log("audience prompts: all assertions passed");

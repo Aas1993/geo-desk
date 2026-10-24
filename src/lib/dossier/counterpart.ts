@@ -4,7 +4,7 @@ import { STATECRAFT } from "../statecraft";
 import { TRADECRAFT } from "../tradecraft";
 
 // The COUNTERPART PROFILE: a brief on the person the UAE minister (or Leader) is about to meet, in the manner of the leader-profile and biographic annexes of diplomatic briefing books.
-export const CP_BUDGET = { maxTokens: 14_000, searches: 9, fetches: 2, fetchTokens: 10_000, words: "about 3,000 words in total" };
+export const CP_BUDGET = { maxTokens: 14_000, searches: 7, fetches: 0, fetchTokens: 10_000, words: "about 3,000 words in total" };
 export const cpKey = (iso3: string, o: DossierOptions) => { const s = JSON.stringify([o.counterpart, o.counterpartName, o.meeting, o.meetingDate, o.lang, o.notes]); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return `cp:${iso3}:${o.lang}:${h >>> 0}`; };
 
 // The evidence rules are shared with the other briefs, so the products cannot drift apart.

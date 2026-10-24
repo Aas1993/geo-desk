@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { dossierFacts, type Tile } from "@/lib/dossier/facts";
 import { BUDGET, budgetFor, cleanOptions, optionsKey } from "@/lib/dossier/options";
 import { DESK_BUDGET, DESK_SYSTEM, cleanDeskOptions, deskKey, deskMessage } from "@/lib/dossier/desk";
-import { SYSTEM, userMessage } from "@/lib/dossier/prompt";
+import { LEADER_SYSTEM, MINISTER_SYSTEM, userMessage } from "@/lib/dossier/prompt";
 import { CP_BUDGET, CP_SYSTEM, cpKey, cpMessage } from "@/lib/dossier/counterpart";
 import { renderFacts } from "@/lib/ask/facts";
 import { rejectCrossSite, safeMessage } from "@/lib/guard";
@@ -82,7 +82,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
           const maxTok = Math.max(1500, Math.min(bud.maxTokens, outputRoom(cost(), MAX_RUN_USD, MODEL)));
           const tac = new AbortController(); ac.signal.addEventListener("abort", () => tac.abort(), { once: true });
           const s = client.beta.messages.stream({
-            model: MODEL, max_tokens: maxTok, system: [{ type: "text", text: desk ? DESK_SYSTEM : cp ? CP_SYSTEM : SYSTEM, cache_control: { type: "ephemeral" } }], messages: withNote(messages), tools: toolsLeft(), ...(containerId ? { container: containerId } : {}),
+            model: MODEL, max_tokens: maxTok, system: [{ type: "text", text: desk ? DESK_SYSTEM : cp ? CP_SYSTEM : options!.audience === "leader" ? LEADER_SYSTEM : MINISTER_SYSTEM, cache_control: { type: "ephemeral" } }], messages: withNote(messages), tools: toolsLeft(), ...(containerId ? { container: containerId } : {}),
             output_config: { effort: effortFor(long) },
           }, { signal: tac.signal });
           const pending = new Map<number, { name: string; json: string; start: Record<string, unknown> }>();

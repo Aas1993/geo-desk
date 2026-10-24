@@ -6,6 +6,9 @@ import { useNow } from "@/lib/use-now";
 import type { Country } from "@/lib/types";
 import { safeHttp } from "@/lib/url";
 import { instrumentLabel } from "@/lib/statecraft";
+import { VisualBrief } from "./VisualBrief";
+import { EconomySwitch, useEconomy } from "./EconomySwitch";
+import { bandOf, confidenceOf } from "@/lib/visual";
 
 type Fact = { id: string; kind: string; text: string; src: string; url?: string };
 type Brief = { headline: string; confidence: "low" | "medium" | "high"; sections: { key: string; bullets: { text: string; basis: string[]; tags?: string[] }[] }[] };
@@ -26,6 +29,8 @@ const UI = {
     disclaimer: "مُولَّد بالذكاء الاصطناعي من مصادر عامة للاطلاع فقط. تحقق قبل الاعتماد عليه؛ الوقائع المستشهد بها مدرجة أدناه. ليس تقييمًا استخباريًا ولا نصيحة.", conf: "الثقة", left: "موجزات جديدة متبقية هذه الساعة", disabled: "موجزات الذكاء الاصطناعي متوقفة على هذا الخادم." },
 } as const;
 
+const stripPrefix = (t: string) => t.replace(/^(Proposal|Assessment|Watch|Signpost)[:.]?\s*/i, "");
+const briefVisual = (b: Brief) => { const sec = (k: string) => b.sections.find((x) => x.key === k)?.bullets ?? []; return { bluf: b.headline, judgments: sec("outlook").map((x) => ({ text: stripPrefix(x.text), band: bandOf(x.text), confidence: confidenceOf(/confidence (?:is |of )?(\w+)/i.exec(x.text)?.[1] ?? ""), so: "" })), moves: sec("moves").map((x) => ({ text: stripPrefix(x.text), tags: x.tags ?? [] })), signals: sec("watch").map((x) => stripPrefix(x.text)) }; };
 const toMarkdown = (c: Country, s: Saved, lang: "en" | "ar") => {
   const L = (k: string) => LABEL[k]?.[lang] ?? k; const f = new Map(s.facts.map((x) => [x.id, x]));
   const body = s.brief.sections.filter((x) => x.bullets.length).map((x) => `## ${L(x.key)}\n${x.bullets.map((b) => `- ${b.tags?.length ? `[${b.tags.map((t) => instrumentLabel(t, lang)).join(" / ")}] ` : ""}${b.text}${b.basis.length ? ` [${b.basis.join(", ")}]` : ""}`).join("\n")}`).join("\n\n");
@@ -35,7 +40,7 @@ const toMarkdown = (c: Country, s: Saved, lang: "en" | "ar") => {
 
 /** AI country brief. Never starts on its own: a click runs one cheap model call (no web tools) over a fact pack built from the app's own feeds. */
 export function BriefTab({ c }: { c: Country }) {
-  const { lang } = useT(); const now = useNow(60_000); const u = UI[lang]; const storeKey = `gd-brief2:${c.iso3}:${lang}`;
+  const { lang } = useT(); const [eco, setEco] = useEconomy(); const [view, setView] = useState<"read" | "visual">("read"); const now = useNow(60_000); const u = UI[lang]; const storeKey = `gd-brief2:${c.iso3}:${lang}`;
   const [phase, setPhase] = useState<"idle" | "running" | "done" | "error">("idle"); const [saved, setSaved] = useState<Saved | null>(null);
   const [err, setErr] = useState(""); const [status, setStatus] = useState<Status | null>(null); const [copied, setCopied] = useState(false); const abort = useRef<AbortController | null>(null);
 
@@ -49,7 +54,7 @@ export function BriefTab({ c }: { c: Country }) {
   const run = async (refresh: boolean) => {
     const k = storeKey; abort.current?.abort(); const ac = new AbortController(); abort.current = ac; setPhase("running"); setErr("");
     try {
-      const r = await fetch("/api/brief/" + c.iso3, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang, refresh }), signal: ac.signal });
+      const r = await fetch("/api/brief/" + c.iso3, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang, refresh, economy: eco }), signal: ac.signal });
       const j = await r.json(); if (!r.ok) throw new Error(j.message ?? j.error ?? `HTTP ${r.status}`);
       try { localStorage.setItem(k, JSON.stringify(j)); } catch {} if (keyRef.current !== k) return; setSaved(j as Saved); setPhase("done");
       fetch("/api/brief/" + c.iso3).then((x) => x.json()).then(setStatus).catch(() => {});
@@ -67,7 +72,7 @@ export function BriefTab({ c }: { c: Country }) {
       {phase !== "done" && phase !== "running" && (
         <div className="rounded-[10px] border border-line bg-bg2 p-3.5">
           <p className="text-[13px] leading-relaxed text-t1">{u.intro}</p>
-          <button onClick={() => run(false)} className="mt-3 inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-semibold text-[var(--accent-ink)] shadow-[var(--glow)]"><Sparkles size={15} />{u.run}</button>
+          <button onClick={() => run(false)} className="mt-3 inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-semibold text-[var(--accent-ink)] shadow-[var(--glow)]"><Sparkles size={15} />{u.run}</button><EconomySwitch eco={eco} onChange={setEco} />
           {status && <p className="num mt-2 text-[11px] text-t2">{status.model} · {status.remainingThisHour} {u.left}</p>}
         </div>
       )}
@@ -79,7 +84,9 @@ export function BriefTab({ c }: { c: Country }) {
             <p className="display text-[15px] font-semibold leading-snug text-t0">{saved.brief.headline}</p>
             <p className="num mt-1.5 text-[11px] text-t2">{u.conf}: <span className={saved.brief.confidence === "high" ? "text-up" : saved.brief.confidence === "low" ? "text-warn" : "text-t1"}>{saved.brief.confidence}</span></p>
           </div>
-          {saved.brief.sections.filter((s) => s.bullets.length).map((s) => (
+          <div role="tablist" className="flex gap-1">{(["read", "visual"] as const).map((k) => <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} className={`h-8 rounded-full px-3 text-[12.5px] ${view === k ? "bg-accent font-semibold text-[var(--accent-ink)]" : "bg-bg2 text-t1 hover:text-t0"}`}>{k === "read" ? (lang === "ar" ? "نص" : "Read") : `🎨 ${lang === "ar" ? "مصوّر" : "Illustrated"}`}</button>)}</div>
+          {view === "visual" && <VisualBrief iso3={c.iso3} name={c.name} parsed={briefVisual(saved.brief)} />}
+          {view === "read" && saved.brief.sections.filter((s) => s.bullets.length).map((s) => (
             <section key={s.key}>
               <h3 className="label mb-1.5">{L(s.key)}</h3>
               <ul className="space-y-2">{s.bullets.map((b, i) => (

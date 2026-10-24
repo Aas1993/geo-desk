@@ -6,6 +6,7 @@ import { INSTRUMENT_KEYS } from "@/lib/statecraft";
 
 export const maxDuration = 120;
 // Deliberately cheaper than the stock research note: no web tools, low effort, short output, cached for hours.
+const ECONOMY_MODEL = process.env.ECONOMY_MODEL || "claude-haiku-5-5"; // opt-in per request: about 70 percent cheaper
 const MODEL = process.env.BRIEF_MODEL || "claude-sonnet-5-5";
 const MAX_PER_HOUR = Math.max(1, +(process.env.BRIEF_MAX_PER_HOUR ?? 20) || 20);
 const TTL = 3 * 3600_000;
@@ -27,7 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
   if (process.env.BRIEF_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const bad = rejectCrossSite(req); if (bad) return bad;
   const { iso3: raw } = await params; const iso3 = raw.toUpperCase(); if (!/^[A-Z]{3}$/.test(iso3)) return Response.json({ error: "bad_request" }, { status: 400 });
-  const body = (await req.json().catch(() => ({}))) as { lang?: string; refresh?: boolean }; const arabic = body.lang === "ar"; const key = `${iso3}:${arabic ? "ar" : "en"}`;
+  const body = (await req.json().catch(() => ({}))) as { lang?: string; refresh?: boolean; economy?: boolean }; const arabic = body.lang === "ar"; const eco = body.economy === true; const model = eco ? ECONOMY_MODEL : MODEL; const key = `${iso3}:${arabic ? "ar" : "en"}${eco ? ":eco" : ""}`;
   const hit = store.cache.get(key);
   if (hit && !body.refresh && Date.now() - Date.parse(hit.at) < TTL) return Response.json({ ...hit, cached: true });
   if (store.running.has(key)) return Response.json({ error: "busy", message: "A brief for this country is already being written." }, { status: 409 });
@@ -39,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
     const gathered = await countryFacts(iso3); if (!gathered) { refund(); return Response.json({ error: "not_found" }, { status: 404 }); }
     const client = new Anthropic(); // credentials: ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login` profile
     const msg = await client.messages.create({
-      model: MODEL, max_tokens: 5000, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
+      model, max_tokens: 5000, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: userMessage({ facts: renderFacts(gathered.facts, gathered.gaps), asOf: new Date().toISOString(), arabic }) }],
       output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA as unknown as Record<string, unknown> } },
     }, { signal: req.signal });
@@ -48,9 +49,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
     try { brief = JSON.parse(text) as Brief; } catch { return Response.json({ error: "bad_output", message: "The model returned an unreadable brief. Try again." }, { status: 502 }); }
     const ids = new Set(gathered.facts.map((f) => f.id)); // drop citations to facts that do not exist
     for (const s of brief.sections) for (const b of s.bullets) { b.basis = b.basis.filter((x) => ids.has(x)); b.tags = (b.tags ?? []).filter((t) => (INSTRUMENT_KEYS as readonly string[]).includes(t)).slice(0, 3); }
-    const u = msg.usage; const pr = PRICE[MODEL]; const inTok = u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
+    const u = msg.usage; const pr = PRICE[model]; const inTok = u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
     const usd = pr ? (u.input_tokens * pr.in + u.output_tokens * pr.out + (u.cache_read_input_tokens ?? 0) * pr.cacheRead + (u.cache_creation_input_tokens ?? 0) * pr.cacheWrite) / 1e6 : null;
-    const done: Done = { brief, facts: gathered.facts.map(({ id, kind, text, src, url }) => ({ id, kind, text, src, url })), gaps: gathered.gaps, at: new Date().toISOString(), model: MODEL, usage: { input: inTok, output: u.output_tokens, usd } };
+    const done: Done = { brief, facts: gathered.facts.map(({ id, kind, text, src, url }) => ({ id, kind, text, src, url })), gaps: gathered.gaps, at: new Date().toISOString(), model, usage: { input: inTok, output: u.output_tokens, usd } };
     store.cache.set(key, done); if (store.cache.size > 100) store.cache.delete(store.cache.keys().next().value as string);
     return Response.json({ ...done, cached: false });
   } catch (e) {

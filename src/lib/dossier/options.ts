@@ -18,9 +18,9 @@ export function cleanOptions(b: Record<string, unknown>): DossierOptions {
 export const optionsKey = (iso3: string, o: DossierOptions) => { const s = JSON.stringify([o.audience, o.counterpart, o.counterpartName, o.meeting, o.meetingDate, o.depth, [...o.focus].sort(), o.lang, o.notes]); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return `${iso3}:${o.lang}:${o.depth}:${h >>> 0}`; };
 /** Search and fetch budgets and output ceilings per depth: these bound what one run can cost. */
 export const BUDGET: Record<Depth, { maxTokens: number; searches: number; fetches: number; fetchTokens: number; words: string }> = {
-  executive: { maxTokens: 9000, searches: 5, fetches: 1, fetchTokens: 8_000, words: "about 1,500 words in total" },
-  standard: { maxTokens: 20_000, searches: 8, fetches: 2, fetchTokens: 10_000, words: "about 5,000 words in total" },
-  comprehensive: { maxTokens: 34_000, searches: 12, fetches: 3, fetchTokens: 12_000, words: "9,000 to 12,000 words in total" },
+  executive: { maxTokens: 9000, searches: 4, fetches: 0, fetchTokens: 8_000, words: "about 1,500 words in total" },
+  standard: { maxTokens: 20_000, searches: 7, fetches: 0, fetchTokens: 10_000, words: "about 5,000 words in total" },
+  comprehensive: { maxTokens: 34_000, searches: 10, fetches: 2, fetchTokens: 12_000, words: "9,000 to 12,000 words in total" },
 };
 /** The Leader's brief is two pages: a small budget, whatever depth the form says. */
 export const LEADER_BUDGET = { maxTokens: 6000, searches: 3, fetches: 0, fetchTokens: 8_000, words: "about 900 words in total (two pages)" };

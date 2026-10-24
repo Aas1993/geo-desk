@@ -72,10 +72,10 @@ export function cleanDeskOptions(b: Record<string, unknown>): DeskOptions {
 export const deskKey = (iso3: string, o: DeskOptions) => { const s = JSON.stringify([o.topics, o.custom, o.length, o.style, o.horizon, o.lens, o.lang, o.context]); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return `desk:${iso3}:${o.lang}:${o.length}:${h >>> 0}`; };
 /** Search and fetch budgets and output ceilings per length: these bound what one run can cost. */
 export const DESK_BUDGET: Record<DeskLength, { maxTokens: number; searches: number; fetches: number; fetchTokens: number; words: number }> = {
-  short: { maxTokens: 12_000, searches: 5, fetches: 1, fetchTokens: 8_000, words: 1500 },
-  standard: { maxTokens: 24_000, searches: 8, fetches: 2, fetchTokens: 10_000, words: 4000 },
-  detailed: { maxTokens: 38_000, searches: 12, fetches: 3, fetchTokens: 12_000, words: 6000 },
-  exhaustive: { maxTokens: 50_000, searches: 14, fetches: 4, fetchTokens: 12_000, words: 10000 },
+  short: { maxTokens: 12_000, searches: 4, fetches: 0, fetchTokens: 8_000, words: 1500 },
+  standard: { maxTokens: 24_000, searches: 7, fetches: 0, fetchTokens: 10_000, words: 4000 },
+  detailed: { maxTokens: 38_000, searches: 10, fetches: 2, fetchTokens: 12_000, words: 6000 },
+  exhaustive: { maxTokens: 50_000, searches: 11, fetches: 3, fetchTokens: 12_000, words: 10000 },
 };
 const label = (key: string) => DESK_TOPICS.flatMap((g) => g.items).find((i) => i.key === key)?.en ?? key;
 

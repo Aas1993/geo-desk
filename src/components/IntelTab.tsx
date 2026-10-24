@@ -49,7 +49,7 @@ const usd = (v: number | null | undefined) => (v == null ? "—" : Math.abs(v) >
 const sgn = (v: number, d = 1) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(d)}`;
 const day = (iso: string) => iso.replace(/-00$/, "");
 
-function Quadrant({ theirs, ours, th, u }: { theirs: number | null; ours: number | null; th: number; u: (typeof T)["en"] }) {
+export function Quadrant({ theirs, ours, th, u }: { theirs: number | null; ours: number | null; th: number; u: (typeof T)["en"] }) {
   const S = 200, P = 24; const x = (v: number) => P + (v / 100) * (S - P * 1.4); const y = (v: number) => S - P - (v / 100) * (S - P * 1.4);
   const lab = (t: string, px: number, py: number, anchor: "start" | "end" = "start") => <text x={px} y={py} fontSize="8.5" fill="currentColor" opacity=".55" textAnchor={anchor}>{t}</text>;
   return (
@@ -64,7 +64,7 @@ function Quadrant({ theirs, ours, th, u }: { theirs: number | null; ours: number
     </svg>
   );
 }
-function Spark({ weeks }: { weeks: { w: string; g: number }[] }) {
+export function Spark({ weeks }: { weeks: { w: string; g: number }[] }) {
   if (weeks.length < 2) return null; const W = 220, H = 56, P = 4; const lo = Math.min(-1, ...weeks.map((x) => x.g)), hi = Math.max(1, ...weeks.map((x) => x.g)); const px = (i: number) => P + (i / (weeks.length - 1)) * (W - 2 * P); const py = (v: number) => P + ((hi - v) / (hi - lo)) * (H - 2 * P);
   return <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="weekly temperature"><line x1="0" x2={W} y1={py(0)} y2={py(0)} stroke="var(--line-2)" strokeDasharray="3 3" /><polyline fill="none" stroke="var(--accent)" strokeWidth="2" points={weeks.map((x, i) => `${px(i)},${py(x.g)}`).join(" ")} />{weeks.map((x, i) => <circle key={x.w} cx={px(i)} cy={py(x.g)} r="2.5" fill="var(--accent)"><title>{x.w}: {x.g}</title></circle>)}</svg>;
 }
@@ -96,7 +96,7 @@ function ScoreCard({ d, L }: { d: IntelPayload; L: Lang }) {
 
 const RV = { en: { title: "Who else is here", rank: "UAE ranks", of: "of", hint: "Share of this country's merchandise trade by power, from each power's own customs data (IMF) against the country's World Bank totals. Mirror data, approximate: it shows trade weight only, not investment, lending, ports, security or political influence. UAE figures include re-exports.", none: "No comparison available for this country." },
   ar: { title: "من الحاضر أيضًا", rank: "ترتيب الإمارات", of: "من", hint: "حصة كل قوة من تجارة السلع لهذه الدولة، من بيانات الجمارك لكل قوة (صندوق النقد) مقابل إجماليات البنك الدولي للدولة. بيانات مرآة تقريبية: تُظهر الوزن التجاري فقط، وليس الاستثمار أو الإقراض أو الموانئ أو الأمن أو النفوذ السياسي. أرقام الإمارات تشمل إعادة التصدير.", none: "لا توجد مقارنة متاحة لهذه الدولة." } } as const;
-function RivalsCard({ d, L }: { d: IntelPayload; L: Lang }) {
+export function RivalsCard({ d, L }: { d: IntelPayload; L: Lang }) {
   const u = RV[L]; const r = d.rivals; const top = r ? Math.max(...r.list.map((x) => x.share), 1) : 1;
   return (
     <Card title={u.title} icon="🏁">

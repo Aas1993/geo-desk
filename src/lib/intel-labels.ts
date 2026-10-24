@@ -5,17 +5,17 @@ export const WGI_KEYS = Object.keys(WGI_LABEL); export const wgiLabel = (k: stri
 // Country scorecard labels: eleven aspects in three groups, each made of parts that are percentiles among all countries with data (or yes/no flags).
 export const SCORE_GROUPS = { relationship: { en: "The relationship", ar: "العلاقة" }, country: { en: "The country", ar: "الدولة" }, world: { en: "Weight in the world", ar: "الثقل في العالم" } } as const;
 export const SCORE_DIMS = [
-  { key: "polfriends", group: "relationship", en: "Political friends", ar: "الأصدقاء السياسيون", hint: "How close the political relationship is: news and event tone, UN voting alignment, engagement, agreements and clubs shared with the UAE" },
-  { key: "bizfriends", group: "relationship", en: "Business friends", ar: "الأصدقاء في الأعمال", hint: "How deep the commercial tie is: trade, UAE capital there, UAE deals, a CEPA, their investment in the UAE" },
-  { key: "strategic", group: "relationship", en: "Strategic value to the UAE", ar: "القيمة الاستراتيجية للإمارات", hint: "Weight of the trade tie for the UAE, UAE logistics footprint, proximity to the Gulf, energy-club membership (a heuristic, not a geopolitical model)" },
-  { key: "leverage", group: "relationship", en: "UAE leverage", ar: "نفوذ الإمارات", hint: "How much more they lean on the UAE than the UAE leans on them" },
-  { key: "political", group: "country", en: "Political stability and capacity", ar: "الاستقرار السياسي والقدرة", hint: "Stability, government effectiveness and rule of law (World Bank)" },
-  { key: "economic", group: "country", en: "Economic", ar: "اقتصادي", hint: "Growth, inflation, size and income level of the economy" },
-  { key: "financial", group: "country", en: "Financial", ar: "مالي", hint: "Debt, external balance, regulatory quality and control of corruption" },
-  { key: "social", group: "country", en: "Social and people-to-people", ar: "اجتماعي وتواصل الشعوب", hint: "Air connectivity, UAE humanitarian ties and openness (voice and accountability)" },
-  { key: "security", group: "country", en: "Security and risk", ar: "الأمن والمخاطر", hint: "Sanctions-list entities and ransomware incidents per US$ billion of GDP (higher is safer)" },
-  { key: "uninfluence", group: "world", en: "UN influence", ar: "النفوذ في الأمم المتحدة", hint: "Security Council seat, number of international bodies, and membership of vote-carrying blocs" },
-  { key: "global", group: "world", en: "Global influence", ar: "النفوذ العالمي", hint: "Size of economy, population and trade, and seats in the G7, G20, BRICS, NATO, EU or SCO" },
+  { key: "polfriends", short: { en: "Pol. friends", ar: "أصدقاء سياسيون" }, group: "relationship", en: "Political friends", ar: "الأصدقاء السياسيون", hint: "How close the political relationship is: news and event tone, UN voting alignment, engagement, agreements and clubs shared with the UAE" },
+  { key: "bizfriends", short: { en: "Biz friends", ar: "أصدقاء أعمال" }, group: "relationship", en: "Business friends", ar: "الأصدقاء في الأعمال", hint: "How deep the commercial tie is: trade, UAE capital there, UAE deals, a CEPA, their investment in the UAE" },
+  { key: "strategic", short: { en: "Strategic", ar: "استراتيجي" }, group: "relationship", en: "Strategic value to the UAE", ar: "القيمة الاستراتيجية للإمارات", hint: "Weight of the trade tie for the UAE, UAE logistics footprint, proximity to the Gulf, energy-club membership (a heuristic, not a geopolitical model)" },
+  { key: "leverage", short: { en: "Leverage", ar: "النفوذ" }, group: "relationship", en: "UAE leverage", ar: "نفوذ الإمارات", hint: "How much more they lean on the UAE than the UAE leans on them" },
+  { key: "political", short: { en: "Stability", ar: "الاستقرار" }, group: "country", en: "Political stability and capacity", ar: "الاستقرار السياسي والقدرة", hint: "Stability, government effectiveness and rule of law (World Bank)" },
+  { key: "economic", short: { en: "Economic", ar: "اقتصادي" }, group: "country", en: "Economic", ar: "اقتصادي", hint: "Growth, inflation, size and income level of the economy" },
+  { key: "financial", short: { en: "Financial", ar: "مالي" }, group: "country", en: "Financial", ar: "مالي", hint: "Debt, external balance, regulatory quality and control of corruption" },
+  { key: "social", short: { en: "Social", ar: "اجتماعي" }, group: "country", en: "Social and people-to-people", ar: "اجتماعي وتواصل الشعوب", hint: "Air connectivity, UAE humanitarian ties and openness (voice and accountability)" },
+  { key: "security", short: { en: "Security", ar: "الأمن" }, group: "country", en: "Security and risk", ar: "الأمن والمخاطر", hint: "Sanctions-list entities and ransomware incidents per US$ billion of GDP (higher is safer)" },
+  { key: "uninfluence", short: { en: "UN", ar: "الأمم المتحدة" }, group: "world", en: "UN influence", ar: "النفوذ في الأمم المتحدة", hint: "Security Council seat, number of international bodies, and membership of vote-carrying blocs" },
+  { key: "global", short: { en: "Global", ar: "عالمي" }, group: "world", en: "Global influence", ar: "النفوذ العالمي", hint: "Size of economy, population and trade, and seats in the G7, G20, BRICS, NATO, EU or SCO" },
 ] as const;
 const PART: Record<string, string> = {
   temp: "Bilateral event tone", tone: "News tone about the UAE", align: "UN voting alignment", engage: "Engagement record", agree: "Agreements", shared: "Clubs shared with the UAE",

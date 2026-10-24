@@ -6,6 +6,7 @@ import { tradeSummary, usdM, type OutlookData, type PartnershipData, type TradeD
 import type { Fact } from "@/lib/brief/facts";
 import { intelFor } from "@/lib/intel-data";
 import { investFor } from "@/lib/invest-data";
+import { foresightFacts, foresightFor } from "@/lib/foresight-data";
 
 export type Tile = { label: string; value: string; sub?: string };
 const rd = async <T,>(f: string): Promise<T | null> => { try { return JSON.parse(await readFile(path.join(process.cwd(), "public/data", f), "utf8")) as T; } catch { return null; } };
@@ -56,4 +57,10 @@ export async function investDossierFacts(iso3: string) {
   const r = p.risk; const f1 = (v: number | null, s = "") => (v == null ? "n/a" : `${v.toFixed(1)}${s}`);
   add("risk-indicators", `Risk context for UAE capital in ${g.name}: World Bank governance scores (0-100, higher is better): regulatory quality ${f1(r.regulatoryQuality)}, rule of law ${f1(r.ruleOfLaw)}, control of corruption ${f1(r.corruption)}, political stability ${f1(r.stability)}; IMF this year: growth ${f1(r.growth, "%")}, inflation ${f1(r.inflation, "%")}, government debt ${f1(r.debt, "% of GDP")}, current account ${f1(r.currentAccount, "% of GDP")}; sanctions-list entries with an address there (OFAC and UN): ${r.sanctions ?? "n/a"}.`, "World Bank WGI, IMF WEO, OFAC / UN");
   return { ...g, facts };
+}
+
+/** The fact pack of the detailed brief plus the foresight baseline: the IMF path to the end of its horizon, one baseline fact per front, the geography and the calendar. Used by the foresight dossier. */
+export async function foresightDossierFacts(iso3: string) {
+  const g = await dossierFacts(iso3); if (!g) return null; const p = await foresightFor(iso3); if (!p) return g;
+  const x = foresightFacts(p, g.facts.length); return { ...g, facts: [...g.facts, ...x.facts], gaps: [...g.gaps, ...x.gaps] };
 }

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { sessionState } from "./markets/format";
 import { intelFor } from "./intel-data";
+import { foresightFacts, foresightFor } from "./foresight-data";
 const read = (p: string) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
 const countries = read("../../public/data/countries.json") as { iso3: string; name: string; capital: string | null; lat: number | null; lng: number | null; region: string }[];
 const by = new Map(countries.map((c) => [c.iso3, c]));
@@ -102,4 +103,14 @@ for (const c of ["CHE", "NOR", "NLD", "DNK"]) assert.ok(gv.countries[c].ge > 75 
 }
 for (const [f, max] of [["leverage", 45], ["deals", 45], ["temperature", 30], ["governance", 400], ["leaders", 70], ["uae-aid", 70]] as const) { const d = read(`../../public/data/${f}.json`) as { built: string }; assert.ok(age(d.built) < max, `${f}.json was built ${Math.round(age(d.built))} days ago`); }
 void (async () => { const e = await intelFor("EGY"); assert.ok(e && e.leverage && e.temperature && e.governance && e.leaders && e.deals.total > 0, "EGY intel payload is incomplete"); assert.equal(await intelFor("ARE"), null); assert.equal(await intelFor("XXX"), null); assert.ok(e!.metrics.partnershipScore != null && e!.ids.visits.length > 0); console.log("intel payload: ok"); })();
+void (async () => {
+  const f = await foresightFor("EGY"); assert.ok(f && f.macro && f.signals.length >= 12 && f.region === "Africa", "EGY foresight baseline is incomplete");
+  const fr = new Set(f!.signals.map((x) => x.front)); for (const k of ["economy", "political", "security", "finance", "external"]) assert.ok(fr.has(k as never), `foresight baseline lacks ${k}`);
+  for (const x of f!.signals) { assert.ok(x.value && x.note && x.src && ["good", "info", "watch", "risk"].includes(x.tone), `bad signal ${x.id}`); assert.ok(!/undefined|NaN|Infinity/.test(`${x.value} ${x.note}`), `signal ${x.id} prints junk: ${x.value}`); }
+  const g = f!.signals.find((x) => x.label === "Growth outlook"); assert.ok(g && /^-?\d+\.\d% → -?\d+\.\d%$/.test(g.value), "growth outlook format");
+  assert.ok(f!.macro!.growth.length >= 8 && f!.macro!.growth.at(-1)![0] >= new Date().getFullYear() + 3, "IMF path should reach several years ahead"); assert.ok(f!.blind.includes("defence") && f!.blind.includes("resources"), "blind fronts are named");
+  const fx = foresightFacts(f!, 100); assert.ok(fx.facts.length >= 4 && fx.facts[0].id === "F101" && fx.facts.some((x) => x.kind === "macro-path" && /E /.test(x.text)) && fx.facts.some((x) => x.kind === "foresight-baseline") && fx.gaps.length === 1, "foresight facts");
+  assert.equal(f!.exposure.length, 10); assert.ok(f!.exposure.filter((x) => x.value != null).length >= 6 && f!.exposure.every((x) => x.value == null || (x.value >= 0 && x.value <= 100)), "exposure spokes come from the scorecard"); assert.equal(f!.exposure.find((x) => x.key === "technology")!.value, null, "no dataset for technology");
+  assert.equal(await foresightFor("ARE"), null); assert.equal(await foresightFor("XXX"), null); console.log("foresight baseline: ok");
+})();
 console.log("integrity: all assertions passed");

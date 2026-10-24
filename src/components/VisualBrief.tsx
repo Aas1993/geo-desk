@@ -46,10 +46,10 @@ function Radar({ dims, lang }: { dims: { label: string; v: number | null }[]; la
   );
 }
 
-const Panel = ({ title, children, className = "" }: { title?: string; children: React.ReactNode; className?: string }) => <section className={`rounded-[14px] border border-line bg-bg1 p-4 ${className}`}>{title && <h4 className="label mb-3">{title}</h4>}{children}</section>;
+export const Panel = ({ title, children, className = "" }: { title?: string; children: React.ReactNode; className?: string }) => <section className={`rounded-[14px] border border-line bg-bg1 p-4 ${className}`}>{title && <h4 className="label mb-3">{title}</h4>}{children}</section>;
 const Tile = ({ label, value, sub }: { label: string; value: string; sub?: string }) => <div className="rounded-[12px] bg-bg2 p-3"><div className="num display text-[22px] font-semibold leading-tight text-t0">{value}</div><div className="mt-0.5 text-[11.5px] leading-snug text-t1">{label}</div>{sub && <div className="num mt-0.5 text-[10.5px] text-t2">{sub}</div>}</div>;
 
-function Meter({ j, lang }: { j: Judgment; lang: Lang }) {
+export function Meter({ j, lang }: { j: Judgment; lang: Lang }) {
   const u = V[lang]; const b = j.band; const dots = j.confidence === "high" ? 3 : j.confidence === "moderate" ? 2 : j.confidence === "low" ? 1 : 0;
   return (
     <li className="rounded-[12px] bg-bg2 p-3">

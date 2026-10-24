@@ -11,6 +11,7 @@ import { MinisterTab } from "./MinisterTab";
 import { DeskTab } from "./DeskTab";
 import { CounterpartTab } from "./CounterpartTab";
 import { InvestTab } from "./InvestTab";
+import { ForesightTab } from "./ForesightTab";
 import { IntelTab } from "./IntelTab";
 import { AgreementsTab } from "./AgreementsTab";
 import { MediaTab } from "./MediaTab";
@@ -20,7 +21,7 @@ import { useDashboard } from "@/lib/dashboard-store";
 import { printOnePager } from "@/lib/one-pager";
 import type { Country, CountryDetail, TabId } from "@/lib/types";
 
-const TABS: TabId[] = ["overview", "brief", "intel", "investments", "minister", "counterpart", "desk", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
+const TABS: TabId[] = ["overview", "brief", "intel", "investments", "foresight", "minister", "counterpart", "desk", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
 const cache = new Map<string, CountryDetail>(); const stamp = new Map<string, number>(); // weather and air quality are part of the detail, so it is refreshed when older than 15 minutes
 const fresh = (iso: string) => (stamp.get(iso) ?? 0) > Date.now() - 900_000;
 
@@ -99,6 +100,7 @@ export function CountryPanel() {
         {tab === "intel" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "الرؤى تخص الدول الأخرى." : "Intel covers other countries."}</p> : <IntelTab c={c} />)}
         {tab === "desk" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "موجز المكتب يخص الدول الأخرى." : "The desk brief covers other countries."}</p> : <DeskTab c={c} />)}
         {tab === "investments" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "الاستثمارات الإماراتية تخص الدول الأخرى." : "UAE investment covers other countries."}</p> : <InvestTab c={c} />)}
+        {tab === "foresight" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "الاستشراف يخص الدول الأخرى." : "Foresight covers other countries."}</p> : <ForesightTab c={c} />)}
         {tab === "counterpart" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "ملف الطرف المقابل يخص الدول التي تلتقي بها الإمارات." : "The counterpart profile covers the countries the UAE meets with."}</p> : <CounterpartTab c={c} />)}
         {tab === "minister" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "موجز الوزير يخص الدول التي تلتقي بها الإمارات." : "The ministerial brief covers the countries the UAE meets with."}</p> : <MinisterTab c={c} />)}
         {tab === "economy" && <EconomyTab c={c} detail={detail} />}

@@ -63,3 +63,16 @@ const ps = parseSections(md);
 assert.equal(ps.title, "Title"); assert.deepEqual(ps.sections.map((x) => x.title), ["Sec A", "Sec B"]); assert.equal(ps.sections[0].part, "1. Part");
 assert.deepEqual(ps.sections[0].blocks.map((b) => b.t), ["quote", "list", "table"]); assert.deepEqual((ps.sections[0].blocks[1] as { items: string[] }).items, ["x l", "y"]);
 void (async () => { const blob = await buildDeck(md, { title: "T", subtitle: "s", rtl: true, classification: "C", foot: "f", sources: [{ url: "https://x.org", title: "X" }] }); const head = new Uint8Array(await blob.arrayBuffer()).slice(0, 2); assert.equal(String.fromCharCode(head[0], head[1]), "PK"); console.log("dossier: all assertions passed"); })();
+
+// the statecraft lens: all four AI products carry it, the instruments are the same everywhere, and the scorecard and the play are asked for
+import { INSTRUMENT_KEYS, STATECRAFT } from "./statecraft";
+import { SYSTEM as MIN_SYSTEM } from "./dossier/prompt";
+import { SYSTEM as BRIEF_SYSTEM, SCHEMA as BRIEF_SCHEMA } from "./brief/prompt";
+import { PREP_SYSTEM, PREP_SCHEMA } from "./ask/prep";
+for (const [name, sys] of [["ministerial", MIN_SYSTEM], ["desk", DESK_SYSTEM], ["country brief", BRIEF_SYSTEM], ["prep", PREP_SYSTEM]] as const) assert.ok(sys.includes(STATECRAFT), `${name} prompt lacks the statecraft lens`);
+assert.equal(INSTRUMENT_KEYS.length, 7); assert.ok(MIN_SYSTEM.includes("## The UAE Play") && MIN_SYSTEM.includes("Country scorecard"), "ministerial prompt asks for the play and the scorecard");
+assert.ok(ALL_TOPICS.includes("play") && ALL_TOPICS.includes("rivals") && ALL_TOPICS.includes("scorecard") && PRESETS.some((p) => p.id === "strategic"), "desk strategy topics");
+assert.deepEqual((BRIEF_SCHEMA.properties.sections.items.properties.key.enum as readonly string[]).slice(-3), ["leverage", "moves", "outlook"]);
+assert.ok(PREP_SCHEMA.required.includes("play") && PREP_SCHEMA.required.includes("scorecard") && PREP_SCHEMA.required.includes("tripwires"), "prep schema asks for the play");
+assert.ok(!/\bfabricat|\bcovert action\b[^.]*\brecommend/i.test(STATECRAFT.replace(/never involve deceiving[^.]*\./i, "")), "the lens must not recommend covert or deceptive means");
+console.log("statecraft: all assertions passed");

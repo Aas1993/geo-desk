@@ -7,6 +7,9 @@ type Person = { name: string; qid: string; start: string | null; birth: string |
 export type Leader = Person & { role: "state" | "gov"; tenureYears: number | null; age: number | null };
 export type Election = { label: string; date: string; approx: boolean; daysAway: number };
 export type Deal = { u: string; d: string; t: string; c: string[]; by: string[]; sector: string | null };
+export type Rivals = { year: number; total: number; of: number; uae: { share: number; rank: number }; list: { c: string; share: number; y?: number }[] };
+export type ScoreDim = { score: number | null; n: number; of: number; parts: { k: string; s: number; v: number | null }[] };
+export type Scorecard = { overall: number; tier: "strategic" | "strong" | "mixed" | "weak" | "thin"; coverage: number; dims: Record<string, ScoreDim>; rank: number; of: number; weights: Record<string, number> };
 export type IntelPayload = {
   iso3: string; name: string; asOf: string;
   leverage: { theirs: number | null; ours: number | null; quadrant: string; raw: Record<string, number | null>; threshold: number; year: number } | null;
@@ -16,6 +19,8 @@ export type IntelPayload = {
   aid: { years: number[]; byYear: Record<string, number>; latestFull: number | null; latestFullYear: number | null; uaeTotalLatestFull: number | null; shareOfUaeTotal: number | null; rankLatestFull: number | null; of: number | null; cumulative: number } | null;
   invest: { outwardUsd: number | null; outwardYear: number | null; outwardRank: number | null; inwardUsd: number | null; pctOfTheirGdp: number | null; shareOfUaeAbroad: number | null } | null;
   deals: { items: Deal[]; total: number; last90: number; last365: number; byInvestor: [string, number][]; bySector: [string, number][] };
+  scorecard: Scorecard | null;
+  rivals: Rivals | null;
   metrics: Record<string, number | string | null>;
   ids: { visits: string[]; deals: string[]; agreements: number };
   recentVisits: { u: string; d: string; t: string; k: string; l: number }[];
@@ -24,7 +29,7 @@ import { WGI_KEYS } from "./intel-labels";
 const years = (from: string, to: Date) => { const f = Date.parse(from); return Number.isFinite(f) ? Math.round(((to.getTime() - f) / (365.25 * 86400e3)) * 10) / 10 : null; };
 
 export async function intelFor(iso3: string): Promise<IntelPayload | null> {
-  const [cs, lev, tmp, gov, ldr, aid, inv, outlook, deals, visits, ag, tone, sanc, rw, pi] = await Promise.all([
+  const [cs, lev, tmp, gov, ldr, aid, inv, outlook, deals, visits, ag, tone, sanc, rw, pi, sc, rv] = await Promise.all([
     rd<{ iso3: string; name: string }[]>("countries.json"), rd<{ year: number; threshold: number; countries: Record<string, NonNullable<IntelPayload["leverage"]>> }>("leverage.json"),
     rd<{ built: string; days: number; world: { g: number | null }; countries: Record<string, Omit<NonNullable<IntelPayload["temperature"]>, "worldG" | "days" | "built">> }>("temperature.json"),
     rd<{ year: number; n: Record<string, number>; countries: Record<string, Record<string, number>> }>("governance.json"), rd<{ countries: Record<string, { state?: Person; gov?: Person; elections?: { label: string; date: string; approx: boolean }[] }> }>("leaders.json"),
@@ -32,6 +37,8 @@ export async function intelFor(iso3: string): Promise<IntelPayload | null> {
     rd<{ countries: Record<string, { gdp?: Record<number, number>; growth?: Record<number, number>; debt?: Record<number, number> }> }>("outlook.json"), rd<{ items: Deal[] }>("deals.json"), rd<{ items: { u: string; d: string; t: string; k: string; c: string[]; l: number }[] }>("visits.json"),
     rd<{ countries: Record<string, { mofa: unknown[]; moft: unknown[]; cepa: { status: string } | null }> }>("agreements.json"), rd<{ countries: Record<string, { avg: number | null; trend?: number }> }>("media-tone.json"),
     rd<{ countries: Record<string, { ofac: number; un: number }> }>("sanctions.json"), rd<{ countries: Record<string, { n7: number; n30: number }> }>("ransomware.json"), rd<{ countries: Record<string, { score: number; rank: number }> }>("partnership.json"),
+    rd<{ weights: Record<string, number>; countries: Record<string, Omit<Scorecard, "rank" | "of" | "weights">> }>("scorecard.json"),
+    rd<{ year: number; countries: Record<string, Omit<Rivals, "year">> }>("rivals.json"),
   ]);
   const c = cs?.find((x) => x.iso3 === iso3); if (!c || iso3 === "ARE") return null; const now = new Date(); const today = now.toISOString().slice(0, 10);
   const leverage = lev?.countries[iso3] ? { ...lev.countries[iso3], threshold: lev.threshold, year: lev.year } : null;
@@ -53,7 +60,9 @@ export async function intelFor(iso3: string): Promise<IntelPayload | null> {
     agreements: a0 ? a0.mofa.length + a0.moft.length : null, cepa: a0?.cepa?.status ?? null, ofac: sanc?.countries[iso3]?.ofac ?? null, un: sanc?.countries[iso3]?.un ?? null, ransomware30: rw?.countries[iso3]?.n30 ?? null,
     politicalStability: g?.pv ?? null, growth: outlook?.countries[iso3]?.growth?.[new Date().getFullYear()] ?? null, debt: outlook?.countries[iso3]?.debt?.[new Date().getFullYear()] ?? null, aidLatest: aidOut?.latestFull ?? null, daysToElection: ec ? ec.daysAway : null,
   };
-  return { iso3, name: c.name, asOf: today, leverage, temperature, governance, leaders: L ? { people, elections } : null, aid: aidOut, invest,
+  const sk = sc?.countries[iso3]; const scorecard: Scorecard | null = sk && sc ? { ...sk, weights: sc.weights, of: Object.keys(sc.countries).length, rank: Object.values(sc.countries).filter((x) => x.overall > sk.overall).length + 1 } : null;
+  const rivals: Rivals | null = rv?.countries[iso3] ? { year: rv.year, ...rv.countries[iso3] } : null;
+  return { iso3, name: c.name, asOf: today, leverage, temperature, governance, leaders: L ? { people, elections } : null, aid: aidOut, invest, scorecard, rivals,
     deals: { items: dl.slice(0, 12), total: dl.length, last90: dl.filter((x) => x.d >= cut(90)).length, last365: dl.filter((x) => x.d >= cut(365)).length, byInvestor: tally(dl.flatMap((x) => x.by.map((b) => b.replace(/^Abu Dhabi Fund for Development$/i, "ADFD")))), bySector: tally(dl.map((x) => x.sector ?? "other")) },
     metrics, recentVisits: vs.slice(0, 12).map((x) => ({ u: x.u, d: x.d, t: x.t, k: x.k, l: x.l })), ids: { visits: vs.slice(0, 40).map((x) => x.u), deals: dl.map((x) => x.u), agreements: a0 ? a0.mofa.length + a0.moft.length : 0 } };
 }

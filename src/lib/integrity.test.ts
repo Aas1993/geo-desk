@@ -77,6 +77,23 @@ const tm = read("../../public/data/temperature.json") as { countries: Record<str
 assert.ok(Object.keys(tm.countries).length >= 40, "temperature coverage"); for (const [k, v] of Object.entries(tm.countries)) { assert.ok(iso.has(k) && k !== "ARE", `temperature: bad ${k}`); assert.ok(v.n >= 15 && v.g >= -10 && v.g <= 10 && v.coop >= 0 && v.conflict >= 0 && v.coop + v.conflict <= 1.001, `${k}: ${JSON.stringify({ n: v.n, g: v.g })}`); const ws = v.weeks.map((x) => x.w); assert.deepEqual([...ws].sort(), ws, `${k}: weeks out of order`); }
 const dl = read("../../public/data/deals.json") as { items: { u: string; d: string; t: string; c: string[]; by: string[] }[] };
 assert.ok(dl.items.length >= 100, "deals coverage"); const dids = dl.items.map((x) => x.u); assert.equal(new Set(dids).size, dids.length, "duplicate deal ids"); for (const x of dl.items) { assert.ok(x.c.length && x.c.every((c) => iso.has(c) && c !== "ARE"), `deal ${x.u}: bad countries`); assert.ok(x.by.length && x.d <= todayS, `deal ${x.u}: no investor or a future date`); }
+// anchors that catch a mixed-up World Bank row (a duplicate SYR row once made Syria look like a top-tier state and a stale NLD row understated the Netherlands)
+for (const c of ["AFG", "YEM", "SYR", "SOM"]) assert.ok(gv.countries[c].ge < 45 && gv.countries[c].pv < 45, `governance: ${c} implausibly high`);
+for (const c of ["CHE", "NOR", "NLD", "DNK"]) assert.ok(gv.countries[c].ge > 75 && gv.countries[c].rl > 75, `governance: ${c} implausibly low`);
+// rivals: each country compares the UAE with the other powers by trade share, sorted, with the UAE present and shares within 0-100
+{
+  const rv = read("../../public/data/rivals.json") as { built: string; year: number; countries: Record<string, { uae: { share: number; rank: number }; of: number; list: { c: string; share: number }[] }> };
+  assert.ok(Object.keys(rv.countries).length >= 100 && rv.year >= 2023 && age(rv.built) < 45, "rivals coverage or freshness");
+  for (const [k, v] of Object.entries(rv.countries)) { assert.ok(iso.has(k) && k !== "ARE", `rivals: bad ${k}`); assert.ok(v.list.some((x) => x.c === "ARE") && v.list.length === v.of && v.uae.rank >= 1 && v.uae.rank <= v.of, `rivals: ${k} malformed`); for (let i = 0; i < v.list.length; i++) { assert.ok(v.list[i].share >= 0 && v.list[i].share <= 100, `rivals: ${k} share out of range`); if (i) assert.ok(v.list[i - 1].share >= v.list[i].share, `rivals: ${k} not sorted`); } }
+  assert.ok(rv.countries.PAK.list[0].c === "CHN" && rv.countries.PAK.uae.rank <= 3, "rivals: Pakistan anchor (China first, UAE near the top)"); assert.ok(rv.countries.EGY.list[0].c === "CHN", "rivals: Egypt anchor");
+}
+// the country scorecard: every part a percentile, a dimension the mean of its parts, the overall the weighted mean of the dimensions that have data
+{
+  const sc = read("../../public/data/scorecard.json") as { built: string; weights: Record<string, number>; countries: Record<string, { overall: number; coverage: number; dims: Record<string, { score: number | null; parts: { s: number }[] }> }> };
+  assert.ok(Object.keys(sc.countries).length >= 150, "scorecard coverage"); assert.equal(Object.values(sc.weights).reduce((a, b) => a + b, 0), 100, "scorecard weights sum to 100"); assert.ok(age(sc.built) < 45, "scorecard.json is stale");
+  for (const [k, v] of Object.entries(sc.countries)) { assert.ok(iso.has(k) && k !== "ARE", `scorecard: bad ${k}`); assert.ok(v.overall >= 0 && v.overall <= 100 && v.coverage > 0 && v.coverage <= 100, `scorecard: ${k} out of range`); for (const d of Object.values(v.dims)) for (const p of d.parts) assert.ok(p.s >= 0 && p.s <= 100, `scorecard: ${k} part out of range`); }
+  assert.ok(sc.countries.SYR.overall < sc.countries.CHE.overall, "scorecard: Syria should not outscore Switzerland"); assert.ok(sc.countries.SYR.dims.political.score! < 45, "scorecard: Syria political score implausible");
+}
 for (const [f, max] of [["leverage", 45], ["deals", 45], ["temperature", 30], ["governance", 400], ["leaders", 70], ["uae-aid", 70]] as const) { const d = read(`../../public/data/${f}.json`) as { built: string }; assert.ok(age(d.built) < max, `${f}.json was built ${Math.round(age(d.built))} days ago`); }
 void (async () => { const e = await intelFor("EGY"); assert.ok(e && e.leverage && e.temperature && e.governance && e.leaders && e.deals.total > 0, "EGY intel payload is incomplete"); assert.equal(await intelFor("ARE"), null); assert.equal(await intelFor("XXX"), null); assert.ok(e!.metrics.partnershipScore != null && e!.ids.visits.length > 0); console.log("intel payload: ok"); })();
 console.log("integrity: all assertions passed");

@@ -1,5 +1,6 @@
 import { oneLine, noteText } from "../guard";
 import { SYSTEM } from "./prompt";
+import { STATECRAFT } from "../statecraft";
 
 // The political and economic DESK BRIEF: a long analytical country brief for a desk officer, built from the topics the officer picks, at the length and detail they choose.
 export type TopicGroup = { id: string; en: string; ar: string; items: { key: string; en: string; ar: string }[] };
@@ -34,6 +35,12 @@ export const DESK_TOPICS: TopicGroup[] = [
     { key: "multilateral", en: "Multilateral and UN alignment, candidacies", ar: "التعددية والتوافق في الأمم المتحدة والترشيحات" },
     { key: "softpower", en: "Soft power: education, culture, humanitarian", ar: "القوة الناعمة: التعليم والثقافة والعمل الإنساني" },
   ] },
+  { id: "strategy", en: "Strategy and influence", ar: "الاستراتيجية والنفوذ", items: [
+    { key: "play", en: "The UAE play: options, recommended moves and sequencing", ar: "خطة الإمارات: الخيارات والتحركات الموصى بها وتسلسلها" },
+    { key: "rivals", en: "Rival powers and the competition for influence", ar: "القوى المنافسة والتنافس على النفوذ" },
+    { key: "levers", en: "Levers: hard, economic, financial, logistic and soft power", ar: "الأدوات: القوة الصلبة والاقتصادية والمالية واللوجستية والناعمة" },
+    { key: "scorecard", en: "Country scorecard: every aspect, with drivers", ar: "بطاقة أداء الدولة: كل الجوانب ومحركاتها" },
+  ] },
   { id: "forward", en: "Looking ahead", ar: "نظرة مستقبلية", items: [
     { key: "scenarios", en: "Scenarios and risk register (12 to 24 months)", ar: "السيناريوهات وسجل المخاطر (12 إلى 24 شهرًا)" },
     { key: "watch", en: "Indicators to watch and calendar of coming events", ar: "مؤشرات المتابعة وجدول الأحداث القادمة" },
@@ -43,9 +50,10 @@ export const DESK_TOPICS: TopicGroup[] = [
 export const ALL_TOPICS = DESK_TOPICS.flatMap((g) => g.items.map((i) => i.key));
 const T = (...ids: string[]) => ids;
 export const PRESETS: { id: string; en: string; ar: string; topics: string[] }[] = [
-  { id: "political", en: "Political desk", ar: "مكتب الشؤون السياسية", topics: T("leadership", "domestic", "unrest", "foreign", "regional", "security", "sanctions", "narrative", "history", "agreements", "multilateral", "scenarios", "watch", "actions") },
-  { id: "economic", en: "Economic desk", ar: "مكتب الشؤون الاقتصادية", topics: T("macro", "fiscal", "external", "trade", "investment", "sectors", "business", "development", "history", "agreements", "aviation", "scenarios", "watch", "actions") },
-  { id: "joint", en: "Joint political and economic", ar: "السياسي والاقتصادي معًا", topics: T("leadership", "domestic", "foreign", "security", "sanctions", "macro", "fiscal", "external", "trade", "investment", "sectors", "history", "agreements", "scenarios", "watch", "actions") },
+  { id: "political", en: "Political desk", ar: "مكتب الشؤون السياسية", topics: T("scorecard", "play", "leadership", "domestic", "unrest", "foreign", "regional", "security", "sanctions", "narrative", "history", "agreements", "multilateral", "scenarios", "watch", "actions") },
+  { id: "economic", en: "Economic desk", ar: "مكتب الشؤون الاقتصادية", topics: T("scorecard", "play", "macro", "fiscal", "external", "trade", "investment", "sectors", "business", "development", "history", "agreements", "aviation", "scenarios", "watch", "actions") },
+  { id: "joint", en: "Joint political and economic", ar: "السياسي والاقتصادي معًا", topics: T("scorecard", "play", "leadership", "domestic", "foreign", "security", "sanctions", "macro", "fiscal", "external", "trade", "investment", "sectors", "history", "agreements", "scenarios", "watch", "actions") },
+  { id: "strategic", en: "Strategic influence", ar: "النفوذ الاستراتيجي", topics: T("scorecard", "play", "rivals", "levers", "foreign", "regional", "security", "investment", "sectors", "agreements", "softpower", "scenarios", "watch", "actions") },
   { id: "all", en: "Everything", ar: "كل شيء", topics: ALL_TOPICS },
 ];
 export const DESK_LENGTHS = [["short", "Short (about 1,500 words)", "قصير (نحو 1500 كلمة)"], ["standard", "Standard (about 4,000 words)", "قياسي (نحو 4000 كلمة)"], ["detailed", "Detailed (about 6,000 words)", "مفصّل (نحو 6000 كلمة)"], ["exhaustive", "Exhaustive (up to about 10,000 words)", "شامل جدًا (حتى نحو 10000 كلمة)"]] as const;
@@ -76,11 +84,13 @@ export const DESK_SYSTEM = `You are a senior analyst on a UAE Ministry of Foreig
 
 ${EVIDENCE}
 # What you produce
-One markdown document with exactly three top-level parts, each starting with a level-1 heading ("# ") with these exact titles, in this order: "# 1. Desk Summary", "# 2. Analysis by Topic", "# 3. Annexes". Use level-2 ("## ") headings inside a part and markdown tables for indicators, chronologies and registers. Start with a title line ("# Desk Brief: <country>") and a one-line "Prepared for / Lens / Horizon / As of" block. Never write a preamble or a closing remark about the task.
+One markdown document with exactly three top-level parts, each starting with a level-1 heading ("# ") with these exact titles, in this order: "# 1. Desk Summary", "# 2. Analysis by Topic", "# 3. Annexes". Use level-2 ("## ") headings inside a part and markdown tables for indicators, chronologies and registers. Start with a title line ("# Desk Brief: <country>") and a one-line "Prepared for / Lens / Horizon / As of / Newest source" block. Never write a preamble or a closing remark about the task.
 
 ## Part 1. Desk Summary
 - "Key judgments": 5 to 8 numbered bullets, each a finding in one or two sentences with a confidence (High, Medium, Low), the main evidence, and why it matters to the UAE.
 - "Indicator dashboard": a table of the most important numbers from the chosen topics (indicator, latest value, date, change over the horizon, source). Use the application's series in the facts first; add web figures only with a source and date. "not found" is an acceptable cell.
+- "Country scorecard": a compact table of the seven aspects from the application's scorecard fact (friendliness toward the UAE, political, economic, financial, social and people-to-people, security and risk, UAE leverage): score, one-line driver, direction. If the scorecard fact is missing, say so.
+- "The UAE play in brief": three lines: the best opening for UAE influence, the main exposure, and the one thing to watch.
 - "What has changed": the developments inside the requested horizon that move the picture, newest first.
 - "How solid this is": two lines on evidence quality and the biggest gaps.
 
@@ -89,6 +99,7 @@ One "## " section per CHOSEN topic, in the order given in the request, titled ex
 - bullets: 4 to 8 tight bullets with figures, dates and a source each; no long prose.
 - analysis: two to four paragraphs: what the situation is, what drives it, what it means for the UAE, and the outlook with a confidence.
 - full: the situation; an evidence table (indicator or fact, value, date, source, status); the drivers and the competing explanations; implications for the UAE (political, economic, security, reputational); the outlook with a confidence; and "what would change our view".
+The Strategy and influence topics follow the statecraft lens below: "The UAE play" gives the strategic objective (assumed unless stated), a power map by instrument, three courses of action with costs, second-order effects and probabilities, a recommended sequenced play with timing windows, owners as roles and kill criteria, gives, gets and holds-back, and a red team with tripwires. "Rival powers" is a table of each rival present (Saudi Arabia, Qatar, Türkiye, China, India, the US, the EU and its members, Russia, Iran, Israel) with sourced evidence of footprint, direction and what it means for the UAE, and says plainly where the UAE is ahead, level or behind. "Levers" goes instrument by instrument (hard, economic, financial, logistic, soft, humanitarian, diplomatic): what the UAE holds, what it could add, at what cost. "Country scorecard" explains each of the seven aspects: the application score, the drivers behind it, what would move it and what the UAE can do about the weakest aspects.
 Where a topic needs UAE internal records, positions or mandates (for example consular cases, approved positions, company exposure), write "DESK INPUT REQUIRED:" with what is needed, unless the desk context supplies it.
 
 ## Part 3. Annexes
@@ -97,6 +108,8 @@ Where a topic needs UAE internal records, positions or mandates (for example con
 - "Source assessment": a table of the main sources used (source, type, reliability High/Medium/Low, used for).
 - "Gaps and requests": what could not be established and what the desk or embassy should supply.
 - "Watchlist": a table (indicator or event, trigger or date, why it matters to the UAE, what to do).
+
+${STATECRAFT}
 
 # Length and balance
 The request gives a total word target. Spend about 10 percent on Part 1 and 10 percent on Part 3 and divide the rest across the chosen topics, giving more to topics that matter more under the stated lens (political emphasis, economic emphasis or joint) and to topics where the evidence is richest. For the Detailed and Exhaustive lengths treat the target as a floor: write at least 85 percent of it, spending the extra on evidence tables, drivers and implications for the UAE, never on repetition. Stay within about 15 percent above the target in total. Tables and links cost space: plan the budget so that all three parts are finished, and shorten topic sections rather than leave out Part 3 or end mid-sentence. In a short brief, keep Part 3 to the chronology and the watchlist. Never pad: if the evidence is thin, say so and keep that section short.
@@ -107,13 +120,13 @@ The request gives a time horizon (last 30 days, last 12 months or five years). W
 # Indicators in the facts
 The facts can include leverage and exposure (how far each side leans on the other), bilateral temperature (GDELT events between UAE and the country), World Bank governance scores, the leadership clock (tenure, age, coming elections), UAE humanitarian funding reported to OCHA FTS, UAE investment position, and UAE company and fund deals read from WAM headlines. Use them: lead the leverage and temperature readings in the dashboard and the strategic-importance assessment, use governance and the leadership clock for the political assessment and the counterpart's authority, use the aid and investment figures for development and economic sections, and use the deal facts as the base list of UAE investments in the country, each with its link and described as an announcement, not a verified transaction. State plainly what each figure is not (percentiles are position, not power; temperature is machine-coded news; FTS is only humanitarian reporting). If a fact is absent, say it was not found.
 
-# Cost discipline
-Every run has a hard ceiling of about one US dollar, and web searches and fetched pages are what use it up. Plan the searches before you start: list what the facts lack, then run only the searches that fill those gaps, never the same query twice. Prefer what the search results already say over fetching a page, and fetch a page only to verify a number that decides a conclusion. Write each section once, in final form: no drafts, no preamble, no restating the same fact in several sections (refer to it instead). Keep tables compact. If you are running short of budget, finish every part in shorter form rather than leave a part out.
+# Cost discipline and research effort
+Every run has a hard ceiling of about one US dollar, and a typical run uses well under half of it, so the search budget in the request is there to be used on what decides the quality of the advice: (1) what has happened in the last 30 days in this country and in its relationship with the UAE; (2) who else is present here (investment, lending, ports, arms, bases, mediation) among Saudi Arabia, Qatar, Türkiye, China, India, the US, the EU and its members, Russia and Iran, and which of them is moving; (3) the counterpart, and the scheduled events of the next 90 days (elections, IMF reviews, debt maturities, summits). Plan the searches so each answers a different one of these, never repeat a query, and prefer what a search result already says over fetching a page. Never write "not researched" about rivals or recent events: search for it, or write "not found after searching". Write each section once, in final form: no drafts, no restating the same fact in several sections. Keep tables compact. If budget runs short, finish every part in shorter form rather than leave a part out.
 
 # Research method
-Start from the facts, then research with the tools only what the facts lack, topic by topic, preferring official, institutional and primary sources with dates. Stop once a topic is adequately supported. Write in the requested language; for Arabic use Modern Standard Arabic, keep URLs and fact ids such as F12 in Latin characters and keep table structure.`;
+Start from the facts and from what happened most recently: run your first searches for the last 30 days in this country and in its relationship with the UAE (and for scheduled events in the next 90 days), put the date of the newest source you relied on in the "As of" line, and mark anything older than 90 days as possibly stale where it drives a conclusion. Then research with the tools only what the facts lack, topic by topic, preferring official, institutional and primary sources with dates. Stop once a topic is adequately supported. Write in the requested language; for Arabic use Modern Standard Arabic, keep URLs and fact ids such as F12 in Latin characters and keep table structure.`;
 
 export function deskMessage(o: { facts: string; asOf: string; country: string; options: DeskOptions }) {
   const x = o.options; const b = DESK_BUDGET[x.length]; const lens = DESK_LENSES.find(([k]) => k === x.lens)![1]; const hz = DESK_HORIZONS.find(([k]) => k === x.horizon)![1]; const st = DESK_STYLES.find(([k]) => k === x.style)![1];
-  return `<facts country="${o.country}" as_of="${o.asOf}">\n${o.facts}\n</facts>\n\n<desk_input>\n${x.context ? `<note kind="desk context, approved positions and instructions">\n${x.context}\n</note>\n` : "(none supplied)\n"}</desk_input>\n\n<request>\nCountry: ${o.country}\nLens: ${lens}\nTime horizon: ${hz}\nStyle: ${st} (${x.style})\nTotal length: about ${b.words.toLocaleString("en")} words\nChosen topics, in this order (${x.topics.length}):\n${x.topics.map((k, i) => `${i + 1}. ${label(k)}`).join("\n")}\n${x.custom ? `Custom subjects to cover as extra sections at the end: ${x.custom}\n` : ""}Language: ${x.lang === "ar" ? "Arabic (Modern Standard)" : "English"}\nToday: ${o.asOf.slice(0, 10)}\n</request>\n\nWrite the desk brief now.`;
+  return `<facts country="${o.country}" as_of="${o.asOf}">\n${o.facts}\n</facts>\n\n<desk_input>\n${x.context ? `<note kind="desk context, approved positions and instructions">\n${x.context}\n</note>\n` : "(none supplied)\n"}</desk_input>\n\n<request>\nCountry: ${o.country}\nLens: ${lens}\nTime horizon: ${hz}\nStyle: ${st} (${x.style})\nTotal length: about ${b.words.toLocaleString("en")} words\nResearch budget: up to ${b.searches} web searches and ${b.fetches} page fetches (use the searches)\nChosen topics, in this order (${x.topics.length}):\n${x.topics.map((k, i) => `${i + 1}. ${label(k)}`).join("\n")}\n${x.custom ? `Custom subjects to cover as extra sections at the end: ${x.custom}\n` : ""}Language: ${x.lang === "ar" ? "Arabic (Modern Standard)" : "English"}\nToday: ${o.asOf.slice(0, 10)}\n</request>\n\nWrite the desk brief now.`;
 }

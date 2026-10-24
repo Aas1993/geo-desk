@@ -36,6 +36,7 @@ export async function dossierFacts(iso3: string): Promise<{ name: string; nameAr
   const last = (vs?.items ?? []).find((x) => x.c.includes(iso3) && x.l >= 2); if (last) tiles.push({ label: "Last senior engagement", value: last.d, sub: last.k });
   const g26 = oe?.growth?.[2026]; if (g26 != null) tiles.push({ label: "IMF growth 2026F", value: `${g26.toFixed(1)}%`, sub: oe?.inflation?.[2026] != null ? `inflation ${oe.inflation[2026]}%` : undefined });
   try { const it = await intelFor(iso3); const q: Record<string, string> = { mutual: "mutual", "uae-leverage": "UAE leverage", "uae-exposed": "UAE exposed", light: "light ties", partial: "partial" };
+    if (it?.scorecard) tiles.push({ label: "Country scorecard", value: `${it.scorecard.overall}/100`, sub: `rank ${it.scorecard.rank} of ${it.scorecard.of}${it.scorecard.coverage < 100 ? ` · ${it.scorecard.coverage}% data` : ""}` });
     if (it?.leverage) tiles.push({ label: "Leverage (them / UAE)", value: `${it.leverage.theirs ?? "–"} / ${it.leverage.ours ?? "–"}`, sub: q[it.leverage.quadrant] });
     if (it?.temperature) tiles.push({ label: "Bilateral temperature", value: `${it.temperature.g > 0 ? "+" : ""}${it.temperature.g.toFixed(2)}`, sub: it.temperature.worldG != null ? `all countries ${it.temperature.worldG > 0 ? "+" : ""}${it.temperature.worldG.toFixed(2)}` : undefined });
     if (it && it.deals.total) tiles.push({ label: "UAE deals in WAM", value: String(it.deals.total), sub: `${it.deals.last90} in 90 days` });

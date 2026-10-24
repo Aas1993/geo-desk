@@ -8,8 +8,18 @@ const countries = JSON.parse(readFileSync(new URL("../public/data/countries.json
 const out = {}; let year = 0;
 for (const [k, id] of Object.entries(IND)) {
   const r = await fetch(`https://api.worldbank.org/v2/country/all/indicator/${id}?format=json&per_page=400&mrnev=1&source=3`, { signal: AbortSignal.timeout(40_000) }); if (!r.ok) throw new Error(`${id} ${r.status}`);
-  const rows = (await r.json())[1] ?? [];
-  for (const x of rows) { const iso = x.countryiso3code; if (!valid.has(iso) || x.value == null) continue; (out[iso] ??= {})[k] = Math.round(x.value * 10) / 10; out[iso].y = Math.max(out[iso].y ?? 0, +x.date); year = Math.max(year, +x.date); }
+  const rows = ((await r.json())[1] ?? []).filter((x) => valid.has(x.countryiso3code) && x.value != null);
+  // The bulk response can carry two rows for one country (NLD has a stale 2017 row; SYR has a second 2025 row that is not Syria's series). Keep the latest year; on a tie keep the value closest to the country's previous year.
+  const byIso = {}; for (const x of rows) (byIso[x.countryiso3code] ??= []).push(x);
+  for (const [iso, xs] of Object.entries(byIso)) {
+    const top = Math.max(...xs.map((x) => +x.date)); let pick = xs.filter((x) => +x.date === top);
+    if (pick.length > 1) {
+      const h = await fetch(`https://api.worldbank.org/v2/country/${iso}/indicator/${id}?format=json&per_page=4&source=3`, { signal: AbortSignal.timeout(30_000) }).then((q) => q.json()).catch(() => null);
+      const prev = (h?.[1] ?? []).find((q) => +q.date === top - 1 && q.value != null)?.value; if (prev == null) { console.warn(`${id} ${iso}: conflicting rows and no previous year, skipped`); continue; }
+      pick = [pick.reduce((a, b) => (Math.abs(a.value - prev) <= Math.abs(b.value - prev) ? a : b))]; console.warn(`${id} ${iso}: conflicting rows, kept ${pick[0].value.toFixed(1)} (previous year ${prev.toFixed(1)})`);
+    }
+    const x = pick[0]; (out[iso] ??= {})[k] = Math.round(x.value * 10) / 10; out[iso].y = Math.max(out[iso].y ?? 0, +x.date); year = Math.max(year, +x.date);
+  }
 }
 const n = Object.keys(out).length; const prev = prevOf("governance.json", (j) => Object.keys(j.countries).length);
 if (n < 170 || thin(n, prev, 0.95) || year < 2023) { console.error(`REFUSING TO WRITE: ${n} countries, latest year ${year}`); process.exit(1); }

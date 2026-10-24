@@ -5,14 +5,15 @@ import { useT } from "@/lib/store";
 import { useNow } from "@/lib/use-now";
 import type { Country } from "@/lib/types";
 import { safeHttp } from "@/lib/url";
+import { instrumentLabel } from "@/lib/statecraft";
 
 type Fact = { id: string; kind: string; text: string; src: string; url?: string };
-type Brief = { headline: string; confidence: "low" | "medium" | "high"; sections: { key: string; bullets: { text: string; basis: string[] }[] }[] };
+type Brief = { headline: string; confidence: "low" | "medium" | "high"; sections: { key: string; bullets: { text: string; basis: string[]; tags?: string[] }[] }[] };
 type Saved = { brief: Brief; facts: Fact[]; gaps: string[]; at: string; model: string; usage: { input: number; output: number; usd: number | null }; cached?: boolean };
 type Status = { enabled: boolean; model: string; ttlHours: number; remainingThisHour: number };
 
 const LABEL: Record<string, { en: string; ar: string }> = {
-  status: { en: "Status", ar: "الوضع" }, indicators: { en: "Indicators", ar: "المؤشرات" }, events: { en: "Current events", ar: "الأحداث الجارية" }, uae: { en: "Relationship with the UAE", ar: "العلاقة مع الإمارات" }, outlook: { en: "Outlook", ar: "التوقعات" },
+  status: { en: "Status", ar: "الوضع" }, scorecard: { en: "Scorecard", ar: "بطاقة الأداء" }, leverage: { en: "The UAE's hand", ar: "أوراق الإمارات" }, moves: { en: "Recommended moves", ar: "التحركات المقترحة" }, indicators: { en: "Indicators", ar: "المؤشرات" }, events: { en: "Current events", ar: "الأحداث الجارية" }, uae: { en: "Relationship with the UAE", ar: "العلاقة مع الإمارات" }, outlook: { en: "Outlook", ar: "التوقعات" },
 };
 const UI = {
   en: { run: "Generate brief", rerun: "Regenerate", running: "Writing the brief…", gathering: "Collecting facts and drafting. This takes about 10–20 seconds.",
@@ -27,7 +28,7 @@ const UI = {
 
 const toMarkdown = (c: Country, s: Saved, lang: "en" | "ar") => {
   const L = (k: string) => LABEL[k]?.[lang] ?? k; const f = new Map(s.facts.map((x) => [x.id, x]));
-  const body = s.brief.sections.filter((x) => x.bullets.length).map((x) => `## ${L(x.key)}\n${x.bullets.map((b) => `- ${b.text}${b.basis.length ? ` [${b.basis.join(", ")}]` : ""}`).join("\n")}`).join("\n\n");
+  const body = s.brief.sections.filter((x) => x.bullets.length).map((x) => `## ${L(x.key)}\n${x.bullets.map((b) => `- ${b.tags?.length ? `[${b.tags.map((t) => instrumentLabel(t, lang)).join(" / ")}] ` : ""}${b.text}${b.basis.length ? ` [${b.basis.join(", ")}]` : ""}`).join("\n")}`).join("\n\n");
   const src = [...new Set(s.brief.sections.flatMap((x) => x.bullets.flatMap((b) => b.basis)))].map((id) => f.get(id)).filter(Boolean).map((x) => `- [${x!.id}] ${x!.text} (${x!.src})${x!.url ? ` ${x!.url}` : ""}`).join("\n");
   return `# ${c.name}: country brief\n_${s.brief.headline}_\n\nGenerated ${s.at} by ${s.model}. Confidence: ${s.brief.confidence}. AI-generated from public sources; verify before relying on it.\n\n${body}\n\n## Facts cited\n${src}\n`;
 };
@@ -82,9 +83,9 @@ export function BriefTab({ c }: { c: Country }) {
             <section key={s.key}>
               <h3 className="label mb-1.5">{L(s.key)}</h3>
               <ul className="space-y-2">{s.bullets.map((b, i) => (
-                <li key={i} className="text-[13px] leading-relaxed text-t0">{b.text}{" "}
+                <li key={i} className="text-[13px] leading-relaxed text-t0">{b.tags?.length ? b.tags.map((t) => <span key={t} className="me-1 inline-block rounded bg-accent/15 px-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-accent">{instrumentLabel(t, lang)}</span>) : null}{b.text}{" "}
                   {b.basis.length ? b.basis.map((id) => { const f = facts.get(id); const chip = <span key={id} title={f ? `${f.text} (${f.src})` : id} className="num mx-0.5 inline-block rounded bg-bg3 px-1 text-[10.5px] text-t1">{id}</span>; return f?.url ? <a key={id} href={safeHttp(f.url)} target="_blank" rel="noreferrer noopener" className="hover:text-accent">{chip}</a> : chip; })
-                    : s.key !== "outlook" && <span className="text-[11px] italic text-t2">({u.background})</span>}</li>))}</ul>
+                    : !["outlook", "moves", "leverage"].includes(s.key) && <span className="text-[11px] italic text-t2">({u.background})</span>}</li>))}</ul>
             </section>))}
           {!!saved.gaps.length && <p className="text-[12px] text-t2"><b>{u.gaps}:</b> {saved.gaps.join(" ")}</p>}
           <details className="rounded-[10px] border border-line bg-bg1/60 p-3 text-[12px] text-t1"><summary className="cursor-pointer text-t0">{u.based} ({saved.facts.length})</summary>

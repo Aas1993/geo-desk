@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "@/lib/store";
 import { Card, EmptyState, Skeleton, StatTile } from "./ui";
 import { safeHttp } from "@/lib/url";
-import { wgiLabel } from "@/lib/intel-labels";
+import { SCORE_DIMS, SCORE_TIERS, rivalName, scorePartLabel, wgiLabel } from "@/lib/intel-labels";
 import type { IntelPayload } from "@/lib/intel-data";
 import type { Country } from "@/lib/types";
 
@@ -69,6 +69,46 @@ function Spark({ weeks }: { weeks: { w: string; g: number }[] }) {
   return <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="weekly temperature"><line x1="0" x2={W} y1={py(0)} y2={py(0)} stroke="var(--line-2)" strokeDasharray="3 3" /><polyline fill="none" stroke="var(--accent)" strokeWidth="2" points={weeks.map((x, i) => `${px(i)},${py(x.g)}`).join(" ")} />{weeks.map((x, i) => <circle key={x.w} cx={px(i)} cy={py(x.g)} r="2.5" fill="var(--accent)"><title>{x.w}: {x.g}</title></circle>)}</svg>;
 }
 
+
+const SC = { en: { title: "Country scorecard", rank: "rank", of: "of", cov: "data coverage", parts: "parts", pct: "percentile among countries", hint: "Seven aspects, each the average of its parts. Every part is a 0–100 percentile among countries that have data (higher is better for the UAE), so nothing is judged against an invented standard. Weights: friendliness 25, political 15, economic 15, leverage 15, financial 10, social 10, security 10. An analytical aid, not an official assessment; the social aspect covers connectivity and openness only (UAE nationals and diaspora are not in the data).", partial: "Partial picture: some aspects have no data for this country.", none: "No scorecard for this country." },
+  ar: { title: "بطاقة أداء الدولة", rank: "المرتبة", of: "من", cov: "تغطية البيانات", parts: "مؤشرات", pct: "المئين بين الدول", hint: "سبعة جوانب، كل منها متوسط مؤشراته. كل مؤشر هو مئين من 0 إلى 100 بين الدول التي لديها بيانات (الأعلى أفضل للإمارات)، فلا يُقاس شيء بمعيار مفترض. الأوزان: الود 25، السياسي 15، الاقتصادي 15، النفوذ 15، المالي 10، الاجتماعي 10، الأمن 10. أداة تحليلية وليست تقييمًا رسميًا؛ الجانب الاجتماعي يغطي الربط والانفتاح فقط (المواطنون الإماراتيون والجاليات غير موجودين في البيانات).", partial: "صورة جزئية: بعض الجوانب بلا بيانات لهذه الدولة.", none: "لا توجد بطاقة أداء لهذه الدولة." } } as const;
+const scoreTone = (v: number) => (v >= 70 ? "bg-ok" : v >= 45 ? "bg-warn" : "bg-risk");
+function ScoreCard({ d, L }: { d: IntelPayload; L: Lang }) {
+  const u = SC[L]; const s = d.scorecard; const w = s?.weights ?? {};
+  return (
+    <Card title={u.title} icon="🧭">
+      {!s ? <p className="text-[12.5px] text-t1">{u.none}</p> : (<>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="text-center"><div className="num display text-[40px] font-semibold leading-none text-t0">{s.overall}</div><div className="num text-[11px] text-t2">/100</div></div>
+          <div className="min-w-[160px] flex-1 text-[12.5px]"><div className="display text-[15px] font-semibold text-t0">{SCORE_TIERS[s.tier][L]}</div><div className="num text-t1">{u.rank} {s.rank} {u.of} {s.of} · {u.cov} {s.coverage}%</div>{s.coverage < 100 && <div className="text-[11.5px] text-t2">{u.partial}</div>}</div>
+        </div>
+        <ul className="mt-3 space-y-2">{SCORE_DIMS.map((x) => { const dm = s.dims[x.key]; return (
+          <li key={x.key}><details className="group"><summary className="cursor-pointer list-none">
+            <div className="flex items-baseline justify-between text-[12.5px]"><span className="text-t0">{x[L]} <span className="num text-[10.5px] text-t2">· {w[x.key]}%</span></span><span className="num text-t1">{dm?.score == null ? "—" : dm.score}</span></div>
+            <div className="mt-1 h-2 rounded-full bg-bg3"><div className={`h-2 rounded-full ${dm?.score == null ? "" : scoreTone(dm.score)}`} style={{ width: `${Math.max(2, dm?.score ?? 0)}%` }} /></div></summary>
+            <div className="mt-1.5 rounded-md bg-bg2 p-2 text-[11.5px] text-t1"><div className="mb-1 text-t2">{x.hint}</div>
+              {dm?.parts.length ? <ul className="num space-y-0.5">{dm.parts.map((p) => <li key={p.k} className="flex justify-between gap-2"><span>{scorePartLabel(p.k)}</span><span className="text-t0">{p.s} <span className="text-t2">{u.pct}</span></span></li>)}</ul> : <span className="text-t2">—</span>}</div>
+          </details></li>); })}</ul>
+        <p className="mt-2 text-[11px] leading-snug text-t2">{u.hint}</p></>)}
+    </Card>
+  );
+}
+
+const RV = { en: { title: "Who else is here", rank: "UAE ranks", of: "of", hint: "Share of this country's merchandise trade by power, from each power's own customs data (IMF) against the country's World Bank totals. Mirror data, approximate: it shows trade weight only, not investment, lending, ports, security or political influence. UAE figures include re-exports.", none: "No comparison available for this country." },
+  ar: { title: "من الحاضر أيضًا", rank: "ترتيب الإمارات", of: "من", hint: "حصة كل قوة من تجارة السلع لهذه الدولة، من بيانات الجمارك لكل قوة (صندوق النقد) مقابل إجماليات البنك الدولي للدولة. بيانات مرآة تقريبية: تُظهر الوزن التجاري فقط، وليس الاستثمار أو الإقراض أو الموانئ أو الأمن أو النفوذ السياسي. أرقام الإمارات تشمل إعادة التصدير.", none: "لا توجد مقارنة متاحة لهذه الدولة." } } as const;
+function RivalsCard({ d, L }: { d: IntelPayload; L: Lang }) {
+  const u = RV[L]; const r = d.rivals; const top = r ? Math.max(...r.list.map((x) => x.share), 1) : 1;
+  return (
+    <Card title={u.title} icon="🏁">
+      {!r ? <p className="text-[12.5px] text-t1">{u.none}</p> : (<>
+        <ul className="space-y-1.5">{r.list.slice(0, 8).map((x) => <li key={x.c} className="text-[12.5px]"><div className="flex items-baseline justify-between"><span className={x.c === "ARE" ? "font-semibold text-accent" : "text-t0"}>{rivalName(x.c, L)}{x.y ? <span className="text-[10.5px] text-t2"> · {x.y}</span> : null}</span><span className="num text-t1">{x.share}%</span></div>
+          <div className="mt-0.5 h-1.5 rounded-full bg-bg3"><div className={`h-1.5 rounded-full ${x.c === "ARE" ? "bg-accent" : "bg-t2"}`} style={{ width: `${Math.max(2, (x.share / top) * 100)}%` }} /></div></li>)}</ul>
+        {!r.list.slice(0, 8).some((x) => x.c === "ARE") && <p className="num mt-1.5 text-[12px] text-accent">{rivalName("ARE", L)} {r.uae.share}%</p>}
+        <p className="num mt-1.5 text-[11.5px] text-t1">{u.rank} {r.uae.rank} {u.of} {r.of} · {r.year}</p></>)}
+      <p className="mt-2 text-[11px] leading-snug text-t2">{u.hint}</p>
+    </Card>
+  );
+}
 export function IntelTab({ c }: { c: Country }) {
   const { lang } = useT(); const L = lang as Lang; const u = T[L]; const [d, setD] = useState<IntelPayload | null | "err">(null); const [n, setN] = useState(0);
   useEffect(() => { let dead = false; fetch(`/api/intel/${c.iso3}`).then((r) => (r.ok ? r.json() : Promise.reject())).then((j: IntelPayload) => { if (!dead) setD(j); }).catch(() => { if (!dead) setD("err"); }); return () => { dead = true; }; }, [c.iso3, n]);
@@ -88,7 +128,7 @@ export function IntelTab({ c }: { c: Country }) {
   const markRead = () => { if (!d || d === "err") return; const s: Snap = { at: new Date().toISOString(), metrics: d.metrics, visits: d.ids.visits, deals: d.ids.deals }; ls.set(snapKey, s); setSnap(s); setSaved(true); setTimeout(() => setSaved(false), 1500); };
   const evalTrig = (t: Trig): { fired: boolean; value: number | null } => {
     if (!d || d === "err") return { fired: false, value: null }; const thr = cfg.val[t.id] ?? t.def; const v = num(d.metrics[t.metric]); if (v == null) return { fired: false, value: null }; const p = num(snap?.metrics[t.metric]);
-    if (t.op === "<") return { fired: v < thr, value: v }; if (t.op === ">") return { fired: v > thr, value: v }; if (p == null) return { fired: false, value: v }; if (t.op === "drop") return { fired: p - v >= thr, value: v - p }; return { fired: v - p >= thr, value: v - p };
+    if (t.op === "<") return { fired: v < thr, value: v }; if (t.op === ">") return { fired: v > thr, value: v }; if (p == null) return { fired: false, value: null }; if (t.op === "drop") return { fired: p - v >= thr, value: v - p }; return { fired: v - p >= thr, value: v - p };
   };
   const setCfgSave = (nx: TCfg) => { setCfg(nx); ls.set(cfgKey, nx); };
 
@@ -98,6 +138,7 @@ export function IntelTab({ c }: { c: Country }) {
   const trendWord = tp?.trend == null ? null : tp.trend <= -0.4 ? u.cooling : tp.trend >= 0.4 ? u.warming : u.flat;
   return (
     <div className="space-y-3">
+      <ScoreCard d={d} L={L} />
       <Card title={`${u.since}${snap ? ` · ${snap.at.slice(0, 10)}` : ""}`} icon="🔔">
         {snap === undefined ? <Skeleton h={40} /> : snap === null ? <p className="text-[12.5px] text-t1">{u.baseline}</p> : diff.length === 0 ? <p className="text-[12.5px] text-t1">{u.nothing} {snap.at.slice(0, 10)}.</p> : <ul className="space-y-1.5 text-[12.5px] leading-snug text-t0">{diff.map((x, i) => <li key={i} dir="auto">{x}</li>)}</ul>}
         {snap && <button onClick={markRead} className="mt-3 h-8 rounded-[8px] bg-bg3 px-3 text-[12px] text-t1 hover:text-t0">{saved ? u.saved : u.markRead}</button>}
@@ -119,6 +160,7 @@ export function IntelTab({ c }: { c: Country }) {
             <ul className="num space-y-0.5 text-[11.5px] text-t2"><li>UAE share of their trade: {fmt(lv.raw.uaeSharePartnerTrade)}%</li><li>UAE investment, % of their GDP: {fmt(lv.raw.uaeInvPctGdp, 2)}%</li><li>Their share of UAE trade: {fmt(lv.raw.shareUaeTrade, 2)}%</li><li>Their share of UAE investment abroad: {fmt(lv.raw.shareUaeInvAbroad, 2)}%</li><li>Their investment in the UAE, % of UAE GDP: {fmt(lv.raw.theirInvPctUaeGdp, 2)}%</li></ul></div></div>}
         <p className="mt-2 text-[11px] leading-snug text-t2">{u.levHint}</p>
       </Card>
+      <RivalsCard d={d} L={L} />
       <Card title={u.temp} icon="🌡️">
         {!tp ? <p className="text-[12.5px] text-t1">{u.noData}</p> : (<>
           <div className="grid grid-cols-3 gap-2"><StatTile label="Goldstein" value={sgn(tp.g, 2)} sub={tp.worldG != null ? `${u.worldAvg} ${sgn(tp.worldG, 2)}` : undefined} /><StatTile label={u.coop} value={`${Math.round(tp.coop * 100)}%`} sub={`${u.conf} ${Math.round(tp.conflict * 100)}%`} /><StatTile label={u.events} value={tp.n.toLocaleString("en")} sub={trendWord ? `${trendWord} (${sgn(tp.trend!, 1)})` : undefined} /></div>

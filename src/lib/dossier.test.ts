@@ -109,3 +109,21 @@ assert.ok(LEADER_SYSTEM.includes("# 1. Leader's Brief") && LEADER_SYSTEM.include
 assert.ok(!LEADER_SYSTEM.includes("# 2. Strategic Country Intelligence Dossier") && LEADER_SYSTEM.length < MIN_SYSTEM.length * 0.7, "leader prompt is lean");
 assert.ok(MINISTER_SYSTEM.includes("# 2. Strategic Country Intelligence Dossier") && MINISTER_SYSTEM.includes(TRADECRAFT) && !MINISTER_SYSTEM.includes("# 1. Leader's Brief") && MINISTER_SYSTEM.length < MIN_SYSTEM.length, "ministerial prompt drops the leader format");
 console.log("audience prompts: all assertions passed");
+
+// the three advisers and the investment dossier
+import { ADVISERS } from "./advisers";
+import { INV_BUDGET, INV_SYSTEM, invKey, invMessage } from "./dossier/investments";
+for (const [name, sys] of [["ministerial", MINISTER_SYSTEM], ["leader", LEADER_SYSTEM], ["investments", INV_SYSTEM]] as const) assert.ok(sys.includes(ADVISERS), `${name} prompt lacks the three advisers`);
+assert.ok(ADVISERS.includes("National Security Adviser") && ADVISERS.includes("Minister of Economy") && ADVISERS.includes("Minister of Foreign Affairs") && ADVISERS.includes("Reconciliation is mandatory"), "advisers block");
+assert.ok(MINISTER_SYSTEM.includes("The Three Advisers' Reading") && MINISTER_SYSTEM.includes("Reconciled call") && MINISTER_SYSTEM.includes("Track column") && LEADER_SYSTEM.includes("## The Three Advisers"), "the advisers are asked for in the output");
+assert.ok(INV_SYSTEM.includes("# 1. Portfolio") && INV_SYSTEM.includes("# 2. Exposure and Strategy") && INV_SYSTEM.includes("Register of UAE Investments") && /never turn an announcement into a completed transaction/i.test(INV_SYSTEM) && INV_SYSTEM.includes("DESK INPUT REQUIRED"), "investment dossier prompt");
+assert.ok(invKey("EGY", cleanMin({})).startsWith("inv:EGY:") && invMessage({ facts: "[F1] x", asOf: "2026-10-24T00:00:00Z", country: "Egypt", options: cleanMin({}) }).includes("Investment dossier") && INV_BUDGET.searches >= 6);
+console.log("advisers and investments: all assertions passed");
+
+// research reliability: every prompt that uses the search tool carries the lessons that stopped it failing silently
+import { DESK_SYSTEM as DSK } from "./dossier/desk"; import { CP_SYSTEM as CPS } from "./dossier/counterpart";
+for (const [name, sys] of [["ministerial", MINISTER_SYSTEM], ["leader", LEADER_SYSTEM], ["desk", DSK], ["counterpart", CPS], ["investments", INV_SYSTEM]] as const) {
+  assert.ok(sys.includes("Search one query per code step") && sys.includes('json.loads(await web_search({"query": q}))') && /Never retry a failed search/.test(sys) && /one-line research note/.test(sys), `${name} prompt lacks the research safeguards`);
+  assert.ok(!/single code block/i.test(sys), `${name} prompt must not ask for one big code block`); assert.ok(!sys.includes("`"), `${name} prompt contains a backtick`);
+}
+console.log("research safeguards: all assertions passed");

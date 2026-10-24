@@ -80,6 +80,12 @@ assert.ok(dl.items.length >= 100, "deals coverage"); const dids = dl.items.map((
 // anchors that catch a mixed-up World Bank row (a duplicate SYR row once made Syria look like a top-tier state and a stale NLD row understated the Netherlands)
 for (const c of ["AFG", "YEM", "SYR", "SOM"]) assert.ok(gv.countries[c].ge < 45 && gv.countries[c].pv < 45, `governance: ${c} implausibly high`);
 for (const c of ["CHE", "NOR", "NLD", "DNK"]) assert.ok(gv.countries[c].ge > 75 && gv.countries[c].rl > 75, `governance: ${c} implausibly low`);
+// investment: the IMF positions carry a multi-year series, and the investment loader tells a known country from a mirror-data gap
+{
+  const iv = read("../../public/data/investment.json") as { countries: Record<string, { outward?: { usd: number; year: number; series?: [number, number][] } }> };
+  assert.ok((iv.countries.PAK.outward?.series?.length ?? 0) >= 5 && iv.countries.PAK.outward!.series!.at(-1)![0] === iv.countries.PAK.outward!.year, "investment series");
+  void (async () => { const { investFor } = await import("./invest-data"); const p = await investFor("PAK"), e = await investFor("EGY"); assert.ok(p && p.stock.outward && p.deals.total > 0 && p.protection.total > 0 && p.deals.items.every((x, i, a) => !i || a[i - 1].d >= x.d), "PAK investment payload"); assert.ok(e && !e.stock.outward && e.flags.some((f) => f.id === "no_stock"), "EGY has no IMF record and says so"); assert.equal(await investFor("ARE"), null); console.log("investment payload: ok"); })();
+}
 // rivals: each country compares the UAE with the other powers by trade share, sorted, with the UAE present and shares within 0-100
 {
   const rv = read("../../public/data/rivals.json") as { built: string; year: number; countries: Record<string, { uae: { share: number; rank: number }; of: number; list: { c: string; share: number }[] }> };

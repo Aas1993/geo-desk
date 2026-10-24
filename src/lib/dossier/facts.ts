@@ -5,6 +5,7 @@ import { LAYERS } from "@/lib/layers/registry";
 import { tradeSummary, usdM, type OutlookData, type PartnershipData, type TradeData } from "@/lib/intel";
 import type { Fact } from "@/lib/brief/facts";
 import { intelFor } from "@/lib/intel-data";
+import { investFor } from "@/lib/invest-data";
 
 export type Tile = { label: string; value: string; sub?: string };
 const rd = async <T,>(f: string): Promise<T | null> => { try { return JSON.parse(await readFile(path.join(process.cwd(), "public/data", f), "utf8")) as T; } catch { return null; } };
@@ -42,4 +43,17 @@ export async function dossierFacts(iso3: string): Promise<{ name: string; nameAr
     if (it && it.deals.total) tiles.push({ label: "UAE deals in WAM", value: String(it.deals.total), sub: `${it.deals.last90} in 90 days` });
   } catch { /* tiles are optional */ }
   return { name: base.name, nameAr: c?.nameAr ?? null, facts, gaps: base.gaps, tiles };
+}
+
+/** The fact pack of the detailed brief plus the investment detail: the IMF series, every deal found (the base pack carries the newest eight), who is active, the treaties and the risk indicators. Used by the investment dossier. */
+export async function investDossierFacts(iso3: string) {
+  const g = await dossierFacts(iso3); if (!g) return null; const p = await investFor(iso3); if (!p) return g; const facts = [...g.facts]; let n = facts.length; const add = (kind: string, text: string, src: string, url?: string, t?: number) => facts.push({ id: `F${++n}`, kind, text, src, url, t });
+  const bn = (v: number) => `US$${(v / 1e9).toFixed(2)}bn`; const ser = (s?: [number, number][]) => (s?.length ? s.map(([y, v]) => `${y} ${bn(v)}`).join(", ") : "no series");
+  add("investment-series", `IMF direct-investment position series for ${g.name} (mirror data, net position, all instruments): UAE in ${g.name}: ${p.stock.outward ? ser(p.stock.outward.series) : "no IMF record"}; ${g.name} in the UAE: ${p.stock.inward ? ser(p.stock.inward.series) : "no IMF record"}.`, "IMF Direct Investment Positions (mirror data)");
+  if (p.deals.byInvestor.length) add("investor-activity", `UAE entities found in WAM deal headlines for ${g.name} since late 2024, with number of deals and the latest date: ${p.deals.byInvestor.slice(0, 12).map((x) => `${x.name} ${x.n} (${x.last})`).join("; ")}. Sector mix: ${p.deals.bySector.map(([k, v]) => `${k} ${v}`).join(", ")}.`, "WAM headlines (rule-classified)");
+  const have = new Set(facts.filter((f) => f.kind === "deal").map((f) => f.url)); for (const x of p.deals.items.slice(0, 30)) { const url = `https://www.wam.ae/en/article/${x.u}`; if (have.has(url)) continue; add("deal", `${x.d} · ${x.by.join(", ")}${x.sector ? ` · ${x.sector}` : ""}: ${x.t}`, "WAM headline", url, Date.parse(x.d)); }
+  add("protection", `Investment protection for UAE capital in ${g.name} on the MOFA and Ministry of Foreign Trade lists: ${p.protection.investment} investment agreement(s), ${p.protection.tax} double-taxation treaty(ies), ${p.protection.air} air-services agreement(s), ${p.protection.total} agreements in all; CEPA: ${p.protection.cepa ? `${p.protection.cepa.status}${p.protection.cepa.inForce ? `, in force ${p.protection.cepa.inForce}` : ""}` : "none documented"}; joint committee meetings recorded: ${p.protection.committees ?? "none"}.${p.protection.titles.length ? ` Titles: ${p.protection.titles.map((x) => x.t).join("; ")}.` : ""} Titles only: texts, dates and entry into force are not published on those lists.`, "MOFA / Ministry of Foreign Trade");
+  const r = p.risk; const f1 = (v: number | null, s = "") => (v == null ? "n/a" : `${v.toFixed(1)}${s}`);
+  add("risk-indicators", `Risk context for UAE capital in ${g.name}: World Bank governance scores (0-100, higher is better): regulatory quality ${f1(r.regulatoryQuality)}, rule of law ${f1(r.ruleOfLaw)}, control of corruption ${f1(r.corruption)}, political stability ${f1(r.stability)}; IMF this year: growth ${f1(r.growth, "%")}, inflation ${f1(r.inflation, "%")}, government debt ${f1(r.debt, "% of GDP")}, current account ${f1(r.currentAccount, "% of GDP")}; sanctions-list entries with an address there (OFAC and UN): ${r.sanctions ?? "n/a"}.`, "World Bank WGI, IMF WEO, OFAC / UN");
+  return { ...g, facts };
 }

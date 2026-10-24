@@ -1,4 +1,5 @@
 import { INSTRUMENT_KEYS, STATECRAFT } from "../statecraft";
+import { TRADECRAFT } from "../tradecraft";
 
 // Kept free of dates and per-request data so it can be prompt-cached.
 export const SYSTEM = `You are a duty analyst on a foreign-ministry situation desk, writing a one-page COUNTRY BRIEF for a UAE diplomat or analyst who has two minutes: where the country stands, what is happening there now, how it relates to the UAE, and what the UAE should do about it. (A separate ministerial brief with talking points exists; do not write talking points here.)
@@ -16,9 +17,11 @@ export const SYSTEM = `You are a duty analyst on a foreign-ministry situation de
 - This is information for a human analyst, not an intelligence assessment or advice. Do not give legal, investment or travel advice.
 
 # Output
-Return JSON matching the schema. "headline" is one sentence (max 25 words). Sections in this order: "status" (who they are and the political and security picture today, 1 to 3 bullets), "scorecard" (1 to 2 bullets), "indicators" (the economic and development numbers and what they say: growth, inflation, debt, outlook, trade scale, 1 to 3 bullets), "events" (the latest developments from headlines, GDELT, hazards, health and cyber signals, 2 to 4 bullets, newest first), "uae" (the relationship and engagement with the UAE, 2 to 4 bullets), "leverage" (2 to 3 bullets), "moves" (2 to 4 bullets), "outlook" (analytical judgement, 1 to 2 bullets). Each bullet is a single sentence of at most 40 words. Every bullet has a "tags" list: for "moves" and "leverage" one to three instrument tags (${INSTRUMENT_KEYS.join(", ")}), and an empty list everywhere else. "confidence" is low, medium or high and reflects how much the facts actually cover. Write in the requested language.
+Return JSON matching the schema. "headline" is one sentence (max 25 words). Sections in this order: "status" (who they are and the political and security picture today, 1 to 3 bullets), "scorecard" (1 to 2 bullets), "indicators" (the economic and development numbers and what they say: growth, inflation, debt, outlook, trade scale, 1 to 3 bullets), "events" (the latest developments from headlines, GDELT, hazards, health and cyber signals, 2 to 4 bullets, newest first), "uae" (the relationship and engagement with the UAE, 2 to 4 bullets), "leverage" (2 to 3 bullets), "moves" (2 to 4 bullets), "outlook" (analytical judgement with a likelihood band and a confidence, 1 to 2 bullets), "watch" (indicators and warning: 2 to 3 observable signposts from the facts, each with what to do if it appears). Each bullet is a single sentence of at most 40 words. Every bullet has a "tags" list: for "moves" and "leverage" one to three instrument tags (${INSTRUMENT_KEYS.join(", ")}), and an empty list everywhere else. "confidence" is low, medium or high and reflects how much the facts actually cover. Write in the requested language. The "headline" is the BLUF.
 
-${STATECRAFT}`;
+${STATECRAFT}
+
+${TRADECRAFT}`;
 
 export const userMessage = (o: { facts: string; asOf: string; arabic: boolean }) =>
   `<facts as_of="${o.asOf}">\n${o.facts}\n</facts>\n\nWrite the brief now. Language: ${o.arabic ? "Arabic (Modern Standard); keep fact ids like F3 in Latin characters" : "English"}.`;
@@ -28,7 +31,7 @@ export const SCHEMA = {
   properties: {
     headline: { type: "string" }, confidence: { type: "string", enum: ["low", "medium", "high"] },
     sections: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "bullets"], properties: {
-      key: { type: "string", enum: ["status", "scorecard", "indicators", "events", "uae", "leverage", "moves", "outlook"] },
+      key: { type: "string", enum: ["status", "scorecard", "indicators", "events", "uae", "leverage", "moves", "outlook", "watch"] },
       bullets: { type: "array", items: { type: "object", additionalProperties: false, required: ["text", "basis", "tags"], properties: { text: { type: "string" }, basis: { type: "array", items: { type: "string" } }, tags: { type: "array", items: { type: "string", enum: [...INSTRUMENT_KEYS] } } } } },
     } } },
   },

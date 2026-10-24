@@ -72,7 +72,21 @@ import { PREP_SYSTEM, PREP_SCHEMA } from "./ask/prep";
 for (const [name, sys] of [["ministerial", MIN_SYSTEM], ["desk", DESK_SYSTEM], ["country brief", BRIEF_SYSTEM], ["prep", PREP_SYSTEM]] as const) assert.ok(sys.includes(STATECRAFT), `${name} prompt lacks the statecraft lens`);
 assert.equal(INSTRUMENT_KEYS.length, 7); assert.ok(MIN_SYSTEM.includes("## The UAE Play") && MIN_SYSTEM.includes("Country scorecard"), "ministerial prompt asks for the play and the scorecard");
 assert.ok(ALL_TOPICS.includes("play") && ALL_TOPICS.includes("rivals") && ALL_TOPICS.includes("scorecard") && PRESETS.some((p) => p.id === "strategic"), "desk strategy topics");
-assert.deepEqual((BRIEF_SCHEMA.properties.sections.items.properties.key.enum as readonly string[]).slice(-3), ["leverage", "moves", "outlook"]);
+assert.deepEqual((BRIEF_SCHEMA.properties.sections.items.properties.key.enum as readonly string[]).slice(-4), ["leverage", "moves", "outlook", "watch"]);
 assert.ok(PREP_SCHEMA.required.includes("play") && PREP_SCHEMA.required.includes("scorecard") && PREP_SCHEMA.required.includes("tripwires"), "prep schema asks for the play");
 assert.ok(!/\bfabricat|\bcovert action\b[^.]*\brecommend/i.test(STATECRAFT.replace(/never involve deceiving[^.]*\./i, "")), "the lens must not recommend covert or deceptive means");
 console.log("statecraft: all assertions passed");
+
+// intelligence tradecraft, the Leader's brief and the counterpart profile
+import { TRADECRAFT } from "./tradecraft";
+import { CP_BUDGET, CP_SYSTEM, cpKey, cpMessage } from "./dossier/counterpart";
+import { LEADER_BUDGET, budgetFor, cleanOptions as cleanMin, optionsKey as minKey } from "./dossier/options";
+for (const [name, sys] of [["ministerial", MIN_SYSTEM], ["desk", DESK_SYSTEM], ["country brief", BRIEF_SYSTEM], ["prep", PREP_SYSTEM], ["counterpart", CP_SYSTEM]] as const) assert.ok(sys.includes(TRADECRAFT), `${name} prompt lacks the tradecraft rules`);
+assert.ok(TRADECRAFT.includes("almost certain (95 to 99)") && TRADECRAFT.includes("Key assumptions check"), "tradecraft has the likelihood bands and the assumptions check");
+assert.ok(MIN_SYSTEM.includes("## BLUF") && MIN_SYSTEM.includes("## Key Judgments") && MIN_SYSTEM.includes("Assumptions, Alternatives and Warning") && MIN_SYSTEM.includes("Defensive lines") && MIN_SYSTEM.includes("# 1. Leader's Brief"), "ministerial prompt has the intelligence structure");
+assert.equal(cleanMin({}).audience, "minister"); assert.equal(cleanMin({ audience: "leader" }).audience, "leader"); assert.equal(cleanMin({ audience: "president" }).audience, "minister");
+assert.equal(budgetFor(cleanMin({ audience: "leader", depth: "comprehensive" })), LEADER_BUDGET); assert.ok(LEADER_BUDGET.maxTokens < 12_000);
+assert.notEqual(minKey("EGY", cleanMin({ audience: "leader" })), minKey("EGY", cleanMin({}))); assert.ok(cpKey("EGY", cleanMin({})).startsWith("cp:EGY:"));
+assert.ok(CP_SYSTEM.includes("# 1. Profile and Priorities") && CP_SYSTEM.includes("# 2. Handling the Meeting") && /public official/.test(CP_SYSTEM) && /rumour/.test(CP_SYSTEM), "counterpart prompt");
+assert.ok(cpMessage({ facts: "[F1] x", asOf: "2026-10-24T00:00:00Z", country: "Egypt", options: cleanMin({ counterpartName: "A B" }) }).includes("verify it") && CP_BUDGET.searches >= 6);
+console.log("tradecraft: all assertions passed");

@@ -13,7 +13,7 @@ type Saved = { brief: Brief; facts: Fact[]; gaps: string[]; at: string; model: s
 type Status = { enabled: boolean; model: string; ttlHours: number; remainingThisHour: number };
 
 const LABEL: Record<string, { en: string; ar: string }> = {
-  status: { en: "Status", ar: "الوضع" }, scorecard: { en: "Scorecard", ar: "بطاقة الأداء" }, leverage: { en: "The UAE's hand", ar: "أوراق الإمارات" }, moves: { en: "Recommended moves", ar: "التحركات المقترحة" }, indicators: { en: "Indicators", ar: "المؤشرات" }, events: { en: "Current events", ar: "الأحداث الجارية" }, uae: { en: "Relationship with the UAE", ar: "العلاقة مع الإمارات" }, outlook: { en: "Outlook", ar: "التوقعات" },
+  status: { en: "Status", ar: "الوضع" }, scorecard: { en: "Scorecard", ar: "بطاقة الأداء" }, leverage: { en: "The UAE's hand", ar: "أوراق الإمارات" }, moves: { en: "Recommended moves", ar: "التحركات المقترحة" }, indicators: { en: "Indicators", ar: "المؤشرات" }, events: { en: "Current events", ar: "الأحداث الجارية" }, uae: { en: "Relationship with the UAE", ar: "العلاقة مع الإمارات" }, outlook: { en: "Outlook", ar: "التوقعات" }, watch: { en: "Indicators to watch", ar: "مؤشرات المتابعة" },
 };
 const UI = {
   en: { run: "Generate brief", rerun: "Regenerate", running: "Writing the brief…", gathering: "Collecting facts and drafting. This takes about 10–20 seconds.",
@@ -85,7 +85,7 @@ export function BriefTab({ c }: { c: Country }) {
               <ul className="space-y-2">{s.bullets.map((b, i) => (
                 <li key={i} className="text-[13px] leading-relaxed text-t0">{b.tags?.length ? b.tags.map((t) => <span key={t} className="me-1 inline-block rounded bg-accent/15 px-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-accent">{instrumentLabel(t, lang)}</span>) : null}{b.text}{" "}
                   {b.basis.length ? b.basis.map((id) => { const f = facts.get(id); const chip = <span key={id} title={f ? `${f.text} (${f.src})` : id} className="num mx-0.5 inline-block rounded bg-bg3 px-1 text-[10.5px] text-t1">{id}</span>; return f?.url ? <a key={id} href={safeHttp(f.url)} target="_blank" rel="noreferrer noopener" className="hover:text-accent">{chip}</a> : chip; })
-                    : !["outlook", "moves", "leverage"].includes(s.key) && <span className="text-[11px] italic text-t2">({u.background})</span>}</li>))}</ul>
+                    : !["outlook", "moves", "leverage", "watch"].includes(s.key) && <span className="text-[11px] italic text-t2">({u.background})</span>}</li>))}</ul>
             </section>))}
           {!!saved.gaps.length && <p className="text-[12px] text-t2"><b>{u.gaps}:</b> {saved.gaps.join(" ")}</p>}
           <details className="rounded-[10px] border border-line bg-bg1/60 p-3 text-[12px] text-t1"><summary className="cursor-pointer text-t0">{u.based} ({saved.facts.length})</summary>

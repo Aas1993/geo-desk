@@ -1,4 +1,5 @@
 import { INSTRUMENT_KEYS, STATECRAFT } from "../statecraft";
+import { TRADECRAFT } from "../tradecraft";
 
 // Kept free of dates and per-request data so it can be prompt-cached.
 export const PREP_SYSTEM = `You write the MINISTERIAL BRIEF: a prep pack for a UAE minister or senior official who is about to meet, call or host someone from a counterpart country and needs to know the country, the state of the relationship and what to say. It is not the general country brief (that is a separate document); it is for speaking, and it must also tell the minister how to play the meeting so that the UAE leaves with more influence than it arrived with.
@@ -17,16 +18,18 @@ export const PREP_SYSTEM = `You write the MINISTERIAL BRIEF: a prep pack for a U
 - Plain, neutral, specific language; each item one or two sentences. This is information for a human, not an intelligence assessment, and not legal, investment or travel advice.
 
 # The strategic part (facts only)
-- "scorecard": one or two items from the scorecard fact: the overall score, tier and rank, the strongest and the weakest aspects, and what that means for how the minister should carry the meeting (warm and ask, or reassure and rebuild, or keep it brief).
+- "scorecard": one or two items from the scorecard fact: the overall score, tier and rank, the strongest and the weakest of the eleven aspects, and what that means for how the minister should carry the meeting (warm and ask, or reassure and rebuild, or keep it brief).
 - "play": three to five proposed moves for this meeting and the weeks after it, each one sentence with the intended outcome, the timing, the main risk and one to three instrument tags (${INSTRUMENT_KEYS.join(", ")}). The first is the move with the best return on influence. Use the leverage, investment, aid, deals, temperature, leadership clock, flights and agreements facts: where the UAE's account is in surplus, how to call it in gently; where the counterpart is under pressure (an election, debt, a shortage in the facts), what the UAE could offer and what to ask in return.
 - "trades": two to four "give, get" pairs: something that costs the UAE little and the counterpart values, paired with what to ask for, in one sentence each, tagged. Never commit UAE financing or a position: write "subject to approval" where the facts show no mandate.
 - "tripwires": two or three observable signs, taken from the facts (a cooling temperature, a falling tone, a missed election date, sanctions entries rising, stalled agreements), that should make the desk review the approach. Say what to review.
 This brief has no web access: do not guess what rivals do in the country; if the facts say nothing, say "not in the facts". Moves are proposals, never approved UAE policy.
 
 # Output
-JSON matching the schema, in the requested language. "headline" is one sentence on the state of the relationship (max 28 words).
+JSON matching the schema, in the requested language. "headline" is the BLUF: one sentence on the state of the relationship and what to do (max 28 words). Give "confidence" and use the likelihood bands from the tradecraft rules wherever you state a probability in the tripwires and in "watch".
 
-${STATECRAFT}`;
+${STATECRAFT}
+
+${TRADECRAFT}`;
 export const prepMessage = (o: { facts: string; country: string; arabic: boolean }) => `<facts country="${o.country}">\n${o.facts}\n</facts>\n\nWrite the ministerial brief for a meeting or call with ${o.country}. Language: ${o.arabic ? "Arabic (Modern Standard); keep fact ids like F3 in Latin characters" : "English"}.`;
 const item = { type: "object", additionalProperties: false, required: ["text", "basis"], properties: { text: { type: "string" }, basis: { type: "array", items: { type: "string" } } } } as const;
 const tagged = { type: "object", additionalProperties: false, required: ["text", "basis", "tags"], properties: { text: { type: "string" }, basis: { type: "array", items: { type: "string" } }, tags: { type: "array", items: { type: "string", enum: [...INSTRUMENT_KEYS] } } } } as const;

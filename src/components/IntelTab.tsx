@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "@/lib/store";
 import { Card, EmptyState, Skeleton, StatTile } from "./ui";
 import { safeHttp } from "@/lib/url";
-import { SCORE_DIMS, SCORE_TIERS, rivalName, scorePartLabel, wgiLabel } from "@/lib/intel-labels";
+import { SCORE_DIMS, SCORE_GROUPS, SCORE_TIERS, rivalName, scorePartLabel, wgiLabel } from "@/lib/intel-labels";
 import type { IntelPayload } from "@/lib/intel-data";
 import type { Country } from "@/lib/types";
 
@@ -70,8 +70,8 @@ function Spark({ weeks }: { weeks: { w: string; g: number }[] }) {
 }
 
 
-const SC = { en: { title: "Country scorecard", rank: "rank", of: "of", cov: "data coverage", parts: "parts", pct: "percentile among countries", hint: "Seven aspects, each the average of its parts. Every part is a 0–100 percentile among countries that have data (higher is better for the UAE), so nothing is judged against an invented standard. Weights: friendliness 25, political 15, economic 15, leverage 15, financial 10, social 10, security 10. An analytical aid, not an official assessment; the social aspect covers connectivity and openness only (UAE nationals and diaspora are not in the data).", partial: "Partial picture: some aspects have no data for this country.", none: "No scorecard for this country." },
-  ar: { title: "بطاقة أداء الدولة", rank: "المرتبة", of: "من", cov: "تغطية البيانات", parts: "مؤشرات", pct: "المئين بين الدول", hint: "سبعة جوانب، كل منها متوسط مؤشراته. كل مؤشر هو مئين من 0 إلى 100 بين الدول التي لديها بيانات (الأعلى أفضل للإمارات)، فلا يُقاس شيء بمعيار مفترض. الأوزان: الود 25، السياسي 15، الاقتصادي 15، النفوذ 15، المالي 10، الاجتماعي 10، الأمن 10. أداة تحليلية وليست تقييمًا رسميًا؛ الجانب الاجتماعي يغطي الربط والانفتاح فقط (المواطنون الإماراتيون والجاليات غير موجودين في البيانات).", partial: "صورة جزئية: بعض الجوانب بلا بيانات لهذه الدولة.", none: "لا توجد بطاقة أداء لهذه الدولة." } } as const;
+const SC = { en: { title: "Country scorecard", rank: "rank", of: "of", cov: "data coverage", parts: "parts", pct: "percentile among countries", hint: "Eleven aspects in three groups, each the average of its parts. Every part is a 0–100 percentile among countries that have data, or a yes/no flag (higher is better for the UAE), so nothing is judged against an invented standard. The percentage beside each aspect is its weight in the overall score. An analytical aid, not an official assessment; the social aspect covers connectivity and openness only (UAE nationals and diaspora are not in the data), and strategic value is a heuristic.", partial: "Partial picture: some aspects have no data for this country.", none: "No scorecard for this country." },
+  ar: { title: "بطاقة أداء الدولة", rank: "المرتبة", of: "من", cov: "تغطية البيانات", parts: "مؤشرات", pct: "المئين بين الدول", hint: "أحد عشر جانبًا في ثلاث مجموعات، كل منها متوسط مؤشراته. كل مؤشر هو مئين من 0 إلى 100 بين الدول التي لديها بيانات أو علامة نعم/لا (الأعلى أفضل للإمارات)، فلا يُقاس شيء بمعيار مفترض. النسبة بجانب كل جانب هي وزنه في الدرجة الإجمالية. أداة تحليلية وليست تقييمًا رسميًا؛ الجانب الاجتماعي يغطي الربط والانفتاح فقط (المواطنون الإماراتيون والجاليات غير موجودين في البيانات)، والقيمة الاستراتيجية تقدير استدلالي.", partial: "صورة جزئية: بعض الجوانب بلا بيانات لهذه الدولة.", none: "لا توجد بطاقة أداء لهذه الدولة." } } as const;
 const scoreTone = (v: number) => (v >= 70 ? "bg-ok" : v >= 45 ? "bg-warn" : "bg-risk");
 function ScoreCard({ d, L }: { d: IntelPayload; L: Lang }) {
   const u = SC[L]; const s = d.scorecard; const w = s?.weights ?? {};
@@ -82,13 +82,13 @@ function ScoreCard({ d, L }: { d: IntelPayload; L: Lang }) {
           <div className="text-center"><div className="num display text-[40px] font-semibold leading-none text-t0">{s.overall}</div><div className="num text-[11px] text-t2">/100</div></div>
           <div className="min-w-[160px] flex-1 text-[12.5px]"><div className="display text-[15px] font-semibold text-t0">{SCORE_TIERS[s.tier][L]}</div><div className="num text-t1">{u.rank} {s.rank} {u.of} {s.of} · {u.cov} {s.coverage}%</div>{s.coverage < 100 && <div className="text-[11.5px] text-t2">{u.partial}</div>}</div>
         </div>
-        <ul className="mt-3 space-y-2">{SCORE_DIMS.map((x) => { const dm = s.dims[x.key]; return (
+        <div className="mt-3 space-y-3">{(["relationship", "country", "world"] as const).map((g) => <div key={g}><h4 className="label mb-1.5">{SCORE_GROUPS[g][L]}</h4><ul className="space-y-2">{SCORE_DIMS.filter((x) => x.group === g).map((x) => { const dm = s.dims[x.key]; return (
           <li key={x.key}><details className="group"><summary className="cursor-pointer list-none">
             <div className="flex items-baseline justify-between text-[12.5px]"><span className="text-t0">{x[L]} <span className="num text-[10.5px] text-t2">· {w[x.key]}%</span></span><span className="num text-t1">{dm?.score == null ? "—" : dm.score}</span></div>
             <div className="mt-1 h-2 rounded-full bg-bg3"><div className={`h-2 rounded-full ${dm?.score == null ? "" : scoreTone(dm.score)}`} style={{ width: `${Math.max(2, dm?.score ?? 0)}%` }} /></div></summary>
             <div className="mt-1.5 rounded-md bg-bg2 p-2 text-[11.5px] text-t1"><div className="mb-1 text-t2">{x.hint}</div>
               {dm?.parts.length ? <ul className="num space-y-0.5">{dm.parts.map((p) => <li key={p.k} className="flex justify-between gap-2"><span>{scorePartLabel(p.k)}</span><span className="text-t0">{p.s} <span className="text-t2">{u.pct}</span></span></li>)}</ul> : <span className="text-t2">—</span>}</div>
-          </details></li>); })}</ul>
+          </details></li>); })}</ul></div>)}</div>
         <p className="mt-2 text-[11px] leading-snug text-t2">{u.hint}</p></>)}
     </Card>
   );

@@ -5,6 +5,8 @@ import { LEADER_SYSTEM, MINISTER_SYSTEM, userMessage } from "./prompt";
 import { CP_BUDGET, CP_SYSTEM, cpKey, cpMessage } from "./counterpart";
 import { INV_BUDGET, INV_SYSTEM, invKey, invMessage } from "./investments";
 import { FS_BUDGET, cleanFsOptions, fsKey, fsMessage, fsSystem } from "./foresight";
+import { isScope, scopeLine } from "../falcon/scopes";
+import { scopeFacts } from "../falcon/scope-facts";
 import { LAB_BUDGET, LAB_SYSTEM, RT_BUDGET, RT_SYSTEM, cleanLabOptions, cleanRedTeamOptions, labKey, labMessage, rtKey, rtMessage } from "./lab";
 
 // One resolver for every AI product the dossier route can write. Each product says how its request is cleaned, cached, researched and prompted, so the route holds no per-product branches
@@ -25,7 +27,15 @@ export type Resolved = {
   invalid?: string;
 };
 
+/** Scopes (the world, a region, a bloc, a sector) are served by the products that make sense without a single counterpart government. */
+const SCOPE_KINDS: ProductKind[] = ["foresight", "lab", "redteam"];
 export function resolveProduct(body: Record<string, unknown>, iso3: string): Resolved {
+  const r = resolveInner(body, iso3);
+  if (!isScope(iso3)) return r;
+  if (!SCOPE_KINDS.includes(r.kind)) return { ...r, invalid: "This product needs a single country. For the world, a region, a bloc or a sector, use foresight, the scenario lab or the red team." };
+  return { ...r, gather: (i) => scopeFacts(i), message: (m) => r.message(m).replace(/\nCountry: [^\n]*/, (line) => `${line}\n${scopeLine(iso3)}`) };
+}
+function resolveInner(body: Record<string, unknown>, iso3: string): Resolved {
   const kind = (PRODUCT_KINDS as readonly string[]).includes(String(body.kind)) ? (body.kind as ProductKind) : "minister";
   if (kind === "desk") {
     const o = cleanDeskOptions(body);
@@ -37,7 +47,7 @@ export function resolveProduct(body: Record<string, unknown>, iso3: string): Res
   }
   if (kind === "lab") {
     const o = cleanLabOptions(body);
-    return { kind, key: labKey(iso3, o), budget: LAB_BUDGET, system: LAB_SYSTEM, long: false, gather: foresightDossierFacts, message: (m) => labMessage({ ...m, options: o }), options: { ...o, kind } };
+    return { kind, key: labKey(iso3, o), budget: LAB_BUDGET[o.depth], system: LAB_SYSTEM, long: o.depth === "deep", gather: foresightDossierFacts, message: (m) => labMessage({ ...m, options: o }), options: { ...o, kind } };
   }
   if (kind === "redteam") {
     const o = cleanRedTeamOptions(body);

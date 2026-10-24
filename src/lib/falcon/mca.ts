@@ -22,3 +22,22 @@ export function robustness(opts: Scored[], w: Weights, spread = 0.5, draws = 400
   for (let d = 0; d < draws; d++) { const ww = { ...w }; for (const c of CRITERIA) ww[c] = w[c] * (1 - spread + 2 * spread * rnd()); const r = rank(opts, ww)[0]; if (r && r.total != null) wins[r.i]++; }
   return wins.map((x) => x / draws);
 }
+
+// Robustness across the three variants of a shock: for each option, how well it serves the UAE in a mild, central and severe world. Deterministic.
+export const VARIANTS = ["mild", "central", "severe"] as const;
+export type Variant = (typeof VARIANTS)[number];
+export type Payoff = { name: string; mild: number | null; central: number | null; severe: number | null };
+export type RobustResult = { best: Record<Variant, number | null>; regret: (number | null)[][]; maxRegret: (number | null)[]; expected: (number | null)[]; minimaxRegret: number | null; maximin: number | null; expectedBest: number | null };
+/** Best option per variant, regret (best payoff in that variant minus the option's), the option with the smallest worst regret, the best worst case (maximin) and the best weighted mean. Variant weights are the reader's. */
+export function robustAnalysis(rows: Payoff[], w: Record<Variant, number>): RobustResult {
+  const best = {} as Record<Variant, number | null>; const top = {} as Record<Variant, number>;
+  for (const v of VARIANTS) { let b: number | null = null; let t = -1; rows.forEach((r, i) => { const x = r[v]; if (x != null && x > t) { t = x; b = i; } }); best[v] = b; top[v] = t; }
+  const regret = rows.map((r) => VARIANTS.map((v) => (r[v] != null && top[v] >= 0 ? top[v] - (r[v] as number) : null)));
+  const maxRegret = regret.map((r) => { const xs = r.filter((x): x is number => x != null); return xs.length === 3 ? Math.max(...xs) : null; });
+  const total = VARIANTS.reduce((a, v) => a + Math.max(0, w[v]), 0) || 1;
+  const expected = rows.map((r) => (VARIANTS.every((v) => r[v] != null) ? Math.round((VARIANTS.reduce((a, v) => a + (r[v] as number) * Math.max(0, w[v]), 0) / total) * 100) / 100 : null));
+  const argmin = (xs: (number | null)[]) => { let b: number | null = null; xs.forEach((x, i) => { if (x != null && (b == null || x < (xs[b] as number))) b = i; }); return b; };
+  const argmax = (xs: (number | null)[]) => { let b: number | null = null; xs.forEach((x, i) => { if (x != null && (b == null || x > (xs[b] as number))) b = i; }); return b; };
+  const worst = rows.map((r) => (VARIANTS.every((v) => r[v] != null) ? Math.min(...VARIANTS.map((v) => r[v] as number)) : null));
+  return { best, regret, maxRegret, expected, minimaxRegret: argmin(maxRegret), maximin: argmax(worst), expectedBest: argmax(expected) };
+}

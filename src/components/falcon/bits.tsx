@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import type { Country } from "@/lib/types";
 import type { SourceState } from "@/lib/falcon/world";
+import { SCOPES, SCOPE_BY, type ScopeKind } from "@/lib/falcon/scopes";
 
 export type Lang = "en" | "ar";
 export const mixc = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, var(--bg-2))`;
@@ -28,6 +29,20 @@ export function CountryPicker({ list, value, onPick, L, exclude = "ARE" }: { lis
     <div className="relative">
       <input value={open ? q : cur ? `${cur.flag} ${L === "ar" && cur.nameAr ? cur.nameAr : cur.name}` : q} onFocus={() => { setOpen(true); setQ(""); }} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder={L === "ar" ? "اختر دولة…" : "Choose a country…"} aria-label={L === "ar" ? "الدولة" : "Country"} className="h-10 w-full rounded-[10px] border border-line bg-bg2 px-3 text-[13px] text-t0" />
       {open && <ul className="scroll-thin absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-[10px] border border-line bg-bg1 p-1 shadow-xl" role="listbox">{hits.map((c) => <li key={c.iso3}><button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { onPick(c.iso3); setOpen(false); setQ(""); }} className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-1.5 text-start text-[13px] text-t0 hover:bg-bg3"><span>{c.flag}</span><span className="min-w-0 flex-1 truncate">{L === "ar" && c.nameAr ? c.nameAr : c.name}</span><span className="num text-[10.5px] text-t2">{c.iso3}</span></button></li>)}{!hits.length && <li className="px-3 py-2 text-[12px] text-t2">—</li>}</ul>}
+    </div>
+  );
+}
+
+const KINDS: { k: ScopeKind | "country"; en: string; ar: string }[] = [{ k: "country", en: "Country", ar: "دولة" }, { k: "subregion", en: "Region", ar: "إقليم" }, { k: "bloc", en: "Bloc", ar: "تكتل" }, { k: "sector", en: "Sector", ar: "قطاع" }, { k: "global", en: "World", ar: "العالم" }];
+/** Chooses what the product is about: one country, a region or sub-region, a bloc, a sector, or the world. A scope is a three-letter id that is never a country code. */
+export function ScopePicker({ list, value, onPick, L }: { list: Country[]; value: string | null; onPick: (id: string) => void; L: Lang }) {
+  const cur = value ? SCOPE_BY.get(value) : undefined; const [kind, setKind] = useState<ScopeKind | "country">(cur ? (cur.kind === "region" ? "subregion" : cur.kind) : "country");
+  const opts = SCOPES.filter((s) => (kind === "subregion" ? s.kind === "subregion" || s.kind === "region" : s.kind === kind));
+  return (
+    <div className="space-y-2">
+      <div role="tablist" aria-label={L === "ar" ? "نوع النطاق" : "Scope type"} className="flex flex-wrap gap-1">{KINDS.map((x) => <button key={x.k} role="tab" type="button" aria-selected={kind === x.k} onClick={() => { setKind(x.k); if (x.k === "global") onPick("WLD"); }} className={`h-8 rounded-full px-3 text-[12px] ${kind === x.k ? "bg-accent font-semibold text-[var(--accent-ink)]" : "bg-bg2 text-t1 hover:text-t0"}`}>{L === "ar" ? x.ar : x.en}</button>)}</div>
+      {kind === "country" ? <CountryPicker list={list} value={value && !SCOPE_BY.has(value) ? value : null} onPick={onPick} L={L} /> : kind === "global" ? <p className="text-[12px] text-t1">🌐 {L === "ar" ? SCOPE_BY.get("WLD")!.ar : SCOPE_BY.get("WLD")!.en}</p> : (
+        <select value={cur && opts.some((o) => o.id === cur.id) ? cur.id : ""} onChange={(e) => e.target.value && onPick(e.target.value)} aria-label={L === "ar" ? "النطاق" : "Scope"} className="h-10 w-full rounded-[10px] border border-line bg-bg2 px-2.5 text-[13px] text-t0"><option value="">{L === "ar" ? "اختر…" : "Choose…"}</option>{opts.map((o) => <option key={o.id} value={o.id}>{o.flag} {L === "ar" ? o.ar : o.en}</option>)}</select>)}
     </div>
   );
 }

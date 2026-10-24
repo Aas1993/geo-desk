@@ -5,6 +5,9 @@ import type { WorldCountry, WorldModel } from "@/lib/falcon/world";
 import { safeHttp } from "@/lib/url";
 import { Block, Kpi, Pill, REGION_AR, REGION_COL, SEV, SRC_STATE, ago, type Lang } from "./bits";
 import { useAlerts } from "./hooks";
+import { AskBar } from "./AskBar";
+import type { Country } from "@/lib/types";
+import type { AskRoute } from "@/lib/falcon/ask";
 
 const T = {
   en: { kpiC: "Countries tracked", kpiW: "Early warnings triggered", kpiWsub: "severe", kpiS: "Sources current", kpiSsub: "due or stale", kpiA: "Live alerts", kpiAsub: "UAE-relevant",
@@ -30,7 +33,7 @@ export function WarningRow({ c, k, L, onPick }: { c: WorldCountry; k: WorldCount
 }
 
 /** The Falcon Eye command center: headline counts, the live situation room, the early warnings with the biggest UAE stake, and the health of every dataset behind the page. */
-export function CommandCenter({ world, L, onPick, openRadar }: { world: WorldModel; L: Lang; onPick: (iso: string) => void; openRadar: () => void }) {
+export function CommandCenter({ world, list, L, onPick, openRadar, onAsk }: { world: WorldModel; list: Country[]; L: Lang; onPick: (iso: string) => void; openRadar: () => void; onAsk: (r: AskRoute, q: string) => void }) {
   const u = T[L]; const { data, err } = useAlerts(); const [cat, setCat] = useState("all"); const [sev, setSev] = useState(0); const [uae, setUae] = useState(false); const [more, setMore] = useState(false);
   const items = useMemo(() => (data?.items ?? []).filter((a) => (cat === "all" || a.cat === cat) && a.sev >= sev && (!uae || a.uae)).sort((a, b) => b.sev - a.sev || b.t - a.t), [data, cat, sev, uae]);
   const warns = world.countries.reduce((a, c) => a + c.warnings.length, 0); const severe = world.countries.reduce((a, c) => a + c.warnings.filter((k) => k.sev === 3).length, 0);
@@ -39,6 +42,7 @@ export function CommandCenter({ world, L, onPick, openRadar }: { world: WorldMod
   const shown = more ? items.slice(0, 120) : items.slice(0, 14);
   return (
     <div className="space-y-4">
+      <AskBar list={list} L={L} onGo={onAsk} />
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4"><Kpi label={u.kpiC} value={world.countries.length} /><Kpi label={u.kpiW} value={warns} sub={`${severe} ${u.kpiWsub}`} tone={severe ? "var(--warn)" : undefined} /><Kpi label={u.kpiS} value={`${cur}/${world.sources.length}`} sub={notCur ? `${notCur} ${u.kpiSsub}` : undefined} tone={notCur ? "var(--warn)" : "var(--ok)"} /><Kpi label={u.kpiA} value={data ? data.items.length : "…"} sub={data ? `${data.items.filter((a) => a.uae).length} ${u.kpiAsub}` : undefined} /></div>
       <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
         <Block title={u.room} hint={u.roomHint}>

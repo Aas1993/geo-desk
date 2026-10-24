@@ -39,6 +39,7 @@ ${EVIDENCE}
 - A forecast names an event, a date and a likelihood band. Never write "may", "could" or "might" without a band. Never present a scenario weight as the probability of an event.
 - Do not speculate about the health, family or private life of any person, and do not predict the death or removal of a named leader: discuss succession through institutional rules, documented politics and public roles only. Do not repeat unverified allegations.
 - Every figure carries its year and source. Prefer primary and official sources; mark secondary ones Reported; show where credible sources conflict.
+- The subject may be a region, a sub-region, a bloc, a sector or the world instead of one country: the request then has a Scope line. Treat the word country as that scope: cover the member countries, companies, routes and institutions that drive it, name the three to five that matter most to the UAE and where they differ, never present an aggregate as one government's position, and say when a figure is the app's own roll-up of country data.
 
 ${UAE_MANDATE}
 

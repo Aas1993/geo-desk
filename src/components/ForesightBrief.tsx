@@ -5,6 +5,7 @@ import { parseForesight, type FsParsed } from "@/lib/visual";
 import { Meter } from "./VisualBrief";
 import { Bars, BandChip, ChangesPanel, DIRC, DirChip, GLYPH, ImpactMatrix, OppRadar, OptionColumns, PV, RiskHeat, ScenarioPanel, SignpostList, type Lang } from "./fs-panels";
 import { useForesightData, useTracker } from "./fs-hooks";
+import { GatesPanel } from "./falcon/GatesPanel";
 import { Plus } from "lucide-react";
 
 const B = {
@@ -74,6 +75,7 @@ export function ForesightBrief({ iso3, name, markdown, prevMarkdown, prevAt }: {
         <p className="text-[10.5px] leading-snug text-t2">{u.source}</p>
       </Page>
       <div className="no-print"><ChangesPanel now={p} prev={prev} prevAt={prevAt} L={L} /></div>
+      <div className="no-print"><GatesPanel md={markdown} kind="foresight" L={L} iso3={iso3} /></div>
     </div>
   );
 }

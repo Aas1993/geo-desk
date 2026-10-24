@@ -7,6 +7,8 @@ import type { Fact } from "@/lib/brief/facts";
 import { intelFor } from "@/lib/intel-data";
 import { investFor } from "@/lib/invest-data";
 import { foresightFacts, foresightFor } from "@/lib/foresight-data";
+import { loadGraph } from "@/lib/falcon/graph";
+import { graphText } from "@/lib/falcon/graph-core";
 
 export type Tile = { label: string; value: string; sub?: string };
 const rd = async <T,>(f: string): Promise<T | null> => { try { return JSON.parse(await readFile(path.join(process.cwd(), "public/data", f), "utf8")) as T; } catch { return null; } };
@@ -61,6 +63,9 @@ export async function investDossierFacts(iso3: string) {
 
 /** The fact pack of the detailed brief plus the foresight baseline: the IMF path to the end of its horizon, one baseline fact per front, the geography and the calendar. Used by the foresight dossier. */
 export async function foresightDossierFacts(iso3: string) {
-  const g = await dossierFacts(iso3); if (!g) return null; const p = await foresightFor(iso3); if (!p) return g;
-  const x = foresightFacts(p, g.facts.length); return { ...g, facts: [...g.facts, ...x.facts], gaps: [...g.gaps, ...x.gaps] };
+  const g = await dossierFacts(iso3); if (!g) return null; const p = await foresightFor(iso3);
+  const x = p ? foresightFacts(p, g.facts.length) : { facts: [] as Fact[], gaps: [] as string[] };
+  const gr = await loadGraph(); const gt = gr ? graphText(gr, iso3) : null; const all = [...g.facts, ...x.facts];
+  if (gt) all.push({ id: `F${all.length + 1}`, kind: "graph", text: gt, src: "Geo Desk knowledge graph (datasets joined by typed, weighted, sourced links; inferred links are labelled)" });
+  return { ...g, facts: all, gaps: [...g.gaps, ...x.gaps] };
 }

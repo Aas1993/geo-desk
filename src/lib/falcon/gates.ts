@@ -1,0 +1,44 @@
+import { parseForesight } from "../visual";
+import { parseLab } from "./lab-parse";
+
+// Automated quality gates for a finished product: deterministic checks on the text that catch the failures a reader cannot see at a glance (no sources, a stale newest source, an unfinished table, a broken graph).
+// They are necessary, not sufficient: passing them does not make a product verified. A human reviewer still decides.
+export type GateKind = "lab" | "foresight" | "council" | "redteam" | "other";
+export type Gate = { id: string; en: string; ar: string; status: "pass" | "warn" | "fail"; detail: string };
+const DATE_RE = /\b(20[12]\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/g;
+export const gateScore = (g: Gate[]) => ({ pass: g.filter((x) => x.status === "pass").length, warn: g.filter((x) => x.status === "warn").length, fail: g.filter((x) => x.status === "fail").length });
+
+export function qualityGates(md: string, kind: GateKind, ctx: { today?: Date; redTeamed?: boolean } = {}): Gate[] {
+  const out: Gate[] = []; const today = ctx.today ?? new Date(); const g = (id: string, en: string, ar: string, status: Gate["status"], detail: string) => out.push({ id, en, ar, status, detail });
+  const links = new Set([...md.matchAll(/https?:\/\/[^\s)\]>"']+/g)].map((m) => m[0].replace(/[.,;]+$/, ""))); const hosts = new Set([...links].map((l) => { try { return new URL(l).hostname.replace(/^www\./, ""); } catch { return l; } }));
+  g("sources", "Linked sources", "المصادر المرتبطة", links.size >= 8 ? "pass" : links.size >= 3 ? "warn" : "fail", `${links.size} distinct links from ${hosts.size} sites${links.size < 8 ? ": thin for a product of this kind" : ""}`);
+  const facts = [...md.matchAll(/\[F\d+(?:\s*[,–-]\s*F?\d+)*\]/g)].length; const unv = (md.match(/\[unverified reference/g) ?? []).length;
+  g("facts", "Fact references", "مراجع الحقائق", unv ? "fail" : facts >= 5 ? "pass" : "warn", unv ? `${unv} reference(s) to fact ids that do not exist were removed by the server: re-check those claims` : `${facts} references to the app's own datasets`);
+  const note = /research note[^\n]*|\*Research note[^\n]*/i.exec(md)?.[0] ?? ""; const failed = /timed out|failed|could not|unable|did not return|no results/i.test(note);
+  g("research", "Research completeness", "اكتمال البحث", failed ? "warn" : note || links.size >= 5 ? "pass" : "fail", failed ? `The product reports incomplete research: ${note.replace(/\*/g, "").slice(0, 160)}` : note ? "The research note reports no failed steps" : links.size >= 5 ? "No research note, and web sources are cited" : "No web sources and no research note");
+  const dates = [...md.matchAll(DATE_RE)].map((m) => `${m[1]}-${m[2]}-${m[3]}`).filter((d) => Date.parse(d) <= today.getTime() + 86400e3).sort(); const newest = dates.at(-1); const age = newest ? Math.round((today.getTime() - Date.parse(newest)) / 86400e3) : null;
+  g("freshness", "Newest dated evidence", "أحدث دليل مؤرخ", age == null ? "warn" : age <= 30 ? "pass" : age <= 90 ? "warn" : "fail", age == null ? "No dated evidence found in the text" : `${newest} (${age} days before today)`);
+  g("placeholders", "No placeholders", "لا نصوص بديلة", /\b(TODO|TBD|lorem ipsum|XXX)\b|<[A-Za-z ]{3,30}>/.test(md.replace(/<\/?[a-z]+>/g, "")) ? "fail" : "pass", "Checks for unfinished markers and template brackets");
+  const prob = /\b(probability|probable|chance)\b[^.\n]{0,50}\b\d{1,3}\s?%/i.test(md.replace(/\|/g, " ").replace(/\(\s*\d{1,3}\s?[–-]\s?\d{1,3}\s?%\s*\)/g, "")); g("probability", "Probability language", "لغة الاحتمال", prob ? "warn" : "pass", prob ? "A percentage is described as a probability: check that a method supports it, or use a band" : "Likelihood is expressed in bands, scenario weights are not called probabilities");
+  g("gaps", "Gaps declared", "إعلان الفجوات", /DESK INPUT REQUIRED|not found after searching|not quantified/i.test(md) ? "pass" : "warn", /DESK INPUT REQUIRED|not found after searching|not quantified/i.test(md) ? "The product names what it could not establish" : "No gap is declared: no research is that complete");
+  if (kind === "lab") {
+    const p = parseLab(md); const multi = p.nodes.filter((n) => n.parents.length > 1).length; const pairs = p.nodes.flatMap((n) => n.parents.map((q) => `${q}>${n.id}`)); const linked = new Set(p.links.map((l) => `${l.from}>${l.to}`)); const cover = pairs.length ? pairs.filter((x) => linked.has(x)).length / pairs.length : 0;
+    g("graph", "Outcome graph", "رسم النتائج", p.nodes.length >= 8 && multi >= 2 ? "pass" : p.nodes.length >= 5 ? "warn" : "fail", `${p.nodes.length} outcomes, ${multi} with two or more parents`);
+    g("links", "Causal links classified", "تصنيف الروابط السببية", cover >= 0.9 ? "pass" : cover >= 0.5 ? "warn" : "fail", `${Math.round(cover * 100)}% of graph edges carry a typed link; ${p.links.filter((l) => l.basis === "verified").length} verified, ${p.links.filter((l) => l.basis === "inferred").length} inferred, ${p.links.filter((l) => l.basis === "hypothetical").length} hypothetical`);
+    const verifiedNoEv = p.links.filter((l) => l.basis === "verified" && (!l.evidence || l.evidence === "-" || l.evidence.length < 3)).length; g("verified", "Verified links are sourced", "الروابط الموثّقة لها مصدر", verifiedNoEv ? "fail" : "pass", verifiedNoEv ? `${verifiedNoEv} link(s) marked Verified carry no evidence` : "Every link marked Verified cites evidence");
+    const base = p.scored.some((o) => /baseline|no new action|status quo/i.test(o.name)), wait = p.scored.some((o) => /wait|gather/i.test(o.name)); const full = p.scored.length > 0 && p.scored.every((o) => Object.keys(o.scores).length === 6);
+    g("options", "Options and scores", "الخيارات والدرجات", base && wait && full && p.scored.length >= 4 ? "pass" : p.scored.length >= 3 ? "warn" : "fail", `${p.scored.length} options${base ? ", baseline present" : ", baseline missing"}${wait ? ", waiting present" : ", waiting missing"}${full ? ", all scores filled" : ", scores incomplete"}`);
+    const rbFull = p.robust.length > 0 && p.robust.every((r) => r.mild != null && r.central != null && r.severe != null); g("robust", "Robustness across variants", "الصمود عبر الصيغ", rbFull && p.robust.length >= p.scored.length - 1 ? "pass" : p.robust.length ? "warn" : "fail", p.robust.length ? `${p.robust.length} options tested against mild, central and severe` : "No robustness matrix");
+    g("benchmarks", "Benchmarks", "المقارنات المعيارية", p.analogues.length >= 2 && p.refs.length >= 1 ? "pass" : p.analogues.length >= 1 ? "warn" : "fail", `${p.analogues.length} historical analogues, ${p.refs.length} outside reference scenarios; ${p.analogues.filter((a) => a.calibration === "higher" || a.calibration === "lower").length} analogue(s) differ from the lab's central view`);
+    const stale = p.currency.filter((c) => c.state === "stale").length, dated = p.currency.filter((c) => c.state === "dated").length, dd = p.currency.filter((c) => c.grade === "D").length; g("currency", "Evidence currency and grades", "حداثة الأدلة ودرجاتها", !p.currency.length ? "fail" : stale || dd ? "warn" : "pass", p.currency.length ? `${p.currency.length} items graded: ${stale} stale, ${dated} dated, ${dd} graded D` : "No currency table");
+    g("developments", "Latest developments", "آخر التطورات", p.developments.length >= 3 ? "pass" : p.developments.length ? "warn" : "fail", `${p.developments.length} dated developments`);
+  }
+  if (kind === "foresight") {
+    const p = parseForesight(md); const main = p.scenarios.filter((s) => !s.wildcard); const sum = main.reduce((a, s) => a + (s.weight ?? 0), 0);
+    g("weights", "Scenario weights", "أوزان السيناريوهات", main.length >= 3 && Math.abs(sum - 100) <= 1 ? "pass" : main.length ? "fail" : "warn", main.length ? `Weights sum to ${sum}` : "No scenario table found");
+    const banded = p.judgments.filter((j) => j.band && j.confidence).length; g("judgments", "Key judgments rated", "تقييم الأحكام الرئيسية", p.judgments.length && banded === p.judgments.length ? "pass" : p.judgments.length ? "warn" : "fail", `${banded} of ${p.judgments.length} key judgments carry a likelihood band and a confidence`);
+    g("opps", "Opportunities tested", "اختبار الفرص", p.opportunities.length && p.opportunities.every((o) => o.works.length) ? "pass" : p.opportunities.length ? "warn" : "fail", `${p.opportunities.filter((o) => o.works.length).length} of ${p.opportunities.length} opportunities state the scenarios they survive`);
+  }
+  if (kind !== "redteam") g("redteam", "Independent review", "المراجعة المستقلة", ctx.redTeamed ? "pass" : "warn", ctx.redTeamed ? "A red-team review of this product is saved" : "No red-team review of this product is saved: run one before relying on it");
+  return out;
+}

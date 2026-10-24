@@ -5,6 +5,7 @@ import { parseForesight } from "@/lib/visual";
 import { Meter, Panel } from "./VisualBrief";
 import { Bars, ChangesPanel, DIRC, GLYPH, HeatGrid, ImpactGraph, ImpactMatrix, OppRadar, OptionColumns, PV, RiskHeat, ScenarioPanel, SignpostList, type Lang } from "./fs-panels";
 import { useForesightData, useTracker } from "./fs-hooks";
+import { GatesPanel } from "./falcon/GatesPanel";
 
 const V = {
   en: { title: "Illustrated view", sub: "The report as pictures: the data baseline, the outlook of every front over five horizons, scenarios you can re-weight, the UAE impact and opportunity radar, options by window, the risk heat map and the signposts. Built from the text and the datasets; it costs nothing extra.", base: "Data baseline", imf: "IMF path", growth: "Real GDP growth, %", debt: "Public debt, % of GDP", bluf: "Bottom line", outlook: "Strategic outlook", uae: "Most important UAE implication", judg: "Key judgments", weak: "Weak signals and trends", ranges: "Forecast ranges", ind: "Indicator", latest: "Latest", y3: "3 years", y5: "5 years", y10: "10 years", scores: "Comparative scores", scoresHint: "Dataset percentiles or analyst judgments, each with its basis in the text: not objective measurements.", est: "estimate or projection", noText: "The report text has no tables the picture view can read yet.", sigs: "What the datasets already show", adv: "Reconciled call" },
@@ -48,6 +49,7 @@ export function ForesightVisual({ iso3, name, markdown, prevMarkdown, prevAt }: 
       {p.signposts.length > 0 && <section className="fs-page"><SignpostList p={p} L={L} /></section>}
       {p.scores.length > 0 && <section className="fs-page"><Panel title={u.scores}><ul className="grid gap-2 md:grid-cols-2">{p.scores.map((s, i) => <li key={i}><div className="flex justify-between text-[12px]"><span className="text-t0">{s.score}</span><span className="num text-t1">{s.value ?? "—"}</span></div><div className="mt-1 h-2 rounded-full bg-bg3"><div className="h-2 rounded-full" style={{ width: `${Math.max(2, s.value ?? 0)}%`, background: s.value == null ? "transparent" : tone(s.value) }} /></div><p className="mt-0.5 text-[10px] text-t2">{s.basis}</p></li>)}</ul><p className="mt-2 text-[10.5px] text-t2">{u.scoresHint}</p></Panel></section>}
       <div className="no-print"><ChangesPanel now={p} prev={prev} prevAt={prevAt} L={L} /></div>
+      <div className="no-print"><GatesPanel md={markdown} kind="foresight" L={L} iso3={iso3} /></div>
       {nothing && <p className="text-[12px] text-t2">{u.noText}</p>}
     </div>
   );

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CandlestickChart, Globe2, Languages, Menu, Moon, Sun } from "lucide-react";
+import { Bell, CandlestickChart, Eye, Globe2, Languages, Menu, Moon, Sun } from "lucide-react";
 import { SearchBox } from "./SearchBox";
 import { useStore, useT } from "@/lib/store";
 import { useAlertCount } from "@/lib/alerts-client";
@@ -31,7 +31,7 @@ function NavPills() {
   const item = (href: string, on: boolean, icon: React.ReactNode, label: string) => (
     <Link href={href} aria-current={on ? "page" : undefined} className={`flex h-9 items-center gap-2 rounded-[9px] px-3 text-[12.5px] font-medium transition-colors ${on ? "bg-accent text-[var(--accent-ink)] shadow-[var(--glow)]" : "text-t1 hover:bg-bg3 hover:text-t0"}`}>{icon}<span className="hidden lg:inline">{label}</span></Link>
   );
-  return <nav aria-label="Sections" className="glass hidden h-11 items-center gap-1 rounded-[12px] p-1 sm:flex">{item("/", path === "/", <Globe2 size={16} />, t("nav_world"))}{item("/markets", path.startsWith("/markets"), <CandlestickChart size={16} />, t("nav_markets"))}</nav>;
+  return <nav aria-label="Sections" className="glass hidden h-11 items-center gap-1 rounded-[12px] p-1 sm:flex">{item("/", path === "/", <Globe2 size={16} />, t("nav_world"))}{item("/markets", path.startsWith("/markets"), <CandlestickChart size={16} />, t("nav_markets"))}{item("/falcon", path.startsWith("/falcon"), <Eye size={16} />, t("nav_falcon"))}</nav>;
 }
 
 export function TopBar({ feed }: { feed: { items: Headline[]; at: number | null; ok: boolean } }) {

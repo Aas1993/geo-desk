@@ -177,5 +177,5 @@ export default function MapCanvas() {
   useEffect(() => { if (homeNonce) mapRef.current?.flyTo({ center: [54, 24], zoom: isMobile() ? 3.6 : 4.6, duration: 1200 }); }, [homeNonce]);
   useEffect(() => { if (!zoomCmd.n) return; if (zoomCmd.dir > 0) mapRef.current?.zoomIn(); else mapRef.current?.zoomOut(); }, [zoomCmd]);
 
-  return <div className="absolute inset-0"><div ref={el} style={{ position: "absolute", inset: 0 }} aria-label="World map" role="application" />{failed && <div role="alert" className="absolute inset-x-4 top-24 z-10 mx-auto max-w-sm rounded-[10px] border border-down/40 bg-bg1 p-3 text-[13px] text-t0">The map data could not be loaded. Check the connection and <button onClick={() => location.reload()} className="underline">reload</button>.</div>}</div>;
+  return <div className="absolute inset-0"><div ref={el} style={{ position: "absolute", inset: 0 }} aria-label={lang === "ar" ? "خريطة العالم" : "World map"} role="application" />{failed && <div role="alert" className="absolute inset-x-4 top-24 z-10 mx-auto max-w-sm rounded-[10px] border border-down/40 bg-bg1 p-3 text-[13px] text-t0">{lang === "ar" ? "تعذر تحميل بيانات الخريطة. تحقق من الاتصال و" : "The map data could not be loaded. Check the connection and "}<button onClick={() => location.reload()} className="underline">{lang === "ar" ? "أعد التحميل" : "reload"}</button>.</div>}</div>;
 }

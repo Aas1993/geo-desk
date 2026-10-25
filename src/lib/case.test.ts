@@ -18,7 +18,7 @@ async function main() {
   // ---- statecraft core ----
   assert.equal(pctile(50, [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]), 50); assert.equal(pctile(5, []), null);
   const ls = lenses(base()); assert.equal(ls.length, 6); assert.deepEqual(ls.map((l) => l.id), ["relationship", "scorecard", "strategic", "exposure", "opportunity", "condition"]);
-  const mk = (id: string, pos: number | null): Lens => ({ id, name: { en: id, ar: id }, value: "", scale: { en: "", ar: "" }, pos, basis: "scale", note: { en: "", ar: "" } });
+  const mk = (id: string, pos: number | null): Lens => ({ id, name: { en: id, ar: id }, value: "", valueAr: "", scale: { en: "", ar: "" }, pos, basis: "scale", note: { en: "", ar: "" } });
   assert.equal(divergence([mk("relationship", 80), mk("exposure", 30)]).flag, true, "a 50-point gap flags a divergence"); assert.equal(divergence([mk("relationship", 60), mk("exposure", 50)]).flag, false); assert.equal(divergence([mk("relationship", 60)]).flag, false, "one lens cannot diverge");
   assert.ok(divergence([mk("relationship", 90), mk("condition", 30)]).text.en.includes("counterparty risk"), "a known pair gets its explanation"); assert.ok(divergence([mk("relationship", 90), mk("condition", 30)]).text.ar.length > 20, "and an Arabic one");
   const i = base(); const ps = pillars(i); assert.equal(ps.length, 8); assert.ok(ps.find((p) => p.id === "capital")!.parts.every((x) => x.k !== "Investment"), "an unknown investment stock is excluded, not scored zero");

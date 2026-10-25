@@ -1,4 +1,5 @@
 "use client";
+import { classification } from "@/lib/case/report";
 import { useEffect, useMemo, useState } from "react";
 import { Copy, Download, Printer } from "lucide-react";
 import { DIMS, RADAR_AXES, TIERS, tx } from "@/lib/machiavelli/content";
@@ -30,7 +31,7 @@ export function ProfilePanel({ p, L }: { p: Profile; L: Lang }) {
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4"><Kpi label={u.trade} value={p.facts.tradeUsdM ? bn(p.facts.tradeUsdM * 1e6) : "n/a"} sub={p.facts.tradeYear ? `${p.facts.tradeYear}${p.facts.tradeCagr != null ? ` · ${(p.facts.tradeCagr * 100).toFixed(1)}%/yr` : ""}` : undefined} /><Kpi label={u.inv} value={bn(p.facts.invOutUsd)} /><Kpi label={u.aid} value={p.facts.aid5Usd ? bn(p.facts.aid5Usd) : "none"} /><Kpi label={u.rank} value={p.facts.rank ? `#${p.facts.rank}` : "n/a"} /></div>
       <div className="grid gap-4 lg:grid-cols-2">
         <Block title={u.dims} hint={u.dimsH}><div className="grid items-start gap-3 sm:grid-cols-[minmax(0,230px)_1fr]"><Radar6 size={250} labels={DIMS.map((d) => (L === "ar" ? d.ar : d.en))} series={[{ name: p.name, color: "var(--accent)", values: DIMS.map((d) => p.dims[d.id].s) }]} /><div className="space-y-2">{DIMS.map((d) => <ScoreRow key={d.id} label={L === "ar" ? d.ar : d.en} value={p.dims[d.id].s} ev={p.dims[d.id].ev} hint={d.id === "hard" || d.id === "dur" ? u.hint : undefined} />)}</div></div></Block>
-        <Block title={u.axes} hint={u.axesH} right={tier ? <Pill c="var(--accent)" title={tier.definition}>{u.tier}: {tier.id} {tx(tier.name, L)}</Pill> : undefined}><div className="grid items-start gap-3 sm:grid-cols-[minmax(0,230px)_1fr]"><Radar6 size={250} labels={RADAR_AXES.map((a) => (L === "ar" ? a.ar : a.en))} series={[{ name: p.name, color: "var(--c2)", values: RADAR_AXES.map((a) => p.axes[a.id].s) }]} /><div className="space-y-2"><div className="rounded-[10px] bg-bg2 p-2.5 text-[12px] text-t0">Composite <b className="num text-[15px]">{p.composite}</b></div>{RADAR_AXES.map((a) => <ScoreRow key={a.id} label={L === "ar" ? a.ar : a.en} value={p.axes[a.id].s} ev={p.axes[a.id].ev} />)}</div></div></Block>
+        <Block title={u.axes} hint={u.axesH} right={tier ? <Pill c="var(--accent)" title={tier.definition}>{u.tier}: {tier.id} {tx(tier.name, L)}</Pill> : undefined}><div className="grid items-start gap-3 sm:grid-cols-[minmax(0,230px)_1fr]"><Radar6 size={250} labels={RADAR_AXES.map((a) => (L === "ar" ? a.ar : a.en))} series={[{ name: p.name, color: "var(--c2)", values: RADAR_AXES.map((a) => p.axes[a.id].s) }]} /><div className="space-y-2"><div className="rounded-[10px] bg-bg2 p-2.5 text-[12px] text-t0">{L === "ar" ? "المركّب" : "Composite"} <b className="num text-[15px]">{p.composite}</b></div>{RADAR_AXES.map((a) => <ScoreRow key={a.id} label={L === "ar" ? a.ar : a.en} value={p.axes[a.id].s} ev={p.axes[a.id].ev} />)}</div></div></Block>
       </div>
       <Block title={u.rec}><ul className="space-y-1.5 text-[12.5px] leading-snug text-t0">{p.recs.map((r, i) => <li key={i} className="flex gap-2"><span aria-hidden className="text-accent">▸</span>{r}</li>)}</ul></Block>
     </div>
@@ -47,7 +48,7 @@ export function CountryStrategy({ L, f, setF, list, by, set, scope }: { L: Lang;
   const refusal = refusalText([q, f.objective], L);
   const members = useMemo(() => (isScopeId && set ? set.profiles.filter((p) => { const s = SCOPE_BY.get(iso!)!; return s.kind === "region" ? p.region === s.key : s.kind === "subregion" ? p.subregion === s.key : false; }) : []), [isScopeId, iso, set]);
   const start = () => { if (!iso || refusal) return; void run.run({ kind: "strategy", mode, lang: L, question: q, instruments: ins, ...filterBody(f) }, profile && set ? { snap: snapOf(profile, set.sources) } : undefined); };
-  const s = run.saved; const html = () => briefingHtml(s!.report, { title: `${name}: ${mode === "enhance" ? u.enhance : u.dossier}`, rtl: L === "ar", foot: `${s!.model} · ${s!.at}`, classification: "DRAFT · AI-GENERATED FROM PUBLIC SOURCES · OPEN-SOURCE ANALYSIS · PROPOSALS FOR HUMAN DECISION" });
+  const s = run.saved; const html = () => briefingHtml(s!.report, { title: `${name}: ${mode === "enhance" ? u.enhance : u.dossier}`, rtl: L === "ar", foot: `${s!.model} · ${s!.at}`, classification: classification(L === "ar" ? "ar" : "en") });
   const [copied, setCopied] = useState(false);
   return (
     <div className="space-y-4">
@@ -65,7 +66,7 @@ export function CountryStrategy({ L, f, setF, list, by, set, scope }: { L: Lang;
             <Progress phase={run.phase} status={run.status} tail={run.tail} searches={run.searches} sources={run.sources} err={run.err} L={L} />
           </Block>
           {s && run.phase !== "running" && (<>
-            <div className="flex flex-wrap items-center gap-2"><span className="num text-[11.5px] text-t1">{c?.flag} {name} · {u.saved} {s.at.slice(0, 16).replace("T", " ")} UTC · {u.spent} {usd(s.usage.usd)} · {s.usage.searches} searches{s.cached ? " · cached" : ""}</span>
+            <div className="flex flex-wrap items-center gap-2"><span className="numt text-[11.5px] text-t1">{c?.flag} {name} · {u.saved} {s.at.slice(0, 16).replace("T", " ")} UTC · {u.spent} {usd(s.usage.usd)} · {s.usage.searches} {L === "ar" ? "بحثًا" : "searches"}{s.cached ? (L === "ar" ? " · من الذاكرة" : " · cached") : ""}</span>
               <span className="ms-auto flex flex-wrap gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(s.report); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Copy size={13} />{copied ? u.copied : u.copy}</button><button type="button" onClick={() => saveBlob(`${iso}-${mode}-strategy.md`, "text/markdown", s.report)} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Download size={13} />.md</button><button type="button" onClick={() => printBriefing(html())} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Printer size={13} />{u.pdf}</button></span></div>
             <StrategyVisual md={s.report} L={L} iso3={iso} />
           </>)}

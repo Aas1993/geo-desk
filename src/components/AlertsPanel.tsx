@@ -43,7 +43,7 @@ export function AlertsPanel() {
             <span className={`mt-0.5 shrink-0 ${SEV[a.sev]}`}><Icon size={15} /></span>
             <div className="min-w-0 flex-1">
               <div className="text-[13px] leading-snug text-t0">{a.title}</div>
-              <div className="num mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-t2"><span>{a.src}</span>{now > 0 && <span>{rel(now, a.t)}</span>}{a.uae && <span className="text-accent">UAE</span>}
+              <div className="numt mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-t2"><span>{a.src}</span>{now > 0 && <span>{rel(now, a.t)}</span>}{a.uae && <span className="text-accent">UAE</span>}
                 {a.coords && <button onClick={() => locate(a)} className="inline-flex items-center gap-1 text-t1 hover:text-accent"><LocateFixed size={11} />{t("alertsLocate")}</button>}
                 {a.url && /^https?:/.test(a.url) && <a href={a.url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-t1 hover:text-accent"><ExternalLink size={11} />Open</a>}</div>
             </div>

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useStore, useT } from "@/lib/store";
+import { regionLabel } from "@/lib/regions";
 import { useNow } from "@/lib/use-now";
 import { Card, Row, StatTile, Skeleton, EmptyState, Source, Sparkline, ShareBar } from "./ui";
 import { ago, compact, int, last, pct, usd, wmoLabel } from "@/lib/format";
@@ -83,7 +84,7 @@ export function OverviewTab({ c, detail }: { c: Country; detail: D }) {
       </Card>
       <MembershipsCard iso3={c.iso3} />
       <Card title={t("region")} icon="🏛">
-        <Row k={t("region")} v={c.region} />
+        <Row k={t("region")} v={regionLabel(c.region, lang)} />
         <Row k={t("languagesL")} v={c.languages.join(", ") || "—"} />
         <Row k={t("currency")} v={c.currencies.join(", ") || "—"} />
       </Card>

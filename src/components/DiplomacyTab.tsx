@@ -69,7 +69,7 @@ function CountryDiplomacy({ c }: { c: Country }) {
         {!rows.length ? <p className="text-[12.5px] text-t1">{u.noItems}</p> : (
           <ul className="divide-y divide-line/60">{rows.map((x) => (
             <li key={x.u} className="py-2"><a href={wamUrl(x.u)} target="_blank" rel="noreferrer noopener" title={u.opens} className="text-[13px] leading-snug text-t0 hover:text-accent">{x.t}</a>
-              <div className="num mt-0.5 flex flex-wrap items-center gap-x-2 text-[10.5px] text-t2"><span>{day(x.d, lang)}</span><span>{u.kinds[x.k]}</span><span style={{ color: LEVEL_COLOR[x.l] }}>{x.l === 3 ? u.L3 : x.l === 2 ? u.L2 : u.L1}</span>{x.dir && <span>{x.dir === "in" ? u.inbound : u.outbound}</span>}</div></li>))}</ul>)}
+              <div className="numt mt-0.5 flex flex-wrap items-center gap-x-2 text-[10.5px] text-t2"><span>{day(x.d, lang)}</span><span>{u.kinds[x.k]}</span><span style={{ color: LEVEL_COLOR[x.l] }}>{x.l === 3 ? u.L3 : x.l === 2 ? u.L2 : u.L1}</span>{x.dir && <span>{x.dir === "in" ? u.inbound : u.outbound}</span>}</div></li>))}</ul>)}
         {shown.length > 12 && <button onClick={() => setMore(!more)} className="mt-2 text-[12.5px] text-accent hover:underline">{more ? u.fewer : `${u.showAll} (${shown.length})`}</button>}
         <p className="mt-2 text-[11px] leading-snug text-t2">{u.source}: <a className="underline hover:text-accent" href={v.source.url} target="_blank" rel="noreferrer noopener">WAM</a> · {u.built} {v.built.slice(0, 10)}.</p>
       </Card>

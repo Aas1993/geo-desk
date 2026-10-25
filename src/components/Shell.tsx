@@ -42,9 +42,9 @@ function MobileNav() {
     <>
       <nav aria-label="Main" className="glass absolute inset-x-2 bottom-2 z-30 flex h-14 items-stretch rounded-[14px] sm:hidden">
         <Link href="/" onClick={() => { setMenu(false); select(null); }} className={cls(path === "/" && !menuOpen)}><Globe2 size={19} />{t("nav_world")}</Link>
+        <Link href="/case" className={cls(path.startsWith("/case"))}><Briefcase size={19} />{t("nav_case")}</Link>
         <Link href="/markets" className={cls(path.startsWith("/markets"))}><CandlestickChart size={19} />{t("nav_markets")}</Link>
         <Link href="/falcon" className={cls(path.startsWith("/falcon"))}><Eye size={19} />{t("nav_falcon")}</Link>
-        <Link href="/case" className={cls(path.startsWith("/case"))}><Briefcase size={19} />{t("nav_case")}</Link>
         <Link href="/deep" className={cls(path.startsWith("/deep"))}><Brain size={19} />{t("nav_deep")}</Link>
         <Link href="/machiavelli" className={cls(path.startsWith("/machiavelli"))}><Compass size={19} />{t("nav_mach")}</Link>
         <Link href="/influence" className={cls(path.startsWith("/influence"))}><Award size={19} />{t("nav_influence")}</Link>

@@ -42,6 +42,8 @@ button { cursor: pointer; }
 ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
 
 .num { font-variant-numeric: tabular-nums lining-nums; direction: ltr; unicode-bidi: isolate; font-family: var(--font-mono-ui), ui-monospace, monospace; letter-spacing: -0.01em; }
+/* For a sentence that mixes Arabic words with numbers: each run takes its direction from its first strong letter, so the words read right to left and every number (sign, percent, thousands comma) keeps its own left-to-right order. The Arabic face is in the stack so Arabic words never fall back to a system font. Use .num for pure numbers and axes, which must stay left to right. */
+.numt { font-variant-numeric: tabular-nums lining-nums; unicode-bidi: plaintext; font-family: var(--font-mono-ui), var(--font-arabic), ui-monospace, monospace; letter-spacing: -0.01em; }
 .display { font-family: var(--font-serif), var(--font-arabic), Georgia, serif; font-optical-sizing: auto; font-variant-numeric: lining-nums; letter-spacing: -0.015em; }
 html[lang="ar"] .display { font-family: var(--font-arabic), serif; letter-spacing: 0; font-weight: 600; }
 .label { font-family: var(--font-mono-ui), ui-monospace, monospace; font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--t2); font-weight: 500; }

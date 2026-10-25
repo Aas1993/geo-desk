@@ -19,6 +19,7 @@ import { DiplomacyTab } from "./DiplomacyTab";
 import { IconBtn } from "./ui";
 import { useDashboard } from "@/lib/dashboard-store";
 import { printOnePager } from "@/lib/one-pager";
+import { regionLabel } from "@/lib/regions";
 import type { Country, CountryDetail, TabId } from "@/lib/types";
 
 const TABS: TabId[] = ["overview", "brief", "intel", "investments", "foresight", "minister", "counterpart", "desk", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
@@ -73,7 +74,7 @@ export function CountryPanel() {
         <div className="min-w-0 flex-1">
           <h2 className="display line-clamp-2 text-[22px] font-semibold leading-tight">{displayName(c, lang)}</h2>
           <p className="truncate text-[13px] text-t1">{lang === "ar" ? c.name : c.nameAr ?? ""}</p>
-          <p className="truncate text-[12px] text-t2">{c.region}</p>
+          <p className="truncate text-[12px] text-t2">{regionLabel(c.region, lang)}</p>
         </div>
         <WatchBtn iso3={c.iso3} />
         <IconBtn label={lang === "ar" ? "موجز من صفحة واحدة (طباعة)" : "One-page brief (print / PDF)"} onClick={() => void printOnePager(c, lang)} className="max-sm:hidden"><Printer size={16} /></IconBtn>

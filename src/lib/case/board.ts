@@ -18,7 +18,7 @@ export function boardRow(c: CaseData): BoardRow {
     alerts: (c.deep?.readings ?? []).filter((r) => r.state === "alert").length, tone: c.tone?.g ?? null };
 }
 /** What this browser knows about a country. */
-export type Work = { council: boolean; arch: boolean; baseline: Baseline | null; log: LogCounts | null };
+export type Work = { council: boolean; arch: boolean; baseline: Baseline | null; log: LogCounts | null; king?: { verdict: string; at: string } | null };
 export type SortKey = "value" | "ability" | "risk" | "partnership" | "alerts" | "name";
 export const POSTURE_ORDER: (Posture | "none")[] = ["deepen", "staged", "hedge", "hold", "none"];
 export const GROUP_NAME: Record<Posture | "none", { en: string; ar: string; why: { en: string; ar: string } }> = {

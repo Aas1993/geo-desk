@@ -4,6 +4,7 @@ import { cached } from "@/lib/layers/cache";
 import { loadSnapshot } from "@/lib/deep/snapshot";
 import type { Snapshot } from "@/lib/deep/snapshot";
 import { getProfiles } from "../machiavelli/profile";
+import { LAYERS } from "@/lib/layers/registry";
 import { TREND_METRICS, type Met } from "./catalog";
 import { ageYears, divergence, instruments, lenses, median, pillars, positionMeasured, posture, summarise, tenureYears, type B, type Divergence, type InstrRow, type Inputs, type Lens, type Measured, type Pillar, type PostureResult, type Pt, type Spine } from "./core";
 
@@ -11,13 +12,15 @@ import { ageYears, divergence, instruments, lenses, median, pillars, positionMea
 type Dict = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 const rd = async <T,>(f: string): Promise<T | null> => { try { return JSON.parse(await readFile(path.join(process.cwd(), "public/data", f), "utf8")) as T; } catch { return null; } };
 const files = () => cached("case:files", 600_000, async () => {
-  const [outlook, fin, trade, invest, trends, countries, score, part, lev, rivals, temp, leaders, capture] = await Promise.all([rd<Dict>("outlook.json"), rd<Dict>("finconditions.json"), rd<Dict>("trade.json"), rd<Dict>("investment.json"), rd<Dict>("trends.json"), rd<Dict[]>("countries.json"), rd<Dict>("scorecard.json"), rd<Dict>("partnership.json"), rd<Dict>("leverage.json"), rd<Dict>("rivals.json"), rd<Dict>("temperature.json"), rd<Dict>("leaders.json"), rd<Dict>("vintages/capture.json")]);
+  const [outlook, fin, trade, invest, trends, countries, score, part, lev, rivals, temp, leaders, capture, orgs, deals] = await Promise.all([rd<Dict>("outlook.json"), rd<Dict>("finconditions.json"), rd<Dict>("trade.json"), rd<Dict>("investment.json"), rd<Dict>("trends.json"), rd<Dict[]>("countries.json"), rd<Dict>("scorecard.json"), rd<Dict>("partnership.json"), rd<Dict>("leverage.json"), rd<Dict>("rivals.json"), rd<Dict>("temperature.json"), rd<Dict>("leaders.json"), rd<Dict>("vintages/capture.json"), rd<Dict>("orgs.json"), rd<Dict>("deals.json")]);
   const set = await getProfiles();
-  return { outlook, fin, trade, invest, trends, countries: countries ?? [], score, part, lev, rivals, temp, leaders, capture, set };
+  return { outlook, fin, trade, invest, trends, countries: countries ?? [], score, part, lev, rivals, temp, leaders, capture, orgs, deals, set };
 }).then((r) => r.value);
 
 export type SpineRow = { met: Met; has: boolean; series: Pt[]; proj: Pt[] | null; spine: Spine; region: number | null; uae: number | null; extra?: string };
-export type NeighbourRow = { iso: string; name: string; nameAr: string | null; part: number | null; rank: number | null; tier: string | null; lev: string | null; score: number | null };
+export type NeighbourRow = { iso: string; name: string; nameAr: string | null; part: number | null; rank: number | null; tier: string | null; lev: string | null; score: number | null; un: number | null; shared: B[] };
+/** A UAE deal headline in the WAM-based feed that names this country. */
+export type DealRow = { d: string; t: string; by: string[]; sector: string | null; u: string };
 export type CaseData = {
   asOf: string; iso3: string; name: string; nameAr: string | null; flag: string; region: string; subregion: string | null;
   lenses: Lens[]; divergence: Divergence; pillars: Pillar[]; posture: PostureResult; instruments: InstrRow[]; measured: Measured[];
@@ -26,7 +29,7 @@ export type CaseData = {
   neighbours: { ring1: NeighbourRow[]; ring2: NeighbourRow[] }; rivals: { iso: string; share: number }[]; uaeRank: { rank: number; of: number; share: number } | null; leverage: { theirs: number | null; ours: number | null; quadrant: string | null } | null;
   scorecard: { overall: number; tier: string; dims: { id: string; group: string; score: number | null }[] } | null; partnership: { score: number; rank: number; n: number; c: Record<string, number>; raw: Record<string, number> } | null;
   tone: Inputs["tone"]; spine: SpineRow[]; capture: { months: string[]; series: Record<string, number[]> } | null;
-  deep: { exposure: Snapshot["exposure"]; readings: Snapshot["readings"]; screen: NonNullable<Snapshot["trade"]>["partnerScreen"] | null; screenN: number; vintage: Snapshot["vintage"]; builds: Snapshot["builds"]; gaps: string[]; forecasts: Snapshot["forecasts"]["other"]; invest: Snapshot["invest"] } | null;
+  deals: DealRow[]; deep: { exposure: Snapshot["exposure"]; readings: Snapshot["readings"]; screen: NonNullable<Snapshot["trade"]>["partnerScreen"] | null; screenN: number; vintage: Snapshot["vintage"]; builds: Snapshot["builds"]; gaps: string[]; forecasts: Snapshot["forecasts"]["other"]; invest: Snapshot["invest"] } | null;
   coverage: { trendHeld: number; trendTotal: number; withData: number };
 };
 const THEATRE = ["SAU", "QAT", "JOR", "TUR", "IRN", "IRQ", "OMN", "KWT", "BHR", "ETH", "ERI", "DJI", "SDN", "SSD", "LBY", "EGY", "SYR", "LBN", "YEM", "SOM", "ISR", "PSE"];
@@ -53,7 +56,9 @@ export async function buildCase(iso3: string, now: Date): Promise<CaseData | nul
     growthOutlook: gv.length ? gv.reduce((a, b) => a + b, 0) / gv.length : null, deals365, aid5Usd: prof?.facts.aid5Usd ?? null, now: nowMs };
   const ls = lenses(inp); const pl = pillars(inp); const post = posture(inp, pl);
   // neighbours
-  const row = (i: string): NeighbourRow => { const cc = f.countries.find((x) => x.iso3 === i); return { iso: i, name: cc?.name ?? i, nameAr: cc?.nameAr ?? null, part: f.part?.countries?.[i]?.score ?? null, rank: f.part?.countries?.[i]?.rank ?? null, tier: f.set?.profiles.find((p) => p.iso3 === i)?.tier ?? null, lev: f.lev?.countries?.[i]?.quadrant ?? null, score: f.score?.countries?.[i]?.overall ?? null }; };
+  const blocOf = (key: string) => { const l = LAYERS.find((x) => x.members === key); return l ? { en: l.en.split(" — ")[0], ar: l.ar.split(" — ")[0] } : { en: key, ar: key }; };
+  const orgMap = (f.orgs?.orgs ?? {}) as Record<string, string[]>; const sharedWith = (i: string): B[] => Object.entries(orgMap).filter(([k, m]) => !["ecosoc", "npt", "iaea", "wto", "who", "itu", "unga", "opcw"].includes(k) && m.length >= 3 && m.length <= 120 && m.includes(iso3) && m.includes(i)).map(([k]) => blocOf(k)).slice(0, 6);
+  const row = (i: string): NeighbourRow => { const cc = f.countries.find((x) => x.iso3 === i); return { iso: i, name: cc?.name ?? i, nameAr: cc?.nameAr ?? null, un: typeof un?.[i] === "number" ? un[i] : null, shared: sharedWith(i), part: f.part?.countries?.[i]?.score ?? null, rank: f.part?.countries?.[i]?.rank ?? null, tier: f.set?.profiles.find((p) => p.iso3 === i)?.tier ?? null, lev: f.lev?.countries?.[i]?.quadrant ?? null, score: f.score?.countries?.[i]?.overall ?? null }; };
   const ring1 = ((c.borders ?? []) as string[]).filter((i) => i !== "ARE").map(row); const taken = new Set([iso3, "ARE", ...ring1.map((r) => r.iso)]);
   const inTheatre = THEATRE.includes(iso3) || ring1.some((r) => THEATRE.includes(r.iso)); const ring2 = (inTheatre ? THEATRE.filter((i) => !taken.has(i)) : f.countries.filter((x) => x.region === c.region && !taken.has(x.iso3)).map((x) => x.iso3)).map(row).filter((r) => r.part != null).sort((a, b) => (b.part ?? 0) - (a.part ?? 0)).slice(0, 10);
   // trend spine
@@ -84,6 +89,7 @@ export async function buildCase(iso3: string, now: Date): Promise<CaseData | nul
     leaders: ld ? { head: ld.state ? { name: ld.state.name, start: ld.state.start, tenure: tenureYears(ld.state.start, nowMs), age: ageYears(ld.state.birth, nowMs) } : undefined, gov: ld.gov ? { name: ld.gov.name, start: ld.gov.start, tenure: tenureYears(ld.gov.start, nowMs) } : undefined } : null,
     neighbours: { ring1, ring2 }, rivals: (rv?.list ?? []).slice(0, 8).map((x: { c: string; share: number }) => ({ iso: x.c, share: x.share })), uaeRank: rv?.uae ? { rank: rv.uae.rank, of: rv.of ?? 14, share: rv.uae.share } : null, leverage: inp.lev,
     scorecard: sc ? { overall: sc.overall, tier: sc.tier, dims: Object.entries(sc.dims).map(([id, v]: [string, any]) => ({ id, group: DIM_GROUP(f, id), score: v.score ?? null })) } : null, partnership: inp.part, tone: inp.tone, spine, capture: cap, // eslint-disable-line @typescript-eslint/no-explicit-any
+    deals: ((f.deals?.items ?? []) as DealRow[]).filter((x) => (x as DealRow & { c?: string[] }).c?.includes(iso3)).sort((a, z) => (a.d < z.d ? 1 : -1)).slice(0, 40).map((x) => ({ d: x.d, t: x.t, by: x.by ?? [], sector: x.sector ?? null, u: x.u })),
     deep: deep ? { exposure: deep.exposure, readings: deep.readings, screen: deep.trade?.partnerScreen ?? null, screenN: deep.trade?.screenN ?? 0, vintage: deep.vintage, builds: deep.builds, gaps: deep.gaps, forecasts: deep.forecasts.other, invest: deep.invest } : null,
     coverage: { trendHeld: TREND_METRICS.filter((m) => m.cls === "H").length, trendTotal: TREND_METRICS.length, withData: spine.filter((s) => s.has).length } };
 }

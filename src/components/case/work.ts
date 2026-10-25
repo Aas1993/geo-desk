@@ -25,8 +25,8 @@ export const writeBaseline = (iso: string, b: Baseline) => { try { localStorage.
 /** For the Priority board: per country, a Council or strategy on file, the review baseline and the decision counts. */
 export function useWork(today: number): Record<string, Work> {
   const read = useCallback(() => {
-    const out: Record<string, Work> = {}; const get = (iso: string) => (out[iso] ??= { council: false, arch: false, baseline: null, log: null });
-    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i) ?? ""; let m = /^gd-case-council:([A-Z]{3})$/.exec(k); if (m) { get(m[1]).council = true; continue; } m = /^gd-case-architect:([A-Z]{3})$/.exec(k); if (m) { get(m[1]).arch = true; continue; } m = /^gd-case-baseline:([A-Z]{3})$/.exec(k); if (m) get(m[1]).baseline = readBaseline(m[1]); } } catch { /* storage unavailable */ }
+    const out: Record<string, Work> = {}; const get = (iso: string) => (out[iso] ??= { council: false, arch: false, baseline: null, log: null, king: null });
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i) ?? ""; let m = /^gd-case-council:([A-Z]{3})$/.exec(k); if (m) { get(m[1]).council = true; continue; } m = /^gd-case-architect:([A-Z]{3})$/.exec(k); if (m) { get(m[1]).arch = true; continue; } m = /^gd-case-baseline:([A-Z]{3})$/.exec(k); if (m) { get(m[1]).baseline = readBaseline(m[1]); continue; } m = /^gd-case-king:([A-Z]{3})$/.exec(k); if (m) { const r = rd<{ verdict?: string; at?: string } | null>(k, null); if (r?.verdict && r.at) get(m[1]).king = { verdict: r.verdict, at: r.at }; } } } catch { /* storage unavailable */ }
     const by = logByCountry(rd<Decision[]>(DECISIONS_KEY, []), today); for (const [iso, c] of Object.entries(by)) get(iso).log = c; return out;
   }, [today]);
   return useLive(read, {} as Record<string, Work>);

@@ -112,7 +112,7 @@ Default model: Claude Sonnet 5.5 (`claude-sonnet-5-5`) at low or medium effort.
 | Command | Does |
 |---|---|
 | `npm run dev`, `npm run build`, `npm start` | Develop, build, serve |
-| `npm test` | 19 chained test suites (indicators, research, layers, agreements, flights, investment, media, diplomacy, intel, dossier, integrity, falcon, services, machiavelli, deep, case, architect, case-report and others) |
+| `npm test` | 20 chained test suites (indicators, research, layers, agreements, flights, investment, media, diplomacy, intel, dossier, integrity, falcon, services, machiavelli, deep, case, architect, case-report and others) |
 | `npm run typecheck`, `npm run lint`, `npm run check` | Types, lint, all three |
 | `npm run parity` | Regenerates `docs/parity.md` |
 | `node scripts/build-*.mjs` | Dataset builders (list in section 15) |
@@ -240,11 +240,11 @@ Also: **Red Team** (reviews any saved product independently: verdict, strongest 
 
 ## 8. The Case File (`/case`): the President and Minister view
 
-The one place a President or Minister reads a country. Five views; nothing is shown in two places. **Priorities** is across all countries; the other four are for the chosen country.
+The one place a President or Minister reads a country. Seven views; nothing is shown in two places. **Priorities** is across all countries; the other six are for the chosen country: **THE KING** (final decision), **President**, **Minister**, **Ambassador**, **Detailed**, **Reports**.
 
 ### 8.1 Header
 
-Country picker (shared), name, region, scorecard, rule-based posture, and two status chips: **Council on file / not run** and **Strategy on file / not written**. Five large view buttons: **Priorities, President, Minister, Detailed, Reports**, and a **what-changed chip** (section 8.1a). With no country chosen the page opens on Priorities. Older links (`#exec`, `#council`, `#architect` ...) still open the right place.
+Country picker (shared), name, region, scorecard, rule-based posture, and two status chips: **Council on file / not run** and **Strategy on file / not written**. Seven large view buttons: **Priorities, THE KING, President, Minister, Ambassador, Detailed, Reports**, and a **what-changed chip** (section 8.1a). With no country chosen the page opens on Priorities. Older links (`#exec`, `#council`, `#architect` ...) still open the right place.
 
 ### 8.1a What changed (the chip under the header)
 
@@ -253,6 +253,14 @@ One answer to "has anything moved since this file was last reviewed?". Baseline:
 ### 8.1b Priorities (all countries)
 
 Every country on one board, grouped by the posture rule and sorted by one reading you choose (value, ability, risk, partnership, alerts, name). Three queues on top: **decisions to review**, **changed since the last review**, **high value with no Council yet**. Filters: posture, region, search, only with a file. Rows show value, ability and risk bars, Partnership rank, alerts, leverage, Council and strategy on file, and flags. Click a country to open its President page. There is deliberately no combined priority score. Same `buildCase` as each country's own file; free.
+
+### 8.1c THE KING (the final decision)
+
+The page where a decision-maker decides. It asks one question ("Should the UAE commit in X, in what form and under what conditions?") and brings everything to it: the course the evidence supports (the national-interest scorecard; security and legal are gates that remove a course whatever its total) beside the posture rule's own reading; the four courses with scores, gates and strongest and weakest criteria; a "ready to decide?" checklist (Council, strategy, ambassador's plan, freshness, gates, unknown exposure, desk inputs outstanding); what would change the call, the strongest objection, assumptions to validate; the investment case; what the ambassador advises; and **Take the decision**: approve, approve with conditions (each becomes a milestone), choose another course, defer to a date, or decline, by a **named person**, with a review date (default 90 days). Recorded in the decision log (source "THE KING") and shown on the Priority board as "Decided". Free. The Arabic label is "القرار النهائي".
+
+### 8.1d Ambassador (the UAE ambassador's desk)
+
+Free first: the **UAE investment advantage** (about 40 UAE vehicles against the country's needs in eleven sectors and the UAE deals in the feed: present, openings, where to deepen, concentration) and the neighbours' held facts (UN voting agreement, shared blocs, UAE partnership). Then one click-started run (about US$0.77 measured on Egypt): five advisers (investments first; who to know; the political, security, humanitarian and social hats; neighbours, scenarios and foreign-policy fit; research, media and narrative) and an editor writing the Ambassador's Brief, the **100-day, one-year and three-year plans**, ranked investment plays (enter, expand, protect), a who-to-know map (government, private sector, community, research, media), scenarios by hat and neighbour relations. Boundary: influence is not control; public roles and organisations only; hard power at policy level; no social-media measurement exists and it says so.
 
 ### 8.2 President (one page, no tables)
 
@@ -283,11 +291,13 @@ Eight sections:
 
 ### 8.5 Reports (assembled, never rewritten)
 
-Five types:
+Seven types:
 
 | Report | For | Length |
 |---|---|---|
 | President's one-page brief | The answer, three readings, decisions, what could go wrong, next gates, four numbers | 1 page |
+| THE KING: decision memo | The question, four courses with scores and gates, recommendation, readiness, objection, what would change the call, investment case, gates, decision log | 2 to 3 pages |
+| Ambassador's plan pack | Brief, 100-day, one-year and three-year plans, investment plays and advantage, who to know, neighbours, scenarios by hat | 6 to 10 pages |
 | Ministerial brief | Answer, Council judgment, six lenses, strategy by horizon, decisions, decision log and follow-through, risks, gates, indicators, options, position toward UAE policy | 4 to 6 pages |
 | Strategy and roadmap pack | Three-horizon strategy, 0-to-15-year roadmap, power matrix, scenarios, red-team memorandum, indicators | 6 to 10 pages |
 | Desk-officer brief | The 24-section master document with every trend table | 20+ pages |
@@ -459,10 +469,11 @@ The AI routes accept only same-origin JSON and have **no sign-in**. Caps and cac
 | Deep: research synthesis / analyst team | 0.15 to 0.20 / 0.51 |
 | **Case File Strategic Council (20 seats)** | **0.78** |
 | **Statecraft Architect** | **0.79** |
+| **Ambassador's desk** | **0.77** |
 | Stock research note (EMAAR) | 0.73 |
 | Case File views and Reports, Full Consolidated Intelligence, all dashboards | 0.00 |
 
-The Priority board, the decision log and the what-changed chip cost nothing. A complete ministerial file for one country (Council plus Architect) costs about US$1.57 once; reports then assemble from them for free. Writing them again in Arabic costs the same again.
+THE KING, the Priority board, the decision log, the what-changed chip and the investment advantage cost nothing. A complete ministerial file for one country (Council plus Architect) costs about US$1.57 once; reports then assemble from them for free. Writing them again in Arabic costs the same again.
 
 ---
 

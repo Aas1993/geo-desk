@@ -12,7 +12,7 @@ import { useDecisionLog } from "./work";
 import { bt, useTr } from "./bits";
 
 const DUE_C: Record<DueState, string> = { overdue: "var(--risk)", due: "var(--warn)", later: "var(--t2)", none: "var(--t2)" };
-const SRC: Record<string, { en: string; ar: string }> = { manual: { en: "typed in", ar: "مُدخل يدويًا" }, strategy: { en: "Strategy tab", ar: "تبويبة الاستراتيجية" }, architect: { en: "Architect", ar: "المهندس" }, council: { en: "Council", ar: "المجلس" }, gate: { en: "Architect gate", ar: "بوابة المهندس" } };
+const SRC: Record<string, { en: string; ar: string }> = { manual: { en: "typed in", ar: "مُدخل يدويًا" }, strategy: { en: "Strategy tab", ar: "تبويبة الاستراتيجية" }, architect: { en: "Architect", ar: "المهندس" }, council: { en: "Council", ar: "المجلس" }, gate: { en: "Architect gate", ar: "بوابة المهندس" }, king: { en: "THE KING", ar: "القرار النهائي" } };
 const inp = "h-9 w-full rounded-[8px] border border-line bg-bg2 px-2.5 text-[12.5px] text-t0"; const lab = "block text-[11px] text-t2";
 
 /** The decision log: what was decided, when it is due for review, and what happened. One list for every country, kept in this browser and shared with the Deep Intelligence register. Gates the Architect has dated appear here as scheduled decisions and can be recorded with one click. Follow-through is the review date, the observed result, and how far that result may be credited to the decision (association only unless a method is written down). */

@@ -1,9 +1,9 @@
 "use client";
 import { useMemo, useState } from "react";
 import { POSTURE, type Posture } from "@/lib/case/core";
-import { OPTS, suggest } from "@/lib/case/score";
+import { OPTS, scoreboard, suggest } from "@/lib/case/score";
 import { sectionOf } from "@/lib/case/council";
-import { CRITERIA, GATES, gateTripped, weightedScore } from "@/lib/case/seats";
+import { CRITERIA, GATES } from "@/lib/case/seats";
 import type { CaseData } from "@/lib/case/load";
 import { Block, Pill, type Lang } from "../falcon/bits";
 import { Inline } from "../machiavelli/parts";
@@ -18,7 +18,7 @@ export function StrategyTab({ L, d, iso, report, arch }: { L: Lang; d: CaseData;
   const t = useTr(L); const draft = useMemo(() => suggest(d), [d]); const [edit, setEdit] = useStored<Record<string, Record<string, number>>>(`gd-case-score:${iso}`, {}); const [w, setW] = useStored<Record<string, number>>("gd-case-weights", Object.fromEntries(CRITERIA.map((c) => [c.id, c.w])));
   const [, setDecs] = useDecisionLog(); const [saved, setSaved] = useState(false);
   const sc = (o: Posture) => ({ ...draft[o], ...(edit[o] ?? {}) }); const wsum = Object.values(w).reduce((a, b) => a + b, 0);
-  const rows = OPTS.map((o) => ({ o, s: sc(o), total: weightedScore(sc(o), w), gates: gateTripped(sc(o)) })); const best = rows.filter((r) => r.gates.length === 0).sort((a, b) => b.total - a.total)[0];
+  const { rows, best: best0 } = scoreboard(d, edit, w); const best = best0 ?? undefined;
   const sections: [string, string, string][] = [["Recommended Strategy", "الاستراتيجية الموصى بها", ""], ["Instrument Mix and Neighbour and Third-Party Plays", "مزيج الأدوات وخطوات الجوار والأطراف الثالثة", ""], ["Negotiation Plan", "خطة التفاوض", ""], ["Action Plan", "خطة العمل", ""], ["Risks and Dissent", "المخاطر والخلاف", ""], ["Monitoring and Triggers", "المراقبة والمحفزات", ""]];
   const record = () => { const now = new Date(); const rev = new Date(now.getTime() + 90 * 86_400_000).toISOString().slice(0, 10); const post = best ? POSTURE[best.o].name.en : "no posture passes the gates"; setDecs((decs) => addMissing(decs, [{ iso3: iso, source: "strategy", ref: `strategy:${iso}:${now.toISOString().slice(0, 10)}`, id: `DEC-${now.getTime().toString(36)}${decs.length}`, created: now.toISOString(), updated: now.toISOString(), decision: `${d.name}: ${post}`, informedBy: [`case:${iso}`, ...(report ? ["council"] : []), ...(arch ? ["architect"] : [])], expected: `Posture "${post}" scored ${best?.total ?? "n/a"}/100 on the national-interest scorecard (draft scores edited by the reviewer).`, owner: "", review: rev, milestones: [], observed: "", attribution: "association", method: "", status: "open" }])); setSaved(true); setTimeout(() => setSaved(false), 2500); };
   return (

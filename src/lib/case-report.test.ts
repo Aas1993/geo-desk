@@ -17,10 +17,10 @@ async function main() {
   const egy = (await buildCase("EGY", new Date("2026-10-25T10:00:00Z")))!; const today = Date.parse("2026-10-25T10:00:00Z");
   const ctx = (o: Partial<Ctx> = {}): Ctx => ({ d: egy, council: null, arch: null, others: [], lang: "en", today, ...o });
   // ---- templates reference real blocks ----
-  assert.equal(TEMPLATES.length, 5); for (const t of TEMPLATES) for (const b of t.blocks) assert.ok(BLOCK_BY.has(b), `${t.id}: ${b}`);
-  assert.deepEqual(TEMPLATES.map((t) => t.id), ["president", "minister", "roadmap", "desk", "dossier"]);
+  const TP = (id: string) => TEMPLATES.find((x) => x.id === id)!; assert.equal(TEMPLATES.length, 7); for (const t of TEMPLATES) for (const b of t.blocks) assert.ok(BLOCK_BY.has(b), `${t.id}: ${b}`);
+  assert.deepEqual(TEMPLATES.map((t) => t.id), ["king", "president", "minister", "ambassador", "roadmap", "desk", "dossier"]);
   // ---- the President's page, with nothing paid for: data blocks written, strategy blocks missing, never silent ----
-  const p0 = TEMPLATES[0]; const r0 = buildReport(p0.blocks, ctx(), { title: "President's one-page brief" });
+  const p0 = TP("president"); const r0 = buildReport(p0.blocks, ctx(), { title: "President's one-page brief" });
   assert.ok(r0.md.startsWith("# President's one-page brief: Egypt") && r0.md.includes("WORKING ANALYSIS"), "title and the working-analysis banner");
   assert.equal(r0.parts.find((x) => x.id === "answer")!.state, "written"); assert.equal(r0.parts.find((x) => x.id === "readings")!.state, "written"); assert.equal(r0.parts.find((x) => x.id === "nextGates")!.state, "missing");
   assert.equal(r0.parts.find((x) => x.id === "decisions")!.state, "partial", "only the data trigger: partial, and it says so"); assert.deepEqual(r0.missing, ["architect"]); assert.equal(costToComplete(r0.missing), 0.79);
@@ -30,9 +30,9 @@ async function main() {
   const r1 = buildReport(p0.blocks, ctx({ council: COUNCIL, arch: ARCH }), { title: "President's one-page brief" });
   assert.deepEqual(r1.missing, [], "nothing missing"); assert.ok(r1.md.includes("1. Task the exposure audit.") && r1.md.includes("2027-01"), "decisions from the Architect and the next dated gate");
   assert.ok(!r1.md.includes("Not yet written"));
-  const m1 = buildReport(TEMPLATES[1].blocks, ctx({ council: COUNCIL, arch: ARCH }), { title: "Ministerial brief", reviewer: "A. Reviewer", preparedFor: "H.E. the Minister" });
+  const m1 = buildReport(TP("minister").blocks, ctx({ council: COUNCIL, arch: ARCH }), { title: "Ministerial brief", reviewer: "A. Reviewer", preparedFor: "H.E. the Minister" });
   assert.ok(m1.md.includes("Reviewed by: A. Reviewer") && m1.md.includes("Prepared for: H.E. the Minister") && m1.md.includes("KJ1. We judge it likely"), "reviewer, audience and the Council's judgment");
-  assert.equal(buildReport(TEMPLATES[1].blocks, ctx(), { title: "x" }).md.includes("not yet reviewed"), true, "an unreviewed report says so");
+  assert.equal(buildReport(TP("minister").blocks, ctx(), { title: "x" }).md.includes("not yet reviewed"), true, "an unreviewed report says so");
   // ---- decisions: Architect first, then the Council, then the data ----
   assert.deepEqual(decisionsOf({ d: egy, arch: ARCH, council: COUNCIL }), { items: ["Task the exposure audit.", "Approve a CEPA study."], from: "architect" });
   assert.deepEqual(decisionsOf({ d: egy, arch: null, council: COUNCIL }), { items: ["Supply the Gate 0 inputs.", "Hold new sovereign money."], from: "council" });
@@ -40,7 +40,7 @@ async function main() {
   // ---- the three readings in plain words ----
   assert.equal(band("value", 74), "high"); assert.equal(band("value", 55), "medium"); assert.equal(band("value", 30), "low"); assert.equal(band("risk", 70), "high"); assert.equal(band("risk", 20), "low"); assert.equal(band("ability", null), null);
   // ---- Arabic: the deterministic blocks are in Arabic, with Arabic names, and a block in the other language says so ----
-  const ar = buildReport(TEMPLATES[1].blocks, ctx({ lang: "ar", council: COUNCIL, arch: ARCH }), { title: TEMPLATES[1].ar });
+  const ar = buildReport(TP("minister").blocks, ctx({ lang: "ar", council: COUNCIL, arch: ARCH }), { title: TP("minister").ar });
   assert.ok(ar.md.startsWith("# موجز الوزير: مصر") && ar.md.includes("## الجواب") && ar.md.includes("## ثلاث قراءات") && ar.md.includes("## المخاطر"), "Arabic title, country and headings");
   const ans = ar.parts.find((x) => x.id === "answer")!.md; assert.ok(!/\b(Stance|Biggest risk|Confidence)\b/.test(ans) && /الموقف/.test(ans), "no English labels in the Arabic answer");
   assert.ok(ar.parts.find((x) => x.id === "numbers")!.md.includes("نمو الناتج المحلي الحقيقي"), "metric names are Arabic"); assert.ok(ar.parts.find((x) => x.id === "judgment")!.md.includes("كُتب بالإنجليزية"), "an English council text in an Arabic report is marked");
@@ -50,7 +50,7 @@ async function main() {
   assert.ok(dk.find((s) => s.n === 14)!.body.includes("الفئة") && !/\| Category \|/.test(dk.find((s) => s.n === 14)!.body), "table headers are Arabic"); assert.equal(composeDesk(egy, null).length, 24);
   // ---- the dossier carries other saved products as annexes, once ----
   const other: SavedItem = { key: "gd-strat:EGY:dossier", iso3: "EGY", kind: "strategy", at: "2026-10-20T00:00:00Z", usd: 0.3, words: 10, report: "# Strategy\n\nBody", model: "m" };
-  assert.deepEqual(annexBlocks([other]).map((b) => b.id), ["annex:gd-strat:EGY:dossier"]); const dossier = TEMPLATES[4]; const ids = [...dossier.blocks.slice(0, -1), "annex:gd-strat:EGY:dossier", dossier.blocks[dossier.blocks.length - 1]];
+  assert.deepEqual(annexBlocks([other]).map((b) => b.id), ["annex:gd-strat:EGY:dossier"]); const dossier = TP("dossier"); const ids = [...dossier.blocks.slice(0, -1), "annex:gd-strat:EGY:dossier", dossier.blocks[dossier.blocks.length - 1]];
   const full = buildReport(ids, ctx({ others: [other], council: COUNCIL, arch: ARCH }), { title: "Full dossier" }); assert.ok(full.md.includes("Country strategy dossier") && full.md.indexOf("Country strategy dossier") < full.md.indexOf("## Evidence and status"), "annex before the evidence note");
   assert.equal(chairOf(COUNCIL).includes("Appendix"), false); assert.ok(PRODUCTS.council.usd + PRODUCTS.architect.usd < 2);
   // ---- Arabic name tables cover everything the data carries ----
@@ -65,7 +65,7 @@ async function main() {
   const dd = { id: "D1", created: "2026-10-01T00:00:00Z", updated: "2026-10-01T00:00:00Z", decision: "Approve a CEPA study", informedBy: ["case:EGY"], expected: "", owner: "", review: "2026-10-01", milestones: [], observed: "Study published", attribution: "causal" as const, method: "", status: "open" as const };
   const lg = buildReport(["log"], ctx({ decisions: [dd, { ...dd, id: "D2", informedBy: ["case:IND"], decision: "Other country" }] }), { title: "x" }); assert.ok(lg.md.includes("Approve a CEPA study") && !lg.md.includes("Other country") && lg.md.includes("overdue") && lg.md.includes("Association only"), "this country only; overdue marked; a causal claim without a method is shown as association only");
   assert.equal(buildReport(["log"], ctx(), { title: "x" }).parts[0].state, "partial", "an empty log says so"); assert.ok(buildReport(["log"], ctx({ lang: "ar", decisions: [dd] }), { title: "x" }).md.includes("متأخر"), "Arabic overdue");
-  assert.ok(TEMPLATES[1].blocks.includes("log") && TEMPLATES[4].blocks.includes("log") && !TEMPLATES[0].blocks.includes("log"));
+  assert.ok(TP("minister").blocks.includes("log") && TP("dossier").blocks.includes("log") && !TP("president").blocks.includes("log"));
   console.log("case-report: all checks passed");
 }
 main().catch((e) => { console.error(e); process.exit(1); });

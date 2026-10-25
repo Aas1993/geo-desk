@@ -13,6 +13,7 @@ import { Block, Pill, type Lang } from "../falcon/bits";
 import { Markdown } from "../Markdown";
 import { Tbl, usd } from "../machiavelli/parts";
 import { bt, useTr } from "./bits";
+import { useKingBrief } from "./useKing";
 import { useDecisionLog } from "./work";
 
 const STATE_C: Record<State, string> = { written: "var(--ok)", partial: "var(--warn)", missing: "var(--t2)" };
@@ -21,13 +22,13 @@ function useOthers(iso: string): SavedItem[] { const [s, set] = useState<SavedIt
 function useSpent(iso: string): { usd: number; runs: number } { const [v, set] = useState({ usd: 0, runs: 0 }); useEffect(() => { const read = () => { try { const l = JSON.parse(localStorage.getItem(COST_KEY) ?? "[]") as CostEntry[]; const mine = l.filter((e) => !e.cached && e.scope.includes(iso)); set({ usd: mine.reduce((a, e) => a + e.usd, 0), runs: mine.length }); } catch { set({ usd: 0, runs: 0 }); } }; const t0 = setTimeout(read, 0); window.addEventListener("gd-deep-cost", read); window.addEventListener("storage", read); return () => { clearTimeout(t0); window.removeEventListener("gd-deep-cost", read); window.removeEventListener("storage", read); }; }, [iso]); return v; }
 
 /** Reports: pick what the report is for, see which parts are written and which are missing (with the cost of writing them), preview it in English or Arabic, and print, save as PDF or Word, or copy. Nothing runs here: a report is assembled from what has already been written. */
-export function Reports({ L, d, iso, council, arch, preset, onGo }: { L: Lang; d: CaseData; iso: string; council: SavedProduct | null; arch: SavedProduct | null; preset: { id: TemplateId; n: number }; onGo: (tab: ProductId) => void }) {
+export function Reports({ L, d, iso, council, arch, amb, preset, onGo }: { L: Lang; d: CaseData; iso: string; council: SavedProduct | null; arch: SavedProduct | null; amb: SavedProduct | null; preset: { id: TemplateId; n: number }; onGo: (tab: ProductId) => void }) {
   const t = useTr(L); const now = useNow(60_000); const others = useOthers(iso); const spent = useSpent(iso);
   const [tpl, setTpl] = useState<TemplateId>(preset.id); const [lang, setLang] = useState<RLang>(L === "ar" ? "ar" : "en"); const [pick, setPick] = useState<Set<string> | null>(null); const [forWho, setForWho] = useState(""); const [rev, setRev] = useState(""); const [copied, setCopied] = useState(false); const [busy, setBusy] = useState("");
   useEffect(() => { const t0 = setTimeout(() => { setTpl(preset.id); setPick(null); }, 0); return () => clearTimeout(t0); }, [preset]);
-  const T = TEMPLATE_BY.get(tpl)!; const [decisions] = useDecisionLog(); const ctx: Ctx = useMemo(() => ({ d, council: council?.report ?? null, arch: arch?.report ?? null, others, lang, today: now || 0, decisions }), [d, council, arch, others, lang, now, decisions]);
+  const T = TEMPLATE_BY.get(tpl)!; const [decisions] = useDecisionLog(); const king = useKingBrief(d, iso, council, arch, amb, now); const ctx: Ctx = useMemo(() => ({ d, council: council?.report ?? null, arch: arch?.report ?? null, others, lang, today: now || 0, decisions, ambassador: amb?.report ?? null, king }), [d, council, arch, amb, others, lang, now, decisions, king]);
   const base = useMemo(() => (T.annexes ? [...T.blocks.slice(0, -1), ...others.map((o) => `annex:${o.key}`), T.blocks[T.blocks.length - 1]] : T.blocks), [T, others]);
-  const ordered = useMemo(() => { const all = [...BLOCK_LIST.map((b) => b.id), ...others.map((o) => `annex:${o.key}`)]; const set = new Set(pick ?? base); return all.filter((id) => set.has(id)); }, [pick, base, others]);
+  const ordered = useMemo(() => { const all = [...BLOCK_LIST.map((b) => b.id), ...others.map((o) => `annex:${o.key}`)]; const set = new Set(pick ?? base); return [...base.filter((id) => set.has(id)), ...all.filter((id) => set.has(id) && !base.includes(id))]; }, [pick, base, others]);
   const catalog = useMemo(() => [...BLOCK_LIST, ...annexBlocks(others)].map((b) => ({ b, o: b.build(ctx) })), [ctx, others]);
   const title = L === "ar" || lang === "ar" ? T.ar : T.en; const rep = useMemo(() => buildReport(ordered, ctx, { title: lang === "ar" ? T.ar : T.en, preparedFor: forWho, reviewer: rev }), [ordered, ctx, T, lang, forWho, rev]);
   const toggle = (id: string) => setPick((p) => { const n = new Set(p ?? base); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -38,7 +39,7 @@ export function Reports({ L, d, iso, council, arch, preset, onGo }: { L: Lang; d
   return (
     <div className="space-y-4">
       <Block title={t("Reports", "التقارير")} hint={t("Choose what the report is for. It is assembled from what is already written in this Case File and the other modules, so nothing is paid for twice. A part that is not written yet is shown as missing with what it would cost; nothing runs until you click it.", "اختر غرض التقرير. يُجمَّع مما كُتب بالفعل في ملف الحالة والوحدات الأخرى، فلا يُدفع شيء مرتين. والجزء غير المكتوب يظهر ناقصًا مع كلفته؛ ولا يعمل شيء إلا بنقرتك.")}>
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5" role="radiogroup" aria-label={t("Report type", "نوع التقرير")}>{TEMPLATES.map((x) => <button key={x.id} type="button" role="radio" aria-checked={tpl === x.id} onClick={() => { setTpl(x.id); setPick(null); }} className={`rounded-[12px] border p-3 text-start ${tpl === x.id ? "border-accent bg-accent/10" : "border-line bg-bg2 hover:border-line2"}`}><span className="flex items-center gap-1.5 text-[13px] font-semibold text-t0"><FileText size={14} />{L === "ar" ? x.ar : x.en}</span><span className="mt-1 block text-[11.5px] leading-snug text-t1">{bt(L, x.blurb)}</span><span className="numt mt-1 block text-[10.5px] text-t2">{bt(L, x.pages)}</span></button>)}</div>
+        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label={t("Report type", "نوع التقرير")}>{TEMPLATES.map((x) => <button key={x.id} type="button" role="radio" aria-checked={tpl === x.id} onClick={() => { setTpl(x.id); setPick(null); }} className={`rounded-[12px] border p-3 text-start ${tpl === x.id ? "border-accent bg-accent/10" : "border-line bg-bg2 hover:border-line2"}`}><span className="flex items-center gap-1.5 text-[13px] font-semibold text-t0"><FileText size={14} />{L === "ar" ? x.ar : x.en}</span><span className="mt-1 block text-[11.5px] leading-snug text-t1">{bt(L, x.blurb)}</span><span className="numt mt-1 block text-[10.5px] text-t2">{bt(L, x.pages)}</span></button>)}</div>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <div><span className="label mb-1 block">{t("Report language", "لغة التقرير")}</span><div className="flex gap-1" role="group">{(["en", "ar"] as const).map((x) => <button key={x} type="button" aria-pressed={lang === x} onClick={() => setLang(x)} className={`h-9 rounded-full px-4 text-[12.5px] ${lang === x ? "bg-accent font-semibold text-[var(--accent-ink)]" : "bg-bg2 text-t1"}`}>{x === "en" ? "English" : "العربية"}</button>)}</div></div>
           <label className="min-w-40 flex-1"><span className="label mb-1 block">{t("Prepared for (optional)", "أُعدّ لـ (اختياري)")}</span><input value={forWho} maxLength={80} onChange={(e) => setForWho(e.target.value)} className="h-9 w-full rounded-[8px] border border-line bg-bg2 px-2.5 text-[13px] text-t0" /></label>
@@ -55,13 +56,13 @@ export function Reports({ L, d, iso, council, arch, preset, onGo }: { L: Lang; d
           {lang !== L && <p className="text-[11px] text-t2">{t("The report language differs from the page language: the preview follows the report language.", "لغة التقرير تختلف عن لغة الصفحة: تتبع المعاينة لغة التقرير.")}</p>}
         </section>
       </div>
-      <Products L={L} iso={iso} council={council} arch={arch} others={others} spent={spent} onGo={onGo} />
+      <Products L={L} iso={iso} council={council} arch={arch} amb={amb} others={others} spent={spent} onGo={onGo} />
     </div>
   );
 }
 
 /** What is on file for this country, what it cost, what overlaps what, and which one to run. Reads only; it never starts anything. */
-function Products({ L, iso, council, arch, others, spent, onGo }: { L: Lang; iso: string; council: SavedProduct | null; arch: SavedProduct | null; others: SavedItem[]; spent: { usd: number; runs: number }; onGo: (tab: ProductId) => void }) {
+function Products({ L, iso, council, arch, amb, others, spent, onGo }: { L: Lang; iso: string; council: SavedProduct | null; arch: SavedProduct | null; amb: SavedProduct | null; others: SavedItem[]; spent: { usd: number; runs: number }; onGo: (tab: ProductId) => void }) {
   const t = useTr(L); void iso;
   const row = (id: ProductId, s: SavedProduct | null) => [<b key="n" className="text-t0">{L === "ar" ? PRODUCTS[id].ar : PRODUCTS[id].en}</b>, s ? <Pill key="s" c="var(--ok)">{t("on file", "محفوظ")} {s.at.slice(0, 10)}</Pill> : <Pill key="s" c="var(--t2)">{t("not run", "لم يُشغَّل")}</Pill>, s?.lang ? (s.lang === "ar" ? "العربية" : "English") : "—", s?.usd != null && !s.cached ? usd(s.usd) : s ? "—" : `≈ ${usd(PRODUCTS[id].usd)}`, <button key="b" type="button" onClick={() => onGo(id)} className="h-8 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t0">{s ? t("Open", "افتح") : t("Run", "شغّل")}</button>];
   const byKind = (k: string) => others.find((o) => o.kind === k);
@@ -72,7 +73,7 @@ function Products({ L, iso, council, arch, others, spent, onGo }: { L: Lang; iso
     [t("Deep Intelligence team", "فريق الاستخبارات المعمّقة"), t("The analyst roles the routing rule selects, on the economic and research evidence, then a chair. Use for the consolidated evidence file.", "الأدوار التي تختارها قاعدة التوجيه على الأدلة الاقتصادية والبحثية ثم رئيس. لملف الأدلة الموحّد."), t("$0.51 (measured)", "0.51 دولار (قياس)"), "", undefined]];
   return (
     <Block title={t("What is on file, what it cost, and what overlaps", "ما هو محفوظ وكلفته وما يتداخل")} hint={t("The Case File asks for two products. The three other councils stay available for narrower questions; their saved results can ride along in the Full dossier as annexes, so none is run twice for the same file.", "يطلب ملف الحالة منتجين. وتبقى المجالس الثلاثة الأخرى متاحة لأسئلة أضيق؛ وتنضم نتائجها المحفوظة إلى الملف الكامل كملاحق، فلا يُشغَّل أي منها مرتين للملف نفسه.")}>
-      <Tbl head={[t("Product", "المنتج"), t("Status", "الحالة"), t("Language", "اللغة"), t("Cost", "الكلفة"), ""]} rows={[row("council", council), row("architect", arch)]} />
+      <Tbl head={[t("Product", "المنتج"), t("Status", "الحالة"), t("Language", "اللغة"), t("Cost", "الكلفة"), ""]} rows={[row("council", council), row("architect", arch), row("ambassador", amb)]} />
       <p className="mt-2 text-[12px] text-t1">{t(`Spent on this country in this browser: ${usd(spent.usd)} over ${spent.runs} paid run(s). Repeated requests are served from cache at no cost.`, `المصروف على هذه الدولة في هذا المتصفح: ${usd(spent.usd)} على ${spent.runs} تشغيل مدفوع. والطلبات المكررة تُخدَّم من الذاكرة بلا كلفة.`)}</p>
       <h4 className="label mb-1.5 mt-4">{t("Four councils: which one for what", "أربعة مجالس: أيها لماذا")}</h4>
       <Tbl head={[t("Council", "المجلس"), t("Use it for", "استخدمه لـ"), t("Cost", "الكلفة"), t("On file here", "المحفوظ هنا")]} w={["22%", "50%", "14%", "14%"]} rows={councils.map(([n, u, c, , sv], i) => [<b key="n" className="text-t0">{n}</b>, u, c, i === 0 ? (council ? <Pill key="p" c="var(--ok)">{council.at.slice(0, 10)}</Pill> : <Pill key="p" c="var(--t2)">—</Pill>) : sv ? <Pill key="p" c="var(--ok)">{sv.at.slice(0, 10)}</Pill> : <Pill key="p" c="var(--t2)">—</Pill>])} />

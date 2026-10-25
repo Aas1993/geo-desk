@@ -4,20 +4,22 @@ import { POSTURE } from "@/lib/case/core";
 import { draftAnswer } from "@/lib/case/answer";
 import { metName } from "@/lib/case/ar";
 import type { CaseData } from "@/lib/case/load";
-import { BLOCK_BY, PRODUCTS, band, type Ctx, type Out, type ProductId } from "@/lib/case/report";
+import { BLOCK_BY, PRODUCTS, band, decisionsOf, type Ctx, type Out, type ProductId } from "@/lib/case/report";
 import { useNow } from "@/lib/use-now";
 import { Pill, type Lang } from "../falcon/bits";
 import { Markdown } from "../Markdown";
+import { LogStrip } from "./LogStrip";
 import { Meter, N, Spark, bt, fmt, useTr } from "./bits";
 
 const HEAD = ["Real GDP growth", "Inflation, consumer prices", "Government gross debt, % of GDP", "UAE goods exports to the partner"];
 const TONE = { high: "var(--ok)", medium: "var(--warn)", low: "var(--risk)" } as const; const RISK_TONE = { high: "var(--risk)", medium: "var(--warn)", low: "var(--ok)" } as const;
 
 /** The President's page: one screen, no tables. It renders the same building blocks as the one-page report, so what is read here is exactly what prints. Anything not yet written says what it would add and what it costs. */
-export function President({ L, d, council, arch, onGo, onReport }: { L: Lang; d: CaseData; council: string | null; arch: string | null; onGo: (tab: ProductId) => void; onReport: () => void }) {
+export function President({ L, d, council, arch, onGo, onReport, onLog }: { L: Lang; d: CaseData; council: string | null; arch: string | null; onGo: (tab: ProductId) => void; onReport: () => void; onLog: () => void }) {
   const t = useTr(L); const now = useNow(60_000); const a = useMemo(() => draftAnswer(d), [d]); const post = d.posture.posture; const p = d.posture;
   const ctx: Ctx = useMemo(() => ({ d, council, arch, others: [], lang: L, today: now || 0 }), [d, council, arch, L, now]);
   const { dec, risks, gates } = useMemo(() => { const b = (id: string): Out => BLOCK_BY.get(id)!.build(ctx); return { dec: b("decisions"), risks: b("toprisks"), gates: b("nextGates") }; }, [ctx]);
+  const items = useMemo(() => decisionsOf({ d, arch, council }), [d, arch, council]);
   const tiles = HEAD.map((n) => d.spine.find((s) => s.met.name === n && s.has)).filter((s): s is NonNullable<typeof s> => !!s);
   const gauges: { k: "value" | "ability" | "risk"; en: string; ar: string; sub: { en: string; ar: string }; v: number | null }[] = [
     { k: "value", en: "Value to the UAE", ar: "القيمة للإمارات", sub: { en: "What the UAE stands to gain", ar: "ما قد تكسبه الإمارات" }, v: p.value }, { k: "ability", en: "UAE ability to act", ar: "قدرة الإمارات على الفعل", sub: { en: "How well placed the UAE is to move", ar: "مدى جاهزية الإمارات للتحرك" }, v: p.ability }, { k: "risk", en: "Risk", ar: "المخاطر", sub: { en: "How exposed the UAE would be (lower is better)", ar: "مدى انكشاف الإمارات (الأقل أفضل)" }, v: p.risk }];
@@ -33,7 +35,7 @@ export function President({ L, d, council, arch, onGo, onReport }: { L: Lang; d:
       <section aria-label={t("Three readings", "ثلاث قراءات")} className="grid gap-3 sm:grid-cols-3">{gauges.map((g) => { const b = band(g.k, g.v); const c = b ? (g.k === "risk" ? RISK_TONE : TONE)[b] : "var(--t2)"; return <div key={g.k} className="rounded-[14px] border border-line bg-bg1 p-4"><div className="text-[12.5px] font-semibold text-t0">{L === "ar" ? g.ar : g.en}</div><div className="mt-1 flex items-baseline gap-2"><span className="num display text-[36px] font-semibold leading-none" style={{ color: c }}>{g.v ?? "n/a"}</span>{b && <span className="text-[13px] font-semibold" style={{ color: c }}>{b === "high" ? t("high", "مرتفع") : b === "medium" ? t("medium", "متوسط") : t("low", "منخفض")}</span>}</div><div className="mt-2"><Meter v={g.v} c={c} /></div><p className="mt-1.5 text-[11.5px] leading-snug text-t2">{bt(L, g.sub)}</p></div>; })}
         <p className="text-[11.5px] leading-snug text-t2 sm:col-span-3">{p.value == null ? t("Not enough data to place the country.", "لا بيانات كافية لتحديد موضع الدولة.") : p.stable ? t("This stance holds if any reading moves by 10 points.", "يصمد هذا الموقف إن تحركت أي قراءة 10 نقاط.") : t("This stance changes if a reading moves by 10 points: read the alternatives in the Minister view.", "يتغير هذا الموقف إن تحركت قراءة 10 نقاط: اقرأ البدائل في عرض الوزير.")}</p></section>
       <section className="rounded-[16px] border border-line bg-bg1 p-5" aria-label={t("Decisions for your consideration", "قرارات للنظر")}><div className="flex flex-wrap items-center gap-2"><span className="label">{t("Decisions for your consideration", "قرارات للنظر")}</span>{dec.state === "written" ? <Pill c="var(--ok)">{arch ? t("from the Statecraft Architect", "من مهندس فن الحكم") : t("from the Strategic Council", "من المجلس الاستراتيجي")}</Pill> : <Pill c="var(--warn)">{t("data trigger only", "محفّز البيانات فقط")}</Pill>}</div>
-        <div className="mt-2 text-[15px] leading-relaxed [&_li]:my-1.5 [&_ol]:ps-6 [&_p]:text-[15px]"><Markdown source={dec.md} /></div>{dec.need && ask(dec.need, PRODUCTS[dec.need].adds)}</section>
+        <div className="mt-2 text-[15px] leading-relaxed [&_li]:my-1.5 [&_ol]:ps-6 [&_p]:text-[15px]"><Markdown source={dec.md} /></div>{dec.need && ask(dec.need, PRODUCTS[dec.need].adds)}<LogStrip L={L} iso={d.iso3} items={items.items} from={items.from} onOpen={onLog} /></section>
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-[16px] border border-line bg-bg1 p-5" aria-label={t("What could go wrong", "ما قد يسوء")}><div className="label">{t("What could go wrong", "ما قد يسوء")}</div><div className="mt-1 text-[13.5px] leading-relaxed [&_li]:my-1.5 [&_p]:text-[13.5px]"><Markdown source={risks.md} /></div>{risks.need && ask(risks.need, { en: "adds the strategy risks", ar: "يضيف مخاطر الاستراتيجية" })}</section>
         <section className="rounded-[16px] border border-line bg-bg1 p-5" aria-label={t("Next decision gates", "بوابات القرار القادمة")}><div className="label">{t("Next decision gates", "بوابات القرار القادمة")}</div>{gates.state === "missing" ? <><p className="mt-1 text-[13px] text-t1">{t("No strategy is written, so there are no dated gates yet.", "لا استراتيجية مكتوبة، فلا بوابات مؤرخة بعد.")}</p>{gates.need && ask(gates.need, PRODUCTS[gates.need].adds)}</> : <div className="mt-1 text-[13.5px] leading-relaxed [&_li]:my-1.5 [&_p]:text-[13.5px]"><Markdown source={gates.md} /></div>}</section>

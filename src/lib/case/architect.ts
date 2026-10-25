@@ -219,8 +219,8 @@ export function tradecraftChecks(report: string): Check[] {
 }
 
 // ---- the Strategy Review Engine: has the picture moved since the strategy was written? ----
-export type StateAt = { at: string; posture: string | null; value: number | null; ability: number | null; risk: number | null; alerts: string[]; builds: Record<string, string>; lens: Record<string, number | null> };
-export const stateOf = (c: CaseData, at = new Date().toISOString()): StateAt => ({ at, posture: c.posture.posture, value: c.posture.value, ability: c.posture.ability, risk: c.posture.risk, alerts: (c.deep?.readings ?? []).filter((r) => r.state === "alert").map((r) => r.id), builds: Object.fromEntries((c.deep?.builds ?? []).filter((x) => x.built).map((x) => [x.file, x.built!.slice(0, 10)])), lens: Object.fromEntries(c.lenses.map((l) => [l.id, l.pos])) });
+export type StateAt = { at: string; posture: string | null; value: number | null; ability: number | null; risk: number | null; alerts: string[]; builds: Record<string, string>; lens: Record<string, number | null>; counts?: Record<string, number>; tone?: number | null };
+export const stateOf = (c: CaseData, at = new Date().toISOString()): StateAt => ({ at, posture: c.posture.posture, value: c.posture.value, ability: c.posture.ability, risk: c.posture.risk, alerts: (c.deep?.readings ?? []).filter((r) => r.state === "alert").map((r) => r.id), builds: Object.fromEntries((c.deep?.builds ?? []).filter((x) => x.built).map((x) => [x.file, x.built!.slice(0, 10)])), lens: Object.fromEntries(c.lenses.map((l) => [l.id, l.pos])), counts: Object.fromEntries(Object.entries(c.capture?.series ?? {}).map(([k, v]) => [k, v[v.length - 1] ?? 0])), tone: c.tone?.g ?? null });
 export type Review = { due: boolean; reasons: { en: string; ar: string }[]; days: number };
 export function reviewStrategy(then: StateAt, now: StateAt, dash: Dashboard | null, today: number): Review {
   const r: Review["reasons"] = []; const days = Math.floor((today - Date.parse(then.at)) / 86_400_000);

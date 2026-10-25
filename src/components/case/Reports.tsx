@@ -13,6 +13,7 @@ import { Block, Pill, type Lang } from "../falcon/bits";
 import { Markdown } from "../Markdown";
 import { Tbl, usd } from "../machiavelli/parts";
 import { bt, useTr } from "./bits";
+import { useDecisionLog } from "./work";
 
 const STATE_C: Record<State, string> = { written: "var(--ok)", partial: "var(--warn)", missing: "var(--t2)" };
 /** Every other finished product on this country in this browser, read back live. */
@@ -24,7 +25,7 @@ export function Reports({ L, d, iso, council, arch, preset, onGo }: { L: Lang; d
   const t = useTr(L); const now = useNow(60_000); const others = useOthers(iso); const spent = useSpent(iso);
   const [tpl, setTpl] = useState<TemplateId>(preset.id); const [lang, setLang] = useState<RLang>(L === "ar" ? "ar" : "en"); const [pick, setPick] = useState<Set<string> | null>(null); const [forWho, setForWho] = useState(""); const [rev, setRev] = useState(""); const [copied, setCopied] = useState(false); const [busy, setBusy] = useState("");
   useEffect(() => { const t0 = setTimeout(() => { setTpl(preset.id); setPick(null); }, 0); return () => clearTimeout(t0); }, [preset]);
-  const T = TEMPLATE_BY.get(tpl)!; const ctx: Ctx = useMemo(() => ({ d, council: council?.report ?? null, arch: arch?.report ?? null, others, lang, today: now || 0 }), [d, council, arch, others, lang, now]);
+  const T = TEMPLATE_BY.get(tpl)!; const [decisions] = useDecisionLog(); const ctx: Ctx = useMemo(() => ({ d, council: council?.report ?? null, arch: arch?.report ?? null, others, lang, today: now || 0, decisions }), [d, council, arch, others, lang, now, decisions]);
   const base = useMemo(() => (T.annexes ? [...T.blocks.slice(0, -1), ...others.map((o) => `annex:${o.key}`), T.blocks[T.blocks.length - 1]] : T.blocks), [T, others]);
   const ordered = useMemo(() => { const all = [...BLOCK_LIST.map((b) => b.id), ...others.map((o) => `annex:${o.key}`)]; const set = new Set(pick ?? base); return all.filter((id) => set.has(id)); }, [pick, base, others]);
   const catalog = useMemo(() => [...BLOCK_LIST, ...annexBlocks(others)].map((b) => ({ b, o: b.build(ctx) })), [ctx, others]);

@@ -5,21 +5,22 @@ import { OPTS, suggest } from "@/lib/case/score";
 import { sectionOf } from "@/lib/case/council";
 import { CRITERIA, GATES, gateTripped, weightedScore } from "@/lib/case/seats";
 import type { CaseData } from "@/lib/case/load";
-import type { Decision } from "@/lib/deep/registers";
 import { Block, Pill, type Lang } from "../falcon/bits";
 import { Inline } from "../machiavelli/parts";
 import { useStored } from "../deep/hooks";
+import { addMissing } from "@/lib/case/log";
+import { useDecisionLog } from "./work";
 import { Hatch, bt, useTr } from "./bits";
 
 // The national-interest scorecard (the specification's proposed weights, not official UAE priorities): four postures scored 0 to 5 on nine criteria. The first scores are DRAFT suggestions computed from the value pillars and the posture rule; a person edits them.
 // Security and legal criteria are decision gates: a score of 1 or less trips the gate, and a high weighted total never offsets it. This is a prioritisation tool, not a predictive model.
 export function StrategyTab({ L, d, iso, report, arch }: { L: Lang; d: CaseData; iso: string; report: string | null; arch: string | null }) {
   const t = useTr(L); const draft = useMemo(() => suggest(d), [d]); const [edit, setEdit] = useStored<Record<string, Record<string, number>>>(`gd-case-score:${iso}`, {}); const [w, setW] = useStored<Record<string, number>>("gd-case-weights", Object.fromEntries(CRITERIA.map((c) => [c.id, c.w])));
-  const [decs, setDecs] = useStored<Decision[]>("gd-deep-decisions", []); const [saved, setSaved] = useState(false);
+  const [, setDecs] = useDecisionLog(); const [saved, setSaved] = useState(false);
   const sc = (o: Posture) => ({ ...draft[o], ...(edit[o] ?? {}) }); const wsum = Object.values(w).reduce((a, b) => a + b, 0);
   const rows = OPTS.map((o) => ({ o, s: sc(o), total: weightedScore(sc(o), w), gates: gateTripped(sc(o)) })); const best = rows.filter((r) => r.gates.length === 0).sort((a, b) => b.total - a.total)[0];
   const sections: [string, string, string][] = [["Recommended Strategy", "الاستراتيجية الموصى بها", ""], ["Instrument Mix and Neighbour and Third-Party Plays", "مزيج الأدوات وخطوات الجوار والأطراف الثالثة", ""], ["Negotiation Plan", "خطة التفاوض", ""], ["Action Plan", "خطة العمل", ""], ["Risks and Dissent", "المخاطر والخلاف", ""], ["Monitoring and Triggers", "المراقبة والمحفزات", ""]];
-  const record = () => { const now = new Date(); const rev = new Date(now.getTime() + 90 * 86_400_000).toISOString().slice(0, 10); const post = best ? POSTURE[best.o].name.en : "no posture passes the gates"; setDecs([...decs, { id: `DEC-${now.getTime().toString(36)}`, created: now.toISOString(), updated: now.toISOString(), decision: `${d.name}: ${post}`, informedBy: [`case:${iso}`, ...(report ? ["council"] : []), ...(arch ? ["architect"] : [])], expected: `Posture "${post}" scored ${best?.total ?? "n/a"}/100 on the national-interest scorecard (draft scores edited by the reviewer).`, owner: "", review: rev, milestones: [], observed: "", attribution: "association", method: "", status: "open" }]); setSaved(true); setTimeout(() => setSaved(false), 2500); };
+  const record = () => { const now = new Date(); const rev = new Date(now.getTime() + 90 * 86_400_000).toISOString().slice(0, 10); const post = best ? POSTURE[best.o].name.en : "no posture passes the gates"; setDecs((decs) => addMissing(decs, [{ iso3: iso, source: "strategy", ref: `strategy:${iso}:${now.toISOString().slice(0, 10)}`, id: `DEC-${now.getTime().toString(36)}${decs.length}`, created: now.toISOString(), updated: now.toISOString(), decision: `${d.name}: ${post}`, informedBy: [`case:${iso}`, ...(report ? ["council"] : []), ...(arch ? ["architect"] : [])], expected: `Posture "${post}" scored ${best?.total ?? "n/a"}/100 on the national-interest scorecard (draft scores edited by the reviewer).`, owner: "", review: rev, milestones: [], observed: "", attribution: "association", method: "", status: "open" }])); setSaved(true); setTimeout(() => setSaved(false), 2500); };
   return (
     <div className="space-y-4">
       <Block title={t("National-interest scorecard", "بطاقة المصلحة الوطنية")} hint={t("Four postures scored 0 to 5 on nine criteria with the specification's proposed weights (not official UAE priorities). Starting scores are drafts from the data; edit them. A score of 1 or less on a gating criterion trips a decision gate that no total offsets. It is a prioritisation tool, not a prediction.", "أربعة مواقف تُقيَّم من 0 إلى 5 على تسعة معايير بالأوزان المقترحة في المواصفة (وليست أولويات رسمية). الدرجات الأولية مسودات من البيانات؛ عدّلها. والدرجة 1 فأقل في معيار بوابة تفعّل بوابة قرار لا يعوضها أي مجموع. أداة ترتيب أولويات لا تنبؤ.")}>

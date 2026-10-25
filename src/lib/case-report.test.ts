@@ -61,6 +61,11 @@ async function main() {
   for (const r of new Set((Array.isArray(countries) ? countries : []).map((c) => c.region))) assert.ok(REGION_AR[r], `region: ${r}`);
   const src: Reg = regs.countries ?? (regs as unknown as Reg); for (const v of Object.values(src)) { if (v.region) assert.ok(REGION_AR[v.region], `UN region: ${v.region}`); if (v.subregion) assert.ok(REGION_AR[v.subregion], `UN subregion: ${v.subregion}`); }
   assert.equal(regionLabel("Africa", "ar"), "أفريقيا"); assert.equal(regionLabel("Mars", "ar"), "Mars"); assert.equal(sectorLabel("energy", "ar"), "الطاقة"); assert.equal(sectorLabel("energy", "en"), "energy");
+  // ---- the decision log in a report ----
+  const dd = { id: "D1", created: "2026-10-01T00:00:00Z", updated: "2026-10-01T00:00:00Z", decision: "Approve a CEPA study", informedBy: ["case:EGY"], expected: "", owner: "", review: "2026-10-01", milestones: [], observed: "Study published", attribution: "causal" as const, method: "", status: "open" as const };
+  const lg = buildReport(["log"], ctx({ decisions: [dd, { ...dd, id: "D2", informedBy: ["case:IND"], decision: "Other country" }] }), { title: "x" }); assert.ok(lg.md.includes("Approve a CEPA study") && !lg.md.includes("Other country") && lg.md.includes("overdue") && lg.md.includes("Association only"), "this country only; overdue marked; a causal claim without a method is shown as association only");
+  assert.equal(buildReport(["log"], ctx(), { title: "x" }).parts[0].state, "partial", "an empty log says so"); assert.ok(buildReport(["log"], ctx({ lang: "ar", decisions: [dd] }), { title: "x" }).md.includes("متأخر"), "Arabic overdue");
+  assert.ok(TEMPLATES[1].blocks.includes("log") && TEMPLATES[4].blocks.includes("log") && !TEMPLATES[0].blocks.includes("log"));
   console.log("case-report: all checks passed");
 }
 main().catch((e) => { console.error(e); process.exit(1); });

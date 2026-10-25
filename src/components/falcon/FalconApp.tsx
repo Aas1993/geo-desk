@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Activity, Crosshair, Eye, FlaskConical, Globe2, Library, Network, Radar, ShieldCheck, Telescope, Users } from "lucide-react";
+import { Activity, Target, Crosshair, Eye, FlaskConical, Globe2, Library, Network, Radar, ShieldCheck, Telescope, Users } from "lucide-react";
 import { useT } from "@/lib/store";
 import { DossierWorkspace } from "../DossierWorkspace";
 import { Pill, SRC_STATE, type Lang } from "./bits";
@@ -10,6 +10,7 @@ import { CountryDesk, ForesightDesk, LabDesk, useSaved, type Launch } from "./De
 import { CouncilView } from "./CouncilView";
 import { GraphView } from "./GraphView";
 import { MonitorView } from "./MonitorView";
+import { OpportunityView } from "./OpportunityView";
 import { LibraryView } from "./LibraryView";
 import { PlatformView, type Section } from "./PlatformView";
 import { useCountryList, useWorld } from "./hooks";
@@ -17,7 +18,7 @@ import type { AskRoute } from "@/lib/falcon/ask";
 
 const SECTIONS: { id: Section; icon: typeof Radar; en: string; ar: string }[] = [
   { id: "command", icon: Radar, en: "Command Center", ar: "مركز القيادة" }, { id: "radar", icon: Crosshair, en: "Radar", ar: "الرادار" }, { id: "countries", icon: Globe2, en: "Country Desk", ar: "مكتب الدولة" }, { id: "foresight", icon: Telescope, en: "Foresight", ar: "الاستشراف" },
-  { id: "lab", icon: FlaskConical, en: "Scenario Lab", ar: "مختبر السيناريوهات" }, { id: "council", icon: Users, en: "Council", ar: "المجلس" }, { id: "graph", icon: Network, en: "Graph", ar: "الرسم المعرفي" }, { id: "monitor", icon: Activity, en: "Monitor", ar: "الرصد" }, { id: "library", icon: Library, en: "Library", ar: "المكتبة" }, { id: "platform", icon: ShieldCheck, en: "Platform", ar: "المنصة" },
+  { id: "lab", icon: FlaskConical, en: "Scenario Lab", ar: "مختبر السيناريوهات" }, { id: "opportunity", icon: Target, en: "Opportunity", ar: "الفرص" }, { id: "council", icon: Users, en: "Council", ar: "المجلس" }, { id: "graph", icon: Network, en: "Graph", ar: "الرسم المعرفي" }, { id: "monitor", icon: Activity, en: "Monitor", ar: "الرصد" }, { id: "library", icon: Library, en: "Library", ar: "المكتبة" }, { id: "platform", icon: ShieldCheck, en: "Platform", ar: "المنصة" },
 ];
 const T = {
   en: { sub: "UAE-first intelligence, foresight and decision support, built on the Geo Desk datasets. Evidence as of", asOf: "Dubai", cover: "Monitoring means scheduled and event-triggered snapshots plus five-minute polling while a page is open, never a live stream: each dataset's build date is on the Command Center. AI products are open-source analysis, never classified assessments, and are proposals for human decision.", load: "Loading the world model…", err: "The world model could not be loaded. The datasets are read from files on the server; try again in a moment." },
@@ -27,12 +28,15 @@ const T = {
 /** Falcon Eye: the intelligence console of Geo Desk. One shared world model and one set of saved products feed ten sections; every AI product opens in the same briefing workspace. */
 export function FalconApp() {
   const { lang } = useT(); const L = lang as Lang; const u = T[L]; const world = useWorld(); const { list, by } = useCountryList(); const saved = useSaved();
-  const [section, setSection] = useState<Section>("command"); const [iso, setIso] = useState<string | null>(null); const [launch, setLaunch] = useState<(Omit<Launch, "mode"> & { mode: Exclude<Launch["mode"], "council"> }) | null>(null); const [seed, setSeed] = useState<string | undefined>(); const [preset, setPreset] = useState<AskRoute["rank"]>();
+  const [section, setSection] = useState<Section>("command"); const [iso, setIso] = useState<string | null>(null); const [launch, setLaunch] = useState<(Omit<Launch, "mode"> & { mode: Exclude<Launch["mode"], "council" | "machiavelli"> }) | null>(null); const [seed, setSeed] = useState<string | undefined>(); const [preset, setPreset] = useState<AskRoute["rank"]>();
   useEffect(() => { const t = setTimeout(() => { const h = location.hash.replace("#", "").split(":"); if (SECTIONS.some((s) => s.id === h[0])) setSection(h[0] as Section); if (/^[A-Z]{3}$/.test(h[1] ?? "")) setIso(h[1]); }, 0); return () => clearTimeout(t); }, []);
   const go = useCallback((s: Section) => { setSection(s); try { history.replaceState(null, "", `#${s}${iso ? `:${iso}` : ""}`); } catch { /* ignore */ } window.scrollTo?.(0, 0); }, [iso]);
   const pick = useCallback((i: string, to?: Section) => { setIso(i); const s = to ?? "countries"; setSection(s); try { history.replaceState(null, "", `#${s}:${i}`); } catch { /* ignore */ } }, []);
-  const open = useCallback((l: Launch) => { if (l.mode === "council") { setSeed(undefined); setIso(l.c.iso3); setSection("council"); try { history.replaceState(null, "", `#council:${l.c.iso3}`); } catch { /* ignore */ } window.scrollTo?.(0, 0); } else setLaunch(l as Exclude<typeof l, never> & { mode: Exclude<Launch["mode"], "council"> }); }, []);
+  const open = useCallback((l: Launch) => { if (l.mode === "machiavelli") { try { localStorage.setItem("gd-mach-filters", JSON.stringify({ ...(JSON.parse(localStorage.getItem("gd-mach-filters") ?? "{}") as object), iso: l.c.iso3 })); } catch { /* ignore */ } location.href = `/machiavelli#country:${l.c.iso3}`; return; }
+    if (l.mode === "council") { setSeed(undefined); setIso(l.c.iso3); setSection("council"); try { history.replaceState(null, "", `#council:${l.c.iso3}`); } catch { /* ignore */ } window.scrollTo?.(0, 0); } else setLaunch(l as Exclude<typeof l, never> & { mode: Exclude<Launch["mode"], "council" | "machiavelli"> }); }, []);
   const ask = useCallback((r: AskRoute, q: string) => {
+    if (r.section === "deep") { try { if (r.scope && r.scopeKind === "country") localStorage.setItem("gd-deep-filters", JSON.stringify({ ...(JSON.parse(localStorage.getItem("gd-deep-filters") ?? "{}") as object), iso: r.scope })); } catch { /* ignore */ } location.href = `/deep#${r.deepTab ?? "fe10"}`; return; }
+    if (r.section === "strategy") { try { if (r.scope) localStorage.setItem("gd-mach-filters", JSON.stringify({ ...(JSON.parse(localStorage.getItem("gd-mach-filters") ?? "{}") as object), iso: r.scope })); } catch { /* ignore */ } location.href = `/machiavelli#${r.scopeKind === "country" ? "country" : r.scope ? "regional" : "global"}${r.scope ? `:${r.scope}` : ""}`; return; }
     if (r.section === "council") setSeed(q); if (r.section === "graph") setPreset(r.rank);
     const i = r.scope; if (i) setIso(i); setSection(r.section); try { history.replaceState(null, "", `#${r.section}${i ? `:${i}` : ""}`); } catch { /* ignore */ } window.scrollTo?.(0, 0);
   }, []);
@@ -55,6 +59,7 @@ export function FalconApp() {
             {section === "countries" && <CountryDesk world={cur} list={list} by={by} iso={iso} setIso={(i) => pick(i, "countries")} L={L} launch={open} />}
             {section === "foresight" && <ForesightDesk list={list} by={by} iso={iso} setIso={(i) => { setIso(i); }} L={L} launch={open} saved={saved} />}
             {section === "lab" && <LabDesk list={list} by={by} iso={iso} setIso={(i) => { setIso(i); }} L={L} launch={open} saved={saved} />}
+            {section === "opportunity" && <OpportunityView L={L} list={list} />}
             {section === "council" && <CouncilView key={seed ?? "c"} seed={seed} list={list} by={by} iso={iso} setIso={(i) => { setIso(i); }} L={L} />}
             {section === "graph" && <GraphView key={JSON.stringify(preset ?? null)} preset={preset} L={L} iso={iso} onOpen={(i) => pick(i, "countries")} />}
             {section === "monitor" && <MonitorView world={cur} list={list} L={L} onPick={(i) => pick(i)} />}

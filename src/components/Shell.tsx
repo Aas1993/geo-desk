@@ -2,7 +2,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Layers, Globe2, CandlestickChart, Eye, Share2, LayoutDashboard, Sparkles } from "lucide-react";
+import { Award, Brain, Briefcase, Compass, Layers, Globe2, CandlestickChart, Eye, Share2, LayoutDashboard, Sparkles } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-store";
 import { RightRail } from "./RightRail";
 import { TopBar } from "./TopBar";
@@ -44,6 +44,10 @@ function MobileNav() {
         <Link href="/" onClick={() => { setMenu(false); select(null); }} className={cls(path === "/" && !menuOpen)}><Globe2 size={19} />{t("nav_world")}</Link>
         <Link href="/markets" className={cls(path.startsWith("/markets"))}><CandlestickChart size={19} />{t("nav_markets")}</Link>
         <Link href="/falcon" className={cls(path.startsWith("/falcon"))}><Eye size={19} />{t("nav_falcon")}</Link>
+        <Link href="/case" className={cls(path.startsWith("/case"))}><Briefcase size={19} />{t("nav_case")}</Link>
+        <Link href="/deep" className={cls(path.startsWith("/deep"))}><Brain size={19} />{t("nav_deep")}</Link>
+        <Link href="/machiavelli" className={cls(path.startsWith("/machiavelli"))}><Compass size={19} />{t("nav_mach")}</Link>
+        <Link href="/influence" className={cls(path.startsWith("/influence"))}><Award size={19} />{t("nav_influence")}</Link>
         {path === "/" && <button onClick={() => setMenu(!menuOpen)} className={cls(menuOpen)}><Layers size={19} />{t("layers")}</button>}
         {path === "/" && <button onClick={() => { select(null); useDashboard.getState().setOpen(true); }} className={cls(false)}><LayoutDashboard size={19} />{lang === "ar" ? "اللوحة" : "Brief"}</button>}
         {path === "/" && <button onClick={() => { select(null); useDashboard.getState().setAsk(true); }} className={cls(false)}><Sparkles size={19} />{lang === "ar" ? "اسأل" : "Ask"}</button>}

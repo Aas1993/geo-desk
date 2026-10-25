@@ -1,0 +1,69 @@
+"use client";
+import { useMemo, useState } from "react";
+import { Copy, Download, Printer } from "lucide-react";
+import { SCEN_AXES, SCEN_TEMPLATES, tx } from "@/lib/machiavelli/content";
+import { FIG_EXAMPLE, FIG_EXAMPLE_TABLE, FIG_GATES, FIG_PARTNERSHIP, FIG_PRODUCT, SCENARIO_FLOW, SCENARIO_PRESETS } from "@/lib/machiavelli/figures";
+import { parseScenario } from "@/lib/machiavelli/strategy-parse";
+import { snapOf } from "@/lib/machiavelli/profile-core";
+import { SCEN_HORIZONS } from "@/lib/dossier/strategy";
+import { briefingHtml, printBriefing, saveBlob } from "@/lib/dossier/export";
+import type { Country } from "@/lib/types";
+import { Markdown } from "../Markdown";
+import { GatesPanel } from "../falcon/GatesPanel";
+import { Block, Pill, ScopePicker, type Lang } from "../falcon/bits";
+import { InstrumentChips, Progress, Question, Refusal, RunBar, refusalText } from "./forms";
+import { filterBody, type Filters } from "./filters";
+import { Inline, Tabs, Tbl, TreeSvg, usd } from "./parts";
+import { useRun, type ProfileSet } from "./useRun";
+
+const T = {
+  en: { title: "Scenario builder", sub: "Specify a country or region, the instruments, a horizon and, optionally, a shock. You get an outcome tree with baseline, favourable, adverse and shock branches, an inputs-to-outputs table, indicator shifts, recommended instrument sequencing and a red-team pass. Plausibility, not probability; a missing input is flagged, never invented.", subject: "Country or region", ins: "Instruments (at least one)", hor: "Time horizon", shock: "Shock or condition to test (optional)", q: "Specific question (optional)", go: "Build the scenario", again: "Build again", cost: "Measured on India: about $0.18, 2,100 words, three searches; capped at $1.00 and cached for six hours. Nothing is sent until you click.", build: "Builder", illus: "Illustrations", recap: "Inputs recap", latest: "Latest developments", tree: "Outcome tree", treeH: "Directed graph from the committed action through mechanisms to outcomes on the baseline, favourable, adverse and shock branches. Click a node for its stop condition.", io: "Inputs to outputs", shifts: "Indicator shifts", seq: "Recommended instrument sequencing", red: "Red team", gaps: "Uncertainty and evidence gaps", text: "Full text", saved: "Saved", spent: "Spent", copy: "Copy", copied: "Copied", pdf: "Print / PDF", fig2: "Illustrative partnership outcome tree (figure 2)", fig2h: "An illustration with no measured outcome, probability or causal coefficient.", fig3: "Strategy decision gates (figure 3)", fig4: "Scenario dimensions (figure 4)", tmpl: "Scenarios every dossier covers", ex: "Populated example (section 38.5): format only, not a recommendation", flow: "How the builder works", tmplT: ["Scenario", "Conditions", "UAE implication", "Response to evaluate"], missing: "Pick at least one instrument: a missing input is flagged, not invented." },
+  ar: { title: "منشئ السيناريوهات", sub: "حدّد دولة أو إقليمًا والأدوات وأفقًا زمنيًا واختياريًا صدمة. تحصل على شجرة نتائج بفروع خط الأساس والمؤاتي والسلبي والصدمة، وجدول مدخلات إلى مخرجات، وتحولات المؤشرات، وترتيبًا موصى به للأدوات، ومراجعة فريق أحمر. معقولية لا احتمال؛ والمدخل الناقص يُشار إليه ولا يُختلق.", subject: "الدولة أو الإقليم", ins: "الأدوات (واحدة على الأقل)", hor: "الأفق الزمني", shock: "صدمة أو حالة للاختبار (اختياري)", q: "سؤال محدد (اختياري)", go: "ابنِ السيناريو", again: "ابنِ مجددًا", cost: "قيس على الهند: نحو 0.18 دولار و2,100 كلمة وثلاث عمليات بحث؛ بسقف 1.00 دولار ومخزَّن ست ساعات. لا يُرسل شيء قبل نقرك.", build: "المنشئ", illus: "الرسوم التوضيحية", recap: "ملخص المدخلات", latest: "آخر التطورات", tree: "شجرة النتائج", treeH: "رسم موجَّه من الإجراء الملتزَم به عبر الآليات إلى النتائج على فروع خط الأساس والمؤاتي والسلبي والصدمة. انقر عقدة لشرط توقفها.", io: "من المدخلات إلى المخرجات", shifts: "تحولات المؤشرات", seq: "ترتيب الأدوات الموصى به", red: "الفريق الأحمر", gaps: "عدم اليقين وفجوات الأدلة", text: "النص الكامل", saved: "محفوظ", spent: "المنفَق", copy: "نسخ", copied: "تم النسخ", pdf: "طباعة / PDF", fig2: "شجرة نتائج توضيحية للشراكة (الشكل 2)", fig2h: "رسم توضيحي بلا نتيجة مقيسة أو احتمال أو معامل سببي.", fig3: "بوابات قرار الاستراتيجية (الشكل 3)", fig4: "أبعاد السيناريو (الشكل 4)", tmpl: "السيناريوهات التي يغطيها كل ملف", ex: "مثال معبَّأ (القسم 38.5): للصيغة فقط لا توصية", flow: "كيف يعمل المنشئ", tmplT: ["السيناريو", "الظروف", "الدلالة للإمارات", "الاستجابة المراد تقييمها"], missing: "اختر أداة واحدة على الأقل: المدخل الناقص يُشار إليه ولا يُختلق." },
+} as const;
+type Tab = "build" | "illus";
+export function ScenarioStudio({ L, f, setF, list, by, set }: { L: Lang; f: Filters; setF: (p: Partial<Filters>) => void; list: Country[]; by: Map<string, Country>; set: ProfileSet | null }) {
+  const u = T[L]; const [tab, setTab] = useState<Tab>("build"); const [ins, setIns] = useState<string[]>(["investment"]); const [hor, setHor] = useState("medium"); const [shock, setShock] = useState(SCENARIO_PRESETS[0][1]); const [q, setQ] = useState(""); const [view, setView] = useState<"vis" | "text">("vis"); const [copied, setCopied] = useState(false);
+  const iso = f.iso; const c = iso ? by.get(iso) : undefined; const name = c ? (L === "ar" && c.nameAr ? c.nameAr : c.name) : ""; const run = useRun(iso, iso ? `gd-scen:${iso}` : null); const profile = set && iso ? set.profiles.find((p) => p.iso3 === iso) : undefined;
+  const refusal = refusalText([q, shock, f.objective], L); const s = run.saved; const p = useMemo(() => (s ? parseScenario(s.report) : null), [s]);
+  const start = () => { if (!iso || refusal || ins.length === 0) return; void run.run({ ...filterBody(f), kind: "stratscenario", lang: L, question: q, instruments: ins, horizon: hor, shock }, profile && set ? { snap: snapOf(profile, set.sources) } : undefined); };
+  const html = () => briefingHtml(s!.report, { title: `${u.title}: ${name}`, rtl: L === "ar", foot: `${s!.model} · ${s!.at}`, classification: "DRAFT · AI-GENERATED FROM PUBLIC SOURCES · OPEN-SOURCE ANALYSIS · PROPOSALS FOR HUMAN DECISION" });
+  return (
+    <div className="space-y-4">
+      <Tabs<Tab> tabs={[{ id: "build", label: u.build }, { id: "illus", label: u.illus }]} value={tab} onChange={setTab} />
+      {tab === "build" && (<>
+        <Block title={u.title} hint={u.sub}>
+          <div className="grid gap-4 md:grid-cols-2"><div><span className="label mb-1 block">{u.subject}</span><ScopePicker list={list} value={iso} onPick={(i) => setF({ iso: i })} L={L} /></div>
+            <div className="space-y-3"><div><span className="label mb-1 block">{u.hor}</span><select value={hor} onChange={(e) => setHor(e.target.value)} className="h-10 w-full rounded-[10px] border border-line bg-bg2 px-2.5 text-[13px] text-t0">{SCEN_HORIZONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div></div></div>
+          <div className="mt-3"><span className="label mb-1 block">{u.ins}</span><InstrumentChips value={ins} onChange={setIns} L={L} /></div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2"><Question value={shock} onChange={setShock} presets={SCENARIO_PRESETS} label={u.shock} rows={2} /><Question value={q} onChange={setQ} label={u.q} rows={2} /></div><Refusal text={refusal} />
+          {ins.length === 0 && <p className="mt-2 text-[11.5px] text-warn">{u.missing}</p>}
+          <RunBar phase={run.phase} onRun={start} onCancel={run.cancel} disabled={!iso || !!refusal || ins.length === 0} L={L} label={s ? u.again : u.go} cost={u.cost} />
+          <Progress phase={run.phase} status={run.status} tail={run.tail} searches={run.searches} sources={run.sources} err={run.err} L={L} />
+        </Block>
+        {s && p && run.phase !== "running" && (<>
+          <div className="flex flex-wrap items-center gap-2"><span className="num text-[11.5px] text-t1">{c?.flag} {name} · {u.saved} {s.at.slice(0, 16).replace("T", " ")} UTC · {u.spent} {usd(s.usage.usd)}{s.cached ? " · cached" : ""}</span><span className="ms-auto flex flex-wrap gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(s.report); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Copy size={13} />{copied ? u.copied : u.copy}</button><button type="button" onClick={() => saveBlob(`${iso}-scenario.md`, "text/markdown", s.report)} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Download size={13} />.md</button><button type="button" onClick={() => printBriefing(html())} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Printer size={13} />{u.pdf}</button><button type="button" onClick={() => setView(view === "vis" ? "text" : "vis")} className="h-8 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-accent">{view === "vis" ? u.text : u.title}</button></span></div>
+          {view === "text" ? <div className="space-y-4"><Block title={u.text}><article><Markdown source={s.report} /></article></Block><GatesPanel md={s.report} kind="other" L={L} iso3={iso!} /></div> : (<div className="space-y-4">
+            <h3 className="display text-[16px] font-semibold text-t0">{p.title}</h3><p className="-mt-2 text-[11.5px] text-t2">{p.line}</p>
+            {p.recap.length > 0 && <Block title={u.recap}><Tbl head={["Input", "Value"]} rows={p.recap.map((r) => [`**${r.input}**`, r.value])} w={["26%", "74%"]} /></Block>}
+            {p.developments.length > 0 && <Block title={u.latest}><Tbl head={["Date", "Development", "Source", "Effect on the scenario"]} rows={p.developments.map((d) => [d.date, d.text, d.source, d.effect])} w={["10%", "38%", "24%", "28%"]} /></Block>}
+            {p.tree.length > 0 && <Block title={u.tree} hint={u.treeH}><TreeSvg nodes={p.tree} L={L} title={u.tree} /></Block>}
+            {p.io.length > 0 && <Block title={u.io}><Tbl head={["Input committed", "Mechanism", "Intermediate output", "Favourable outcome", "Adverse outcome", "Signpost"]} rows={p.io.map((r) => [`**${r.input}**`, r.mechanism, r.intermediate, r.favourable, r.adverse, r.signpost])} /></Block>}
+            {p.shifts.length > 0 && <Block title={u.shifts}><Tbl head={["Indicator", "Baseline", "Favourable branch", "Adverse branch", "Evidence"]} rows={p.shifts.map((r) => [`**${r.indicator}**`, r.baseline, r.favourable, r.adverse, r.evidence])} /></Block>}
+            {p.sequence.length > 0 && <Block title={u.seq}><Tbl head={["Step", "Period", "Instrument", "Decision gate", "Exit condition"]} rows={p.sequence.map((r) => [`**${r.step}**`, r.period, r.instrument, r.gate, r.exit])} /></Block>}
+            {p.redteam.length > 0 && <Block title={u.red}><Tbl head={["Check", "Finding", "Effect on the recommendation"]} rows={p.redteam.map((r) => [`**${r.check}**`, r.finding, r.effect])} w={["22%", "50%", "28%"]} /></Block>}
+            {p.gaps.length > 0 && <Block title={u.gaps}><ul className="space-y-1 text-[12px] leading-snug text-t1">{p.gaps.map((x, i) => <li key={i} className="flex gap-2"><span aria-hidden className="text-warn">▲</span><span><Inline text={x} /></span></li>)}</ul></Block>}
+          </div>)}
+        </>)}
+      </>)}
+      {tab === "illus" && (<div className="space-y-4">
+        <Block title="Product relationship (figure 1)"><ol className="flex flex-wrap items-center gap-2 text-[12px]">{FIG_PRODUCT.map((g, i) => <li key={g} className="flex items-center gap-2"><span className="rounded-[10px] bg-bg2 px-3 py-2 text-t0">{g}</span>{i < FIG_PRODUCT.length - 1 && <span aria-hidden className="text-t2 rtl:rotate-180">→</span>}</li>)}</ol></Block>
+        <Block title={u.fig2} hint={u.fig2h}><TreeSvg nodes={FIG_PARTNERSHIP} L={L} title={u.fig2} /></Block>
+        <Block title={u.fig3}><ol className="flex flex-wrap items-center gap-2 text-[12px]">{FIG_GATES.map((g, i) => <li key={g} className="flex items-center gap-2"><span className="rounded-[10px] bg-bg2 px-3 py-2 text-t0"><span className="num me-1.5 text-accent">{i + 1}</span>{g}</span>{i < FIG_GATES.length - 1 && <span aria-hidden className="text-t2 rtl:rotate-180">→</span>}</li>)}</ol></Block>
+        <Block title={u.fig4}><div className="grid gap-px overflow-hidden rounded-[12px] bg-line sm:grid-cols-[150px_1fr_1fr]"><div className="bg-bg1" />{SCEN_AXES.cols.map((c2) => <div key={c2} className="bg-bg1 p-2 text-[11px] font-semibold text-t1">{c2}</div>)}{SCEN_AXES.rows.map((r, i) => <><div key={r} className="bg-bg1 p-2 text-[11px] font-semibold text-t1">{r}</div>{SCEN_AXES.cells[i].map((c2, j) => <div key={j} className="bg-bg2 p-2.5 text-[12px] leading-snug text-t0">{c2}</div>)}</>)}</div></Block>
+        <Block title={u.tmpl}><Tbl head={[...u.tmplT]} rows={SCEN_TEMPLATES.map((t) => [`**${tx(t.name, L)}**`, t.conditions, t.implication, t.response])} /></Block>
+        <Block title={u.flow}><ol className="grid gap-1.5 sm:grid-cols-2">{SCENARIO_FLOW.map((x, i) => <li key={i} className="flex gap-2 rounded-[10px] bg-bg2 p-2.5 text-[12px] text-t0"><span className="num text-accent">{i + 1}</span>{x}</li>)}</ol></Block>
+        <Block title={u.ex}><p className="mb-2 rounded-[10px] bg-bg2 p-2.5 text-[12px] italic text-t1">{FIG_EXAMPLE_TABLE.request}</p><TreeSvg nodes={FIG_EXAMPLE} L={L} title={u.ex} /><div className="mt-3"><Tbl head={["Input committed", "Mechanism", "Intermediate output", "Favourable outcome", "Adverse outcome", "Signpost"]} rows={[[FIG_EXAMPLE_TABLE.row.input, FIG_EXAMPLE_TABLE.row.mechanism, FIG_EXAMPLE_TABLE.row.intermediate, FIG_EXAMPLE_TABLE.row.favourable, FIG_EXAMPLE_TABLE.row.adverse, FIG_EXAMPLE_TABLE.row.signpost]]} /></div><p className="mt-2"><Pill c="var(--warn)">Format only</Pill></p></Block>
+      </div>)}
+    </div>
+  );
+}

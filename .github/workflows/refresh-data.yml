@@ -24,6 +24,11 @@ jobs:
       - run: node scripts/build-trade.mjs
       - run: node scripts/build-rivals.mjs # reads trade.json
       - run: node scripts/build-outlook.mjs
+      # the dated IMF vintage store and the World Bank financial-conditions file feed the Deep Intelligence desk
+      - run: node scripts/snapshot-vintage.mjs
+      - run: node scripts/build-finconditions.mjs
+      - run: node scripts/build-trends.mjs
+      - run: node scripts/capture-counts.mjs
       - run: node scripts/build-leverage.mjs
       # the index reads everything above, so it runs last
       - run: node scripts/build-partnership.mjs
@@ -35,13 +40,13 @@ jobs:
       - name: Check the data, then open or update a PR if it changed
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
-          rc=0; node scripts/data-changed.mjs public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json public/data/scorecard.json public/data/rivals.json public/data/leverage.json public/data/deals.json public/data/graph.json public/data/monitor/history.json || rc=$?
+          rc=0; node scripts/data-changed.mjs public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json public/data/scorecard.json public/data/rivals.json public/data/leverage.json public/data/deals.json public/data/graph.json public/data/monitor/history.json public/data/vintages/weo.json public/data/finconditions.json public/data/trends.json public/data/vintages/capture.json || rc=$?
           if [ "$rc" -eq 1 ]; then echo "No data changes"; exit 0; fi
           if [ "$rc" -ne 0 ]; then echo "::error::the change check failed"; exit 1; fi
           npm test # PRs opened with GITHUB_TOKEN do not trigger CI, so the tests run here, before anything is committed
           branch="data/refresh"
           git config user.name "geo-desk-bot"; git config user.email "geo-desk-bot@users.noreply.github.com"
-          git checkout -B "$branch"; git add public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json public/data/scorecard.json public/data/rivals.json public/data/leverage.json public/data/deals.json public/data/graph.json public/data/monitor/history.json
+          git checkout -B "$branch"; git add public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json public/data/scorecard.json public/data/rivals.json public/data/leverage.json public/data/deals.json public/data/graph.json public/data/monitor/history.json public/data/vintages/weo.json public/data/finconditions.json public/data/trends.json public/data/vintages/capture.json
           git commit -m "Refresh UAE agreements, flights, investment, missions, visits, trade, outlook and partnership data ($(date -u +%F))"
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$branch" # one standing branch: a re-run or the next day updates the same PR instead of failing
           if [ "$(gh pr list --head "$branch" --state open --json number -q length)" = "0" ]; then

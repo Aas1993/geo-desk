@@ -39,6 +39,9 @@ export function qualityGates(md: string, kind: GateKind, ctx: { today?: Date; re
     const banded = p.judgments.filter((j) => j.band && j.confidence).length; g("judgments", "Key judgments rated", "تقييم الأحكام الرئيسية", p.judgments.length && banded === p.judgments.length ? "pass" : p.judgments.length ? "warn" : "fail", `${banded} of ${p.judgments.length} key judgments carry a likelihood band and a confidence`);
     g("opps", "Opportunities tested", "اختبار الفرص", p.opportunities.length && p.opportunities.every((o) => o.works.length) ? "pass" : p.opportunities.length ? "warn" : "fail", `${p.opportunities.filter((o) => o.works.length).length} of ${p.opportunities.length} opportunities state the scenarios they survive`);
   }
+  // no fabricated quotations: a direct quotation of eight or more words next to an attribution to a person is flagged for checking (module section 41.1)
+  const quoted = [...md.matchAll(/["\u201C]([^"\u201D\n]{40,300})["\u201D]/g)].filter((m) => (m[1].match(/\S+/g) ?? []).length >= 8 && /\b(said|says|wrote|writes|told|stated|argued|according to)\b|\u2014\s*[A-Z]/.test(md.slice(Math.max(0, (m.index ?? 0) - 60), (m.index ?? 0) + m[0].length + 60))).length;
+  g("quotes", "No fabricated quotations", "لا اقتباسات مختلقة", quoted ? "warn" : "pass", quoted ? `${quoted} direct quotation${quoted === 1 ? "" : "s"} attributed to a person: check each against its source or remove it` : "No attributed direct quotation found");
   if (kind !== "redteam") g("redteam", "Independent review", "المراجعة المستقلة", ctx.redTeamed ? "pass" : "warn", ctx.redTeamed ? "A red-team review of this product is saved" : "No red-team review of this product is saved: run one before relying on it");
   return out;
 }

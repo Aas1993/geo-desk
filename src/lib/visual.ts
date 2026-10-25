@@ -11,7 +11,7 @@ export const bandOf = (text: string): { label: string; pct: number } | null => {
 export const confidenceOf = (text: string): "high" | "moderate" | "low" | null => (/\bhigh\b/i.test(text) ? "high" : /\bmoderate|medium\b/i.test(text) ? "moderate" : /\blow\b/i.test(text) ? "low" : null);
 
 /** Plain text for a card: links reduced to their text, emphasis and fact ids removed, spaces tidied. */
-export const plain = (s: string) => s.replace(/\[([^\]]+)\]\((?:[^)]+)\)/g, "$1").replace(/\[(?:F\d+(?:\s*[,–-]\s*F?\d+)*|Desk|unverified reference[^\]]*)\]/g, "").replace(/[*_`]+/g, "").replace(/\s{2,}/g, " ").replace(/\s+([.,;:])/g, "$1").trim();
+export const plain = (s: string) => s.replace(/\[([^\]]+)\]\((?:[^)]+)\)/g, "$1").replace(/\[(?:F\d+(?:\s*[,–-]\s*F?\d+)*|Desk|unverified reference[^\]]*)\]/g, "").replace(/[*_`]+/g, "").replace(/\s{2,}/g, " ").replace(/\s+([.,;:])/g, "$1").replace(/\(\s*[,;]?\s*\)/g, "").replace(/,\s*\)/g, ")").replace(/\(\s*,\s*/g, "(").replace(/\s{2,}/g, " ").replace(/\s+([.,;:])/g, "$1").trim();
 const cells = (line: string) => line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
 const isRule = (line: string) => /^\s*\|?\s*:?-{2,}/.test(line);
 const tagsIn = (s: string) => INSTRUMENT_KEYS.filter((k) => new RegExp(`\\b${k}\\b`, "i").test(s));

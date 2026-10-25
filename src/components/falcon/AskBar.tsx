@@ -13,9 +13,11 @@ const NAME: Record<AskSection, { en: string; ar: string; why: { en: string; ar: 
   graph: { en: "Knowledge graph", ar: "الرسم المعرفي", why: { en: "a ranking computed from sourced links, no AI cost", ar: "ترتيب محسوب من روابط موثَّقة بلا كلفة ذكاء اصطناعي" } },
   monitor: { en: "Monitor", ar: "الرصد", why: { en: "what is triggered and what changed, from observed data", ar: "ما تفعَّل وما تغيّر من بيانات مرصودة" } },
   radar: { en: "Radar", ar: "الرادار", why: { en: "risk and opportunity scores across all countries", ar: "درجات المخاطر والفرص لكل الدول" } },
+  strategy: { en: "Machiavellian strategy", ar: "الاستراتيجية الميكيافيلية", why: { en: "a strategy dossier, scenarios and a Council for UAE influence and long-term partnerships", ar: "ملف استراتيجية وسيناريوهات ومجلس لنفوذ الإمارات وشراكاتها بعيدة المدى" } },
+  deep: { en: "Deep Intelligence", ar: "الاستخبارات المعمّقة", why: { en: "think-tank research, economy, finance, trade and indicators in one evidence-linked workspace, free to read", ar: "أبحاث مراكز الفكر والاقتصاد والمال والتجارة والمؤشرات في مساحة عمل موصولة بالأدلة، وقراءتها مجانية" } },
   countries: { en: "Country Desk", ar: "مكتب الدولة", why: { en: "the dossier, scorecard and briefing products for one country", ar: "الملف وبطاقة الدرجات ومنتجات الإحاطة لدولة واحدة" } },
 };
-const AI: AskSection[] = ["foresight", "lab", "council"];
+const AI: AskSection[] = ["foresight", "lab", "council", "strategy"];
 const T = {
   en: { title: "Ask Falcon", ph: "Ask in plain words, for example: What if Egypt defaults? Which African countries show the most UAE logistics activity?", go: "Route", read: "I read this as", free: "Routing is free: it only picks where to go. Nothing is sent to an AI until you start a product there.", ai: "starts a paid AI run only when you click", none: "no cost", instead: "Or open it in", scope: "about", open: "Open",
     ex: ["What if Egypt defaults on its debt?", "Foresight for the Middle East over ten years", "Which African countries show the most UAE logistics activity?", "Convene the council on Pakistan", "What changed today?"] },

@@ -1,9 +1,9 @@
 import { SCOPES } from "./scopes";
 
 // "Ask Falcon": reads a plain question and says where in Falcon Eye it belongs. It is a router made of word lists and the country and scope names, so it costs nothing, never calls a model and always shows what it understood so the reader can change it.
-export type AskSection = "foresight" | "lab" | "council" | "graph" | "monitor" | "radar" | "countries";
+export type AskSection = "foresight" | "lab" | "council" | "graph" | "monitor" | "radar" | "countries" | "strategy" | "deep";
 export type RankQuery = { metric: string; region?: string; org?: string; sector?: string };
-export type AskRoute = { section: AskSection; scope: string | null; scopeKind: "country" | "scope" | null; why: string[]; rank?: RankQuery; alternatives: AskSection[] };
+export type AskRoute = { section: AskSection; scope: string | null; scopeKind: "country" | "scope" | null; why: string[]; rank?: RankQuery; alternatives: AskSection[]; deepTab?: string };
 type Named = { iso3: string; name: string; nameAr?: string | null };
 
 const SYN: [RegExp, string][] = [
@@ -34,13 +34,15 @@ export function routeAsk(text: string, list: Named[]): AskRoute {
   if (c) { scope = c.iso3; scopeKind = "country"; why.push(`country: ${c.name}`); }
   else { for (const [re, id] of SYN) if (re.test(q)) { scope = id; scopeKind = "scope"; why.push(`scope: ${SCOPES.find((s) => s.id === id)?.en ?? id}`); break; } }
   const is = (re: RegExp, label: string) => { const ok = re.test(q); if (ok) why.push(label); return ok; };
-  let section: AskSection;
+  let section: AskSection; let deepTab: string | undefined;
   const rankish = /\b(which|what)\b[^.?]{0,30}\b(countries|states|markets)\b|\brank(ing)?\b|\btop \d*\s*(countries|markets)?\b|\bmost\b.*\b(countries|markets|deals|investment|trade)\b|\bcompare\b|\bpath(s)?\b|\bconnections?\b|\bknowledge graph\b|أي دول|ترتيب|الأكثر|روابط/i;
   if (is(/\bcouncil\b|\bdebate\b|multi-?agent|second opinion|all sides|red team|competing views|مجلس|فريق أحمر/i, "wants several analysts or a challenge")) section = "council";
   else if (is(/\bscenario|what if|what-if|stress test|shock\b|policy option|simulat|tipping|if .{0,40}\b(closes?|collapses?|escalates?|attacks?|bans?|defaults?)\b|سيناريو|ماذا لو|اختبار ضغط|خيارات/i, "a scenario or policy question")) section = "lab";
   else if (is(/foresight|forecast|outlook|\bfuture\b|\b(next|coming) \d+ years?\b|\b20[3-6]\d\b|long[- ]term|megatrend|استشراف|مستقبل|توقعات/i, "a look ahead")) section = "foresight";
   else if (!c && is(rankish, "a ranking across countries")) section = "graph";
   else if (is(/\balerts?\b|\bwatch(list)?\b|\bmonitor|what changed|since yesterday|\btoday\b|new warnings?|تنبيه|رصد|ماذا تغير/i, "a monitoring question")) section = "monitor";
+  else if (is(/think[- ]?tanks?|research institutes?|\btrends\b|\becssr\b|financial conditions|trade concentration|\bhhi\b|\bindicators?\b|\bbenchmarks?\b|\bpeers?\b|consolidat|economic intelligence|decision assessment|\bgdp\b|inflation|مراكز الفكر|مركز فكر|مؤشرات|مقارنات|التضخم|الناتج المحلي/i, "a research, economic or indicator question")) { section = "deep"; deepTab = /think[- ]?tanks?|research institutes?|\becssr\b|\btrends\b|مراكز الفكر|مركز فكر/i.test(q) ? "fe02" : /financial conditions|\bcredit\b|\bbank/i.test(q) ? "fe05" : /trade concentration|\bhhi\b|\btrade\b/i.test(q) ? "fe07" : /\bgdp\b|inflation|التضخم|الناتج/i.test(q) ? "fe04" : /indicators?|benchmarks?|peers?|مؤشرات|مقارنات/i.test(q) ? "fe09" : "fe10"; }
+  else if (is(/\bstrateg(y|ic|ies)\b|\binfluence\b|\bpartnerships?\b|\benhanc(e|ement)\b|soft power|hard power|\bcorridors?\b|\bimec\b|استراتيجية|نفوذ|شراكة|ممر/i, "a strategy or influence question")) section = "strategy";
   else if (!c && is(/opportunit|\brisk\b|early warning|\bradar\b|رادار|فرص|مخاطر/i, "opportunities or risks across countries")) section = "radar";
   else if (c) { section = "countries"; why.push("no product named: opening the country desk"); }
   else if (scope) { section = "foresight"; why.push("no product named: a foresight brief suits a scope"); }
@@ -51,6 +53,6 @@ export function routeAsk(text: string, list: Named[]): AskRoute {
     const org = ORG.find(([re]) => re.test(q))?.[1]; if (org) rank.org = org; const rg = REGION.find(([re]) => re.test(q))?.[1]; if (rg) rank.region = rg;
     if (!m) why.push("no measure named: ranking by deal announcements"); scope = null; scopeKind = null;
   }
-  const all: AskSection[] = ["foresight", "lab", "council", "countries", "graph"]; const alternatives = all.filter((s) => s !== section && (s !== "graph" || !c) && (s !== "countries" || scopeKind === "country"));
-  return { section, scope, scopeKind, why, rank, alternatives };
+  const all: AskSection[] = ["strategy", "deep", "foresight", "lab", "council", "countries", "graph"]; const alternatives = all.filter((s) => s !== section && (s !== "graph" || !c) && (s !== "countries" || scopeKind === "country"));
+  return { section, scope, scopeKind, why, rank, alternatives, deepTab };
 }

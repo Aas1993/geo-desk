@@ -2,11 +2,11 @@
 // Client-side only (localStorage). Nothing here is sent anywhere; it is the desk's own working record.
 import { parseForesight } from "../visual";
 
-export type SavedKind = "foresight-brief" | "foresight-report" | "minister" | "desk" | "counterpart" | "investments" | "lab" | "redteam" | "council";
+export type SavedKind = "foresight-brief" | "foresight-report" | "minister" | "desk" | "counterpart" | "investments" | "lab" | "redteam" | "council" | "strategy" | "strategy-enhance" | "scenario" | "interference" | "scouncil";
 export type SavedItem = { key: string; iso3: string; kind: SavedKind; at: string; usd: number | null; words: number; report: string; model: string };
 const PATTERNS: { re: RegExp; kind: (m: RegExpExecArray) => SavedKind }[] = [
   { re: /^gd-fs:([A-Z]{3}):(brief|report)$/, kind: (m) => (m[2] === "brief" ? "foresight-brief" : "foresight-report") }, { re: /^gd-dossier:([A-Z]{3})$/, kind: () => "minister" }, { re: /^gd-desk:([A-Z]{3})$/, kind: () => "desk" },
-  { re: /^gd-cp:([A-Z]{3})$/, kind: () => "counterpart" }, { re: /^gd-inv:([A-Z]{3})$/, kind: () => "investments" }, { re: /^gd-lab:([A-Z]{3})$/, kind: () => "lab" }, { re: /^gd-rt:([A-Z]{3})$/, kind: () => "redteam" }, { re: /^gd-council:([A-Z]{3})$/, kind: () => "council" },
+  { re: /^gd-cp:([A-Z]{3})$/, kind: () => "counterpart" }, { re: /^gd-inv:([A-Z]{3})$/, kind: () => "investments" }, { re: /^gd-lab:([A-Z]{3})$/, kind: () => "lab" }, { re: /^gd-rt:([A-Z]{3})$/, kind: () => "redteam" }, { re: /^gd-council:([A-Z]{3})$/, kind: () => "council" }, { re: /^gd-strat:([A-Z]{3}):(dossier|enhance)$/, kind: (m) => (m[2] === "enhance" ? "strategy-enhance" : "strategy") }, { re: /^gd-scen:([A-Z]{3})$/, kind: () => "scenario" }, { re: /^gd-interf:([A-Z]{3})$/, kind: () => "interference" }, { re: /^gd-scouncil:([A-Z]{3})$/, kind: () => "scouncil" },
 ];
 export function listSaved(): SavedItem[] {
   const out: SavedItem[] = [];

@@ -34,7 +34,7 @@ export function IndicatorsTab(p: TabProps) {
   const staleBuilds = snap.builds.filter((b) => b.built && now - Date.parse(b.built) > 45 * 86_400_000).length;
   const sorted = [...costs].sort((a, b) => a.ms - b.ms); const pc = (q: number) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))].ms / 1000 : null);
   const paid = costs.filter((c) => !c.cached); const spend = paid.reduce((a, c) => a + c.usd, 0); const reviewed = doss.filter((d) => d.review).length;
-  const kinds = (["council", "research"] as const).map((k) => ({ k, n: paid.filter((c) => c.kind === k).length, usd: paid.filter((c) => c.kind === k).reduce((a, c) => a + c.usd, 0) }));
+  const kinds = (["council", "research", "architect"] as const).map((k) => ({ k, n: paid.filter((c) => c.kind === k).length, usd: paid.filter((c) => c.kind === k).reduce((a, c) => a + c.usd, 0) }));
   const connOk = (res?.status ?? []).filter((x) => x.ok && x.n > 0).length; const pend = (res?.status ?? []).filter((x) => x.connector === "pending").length;
   const withSum = (res?.pubs ?? []).filter((x) => x.summary).length; const n = res?.pubs.length ?? 0;
   return (

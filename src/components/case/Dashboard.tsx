@@ -4,9 +4,12 @@ import { POSTURE } from "@/lib/case/core";
 import { draftAnswer } from "@/lib/case/answer";
 import { riskMatrix } from "@/lib/case/risk";
 import type { CaseData } from "@/lib/case/load";
+import { deliverableOf, parseDashboard } from "@/lib/case/architect";
 import { sectionOf } from "@/lib/case/council";
+import { useNow } from "@/lib/use-now";
 import { Block, Kpi, Pill, type Lang } from "../falcon/bits";
 import { Tbl } from "../machiavelli/parts";
+import { DecisionDashboard } from "./ArchitectParts";
 import { Hatch, LEVEL_C, Meter, Spark, bt, fmt, useTr } from "./bits";
 
 function RiskCell({ L, c }: { L: Lang; c: { level: "high" | "medium" | "low" | "none"; text: { en: string; ar: string } } }) {
@@ -14,10 +17,11 @@ function RiskCell({ L, c }: { L: Lang; c: { level: "high" | "medium" | "low" | "
 }
 const STATUS: Record<string, { c: string; en: string; ar: string }> = { H: { c: "var(--ok)", en: "Held", ar: "محفوظ" }, B: { c: "var(--c2)", en: "Buildable", ar: "قابل للبناء" }, C: { c: "var(--warn)", en: "Capture", ar: "التقاط" }, N: { c: "var(--t2)", en: "No source", ar: "لا مصدر" } };
 
-export function Executive({ L, d, report }: { L: Lang; d: CaseData; report: string | null }) {
+export function Executive({ L, d, report, arch, onOpen }: { L: Lang; d: CaseData; report: string | null; arch: { report: string; at: string } | null; onOpen: () => void }) {
   const t = useTr(L); const a = useMemo(() => draftAnswer(d), [d]); const risk = useMemo(() => riskMatrix(d), [d]); const post = d.posture.posture;
   const tiles = ["Real GDP growth", "Inflation, consumer prices", "Government gross debt, % of GDP", "UAE goods exports to the partner"].map((n) => d.spine.find((s) => s.met.name === n)).filter((s) => !!s);
   const chair = report ? sectionOf(report, "Executive Judgment") : "";
+  const now = useNow(60_000); const dash = useMemo(() => (arch ? parseDashboard(arch.report) : null), [arch]); const abrief = arch ? deliverableOf(arch.report, 1) : "";
   const triggers = (d.deep?.readings ?? []).filter((r) => r.state === "alert" || r.state === "watch");
   return (
     <div className="space-y-4">
@@ -29,6 +33,8 @@ export function Executive({ L, d, report }: { L: Lang; d: CaseData; report: stri
           <ul className="space-y-1.5">{d.lenses.map((l) => <li key={l.id} className="grid grid-cols-[120px_1fr_104px] items-center gap-2 text-[12px]"><span className="text-t1">{bt(L, l.name)}</span><Meter v={l.pos} /><span className="num text-end text-[11px] text-t0">{l.value}</span></li>)}</ul>
           <p className={`mt-2 rounded-[8px] p-2 text-[11.5px] leading-snug ${d.divergence.flag ? "border border-warn/40 bg-warn/10 text-t0" : "bg-bg2 text-t1"}`}>{bt(L, d.divergence.text)}</p></Block>
       </div>
+      <section className="rounded-[14px] border-2 border-accent/40 bg-bg1 p-4" aria-label="Statecraft strategy"><div className="flex flex-wrap items-center gap-2"><span className="label">{t("Statecraft strategy: short, medium and long term", "استراتيجية فن الحكم: قصيرة ومتوسطة وطويلة الأجل")}</span>{arch ? <Pill c="var(--ok)">{t("written", "مكتوبة")} {arch.at.slice(0, 10)}</Pill> : <Pill c="var(--t2)">{t("not written yet", "لم تُكتب بعد")}</Pill>}<Pill c="var(--warn)">{t("proposals, not adopted policy", "مقترحات لا سياسة معتمدة")}</Pill><button type="button" onClick={onOpen} className="ms-auto h-8 rounded-[8px] bg-bg3 px-3 text-[12px] text-t0">{arch ? t("Open the Architect", "افتح المهندس") : t("Write it in the Architect tab", "اكتبها في تبويبة المهندس")}</button></div>
+        {arch ? <>{abrief && <p className="mt-2 rounded-[10px] bg-bg2 p-2.5 text-[12px] leading-snug text-t0">{abrief.replace(/[#*|>]/g, "").replace(/\s+/g, " ").trim().slice(0, 620)}{abrief.length > 620 ? "…" : ""}</p>}{dash ? <div className="mt-3"><DecisionDashboard L={L} dash={dash} compact today={now} /></div> : <p className="mt-2 text-[12px] text-warn">{t("No valid decision dashboard was returned; read the Architect tab.", "لم تُرجع لوحة قرار صالحة؛ اقرأ تبويبة المهندس.")}</p>}</> : <p className="mt-2 text-[12px] leading-snug text-t1">{t("The Architect turns this Case File and the Strategic Council into initiatives by horizon, with funding, institutional dependencies, decision gates, risks and early-warning indicators. Its decision dashboard appears here once written.", "يحوّل المهندس ملف الحالة والمجلس الاستراتيجي إلى مبادرات حسب الأفق مع التمويل والاعتماديات المؤسسية وبوابات القرار والمخاطر ومؤشرات الإنذار المبكر. وتظهر لوحته هنا بعد كتابتها.")}</p>}</section>
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">{tiles.map((s) => { const m = s!.met; const lat = s!.spine.latest; return <Kpi key={m.name} label={`${m.name} · ${lat?.y ?? ""}`} value={lat ? fmt(lat.v) : "n/a"} sub={`${s!.spine.change5 != null ? `5y ${s!.spine.change5 >= 0 ? "+" : ""}${fmt(s!.spine.change5)}` : ""}${s!.region != null ? ` · ${t("region median", "وسيط الإقليم")} ${fmt(s!.region)}` : ""}`} />; })}</div>
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">{tiles.map((s) => <div key={s!.met.name} className="rounded-[12px] border border-line bg-bg1 p-2.5"><Spark obs={s!.series} proj={s!.proj} w={200} h={40} /><div className="mt-1 text-[10.5px] text-t2">{t("Ten years; dashed = IMF projection", "عشر سنوات؛ المتقطع = إسقاط الصندوق")}</div></div>)}</div>
       <div className="grid gap-3 lg:grid-cols-[1.1fr_1fr]">

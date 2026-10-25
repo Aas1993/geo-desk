@@ -12,7 +12,7 @@
     "prebuild": "npm run copy-worker",
     "typecheck": "next typegen && tsc --noEmit",
     "parity": "tsx scripts/parity-report.ts",
-    "test": "tsx src/lib/markets/indicators.test.ts && tsx src/lib/research/normalise.test.ts && tsx src/lib/layers/registry.test.ts && tsx src/lib/agreements.test.ts && tsx src/lib/flights.test.ts && tsx src/lib/investment.test.ts && tsx src/lib/media.test.ts && tsx src/lib/diplomacy.test.ts && tsx src/lib/intel.test.ts && tsx src/lib/dossier.test.ts && tsx src/lib/integrity.test.ts && tsx src/lib/falcon.test.ts && tsx src/lib/services.test.ts && tsx src/lib/machiavelli.test.ts && tsx src/lib/deep.test.ts && tsx src/lib/case.test.ts",
+    "test": "tsx src/lib/markets/indicators.test.ts && tsx src/lib/research/normalise.test.ts && tsx src/lib/layers/registry.test.ts && tsx src/lib/agreements.test.ts && tsx src/lib/flights.test.ts && tsx src/lib/investment.test.ts && tsx src/lib/media.test.ts && tsx src/lib/diplomacy.test.ts && tsx src/lib/intel.test.ts && tsx src/lib/dossier.test.ts && tsx src/lib/integrity.test.ts && tsx src/lib/falcon.test.ts && tsx src/lib/services.test.ts && tsx src/lib/machiavelli.test.ts && tsx src/lib/deep.test.ts && tsx src/lib/case.test.ts && tsx src/lib/architect.test.ts",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {

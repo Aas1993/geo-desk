@@ -2,6 +2,7 @@ import { infoValueQueue } from "../deep/registers";
 import { POSITION_ISSUES, POSTURE } from "./core";
 import { draftAnswer } from "./answer";
 import { riskMatrix } from "./risk";
+import { deliverableOf, parseDashboard } from "./architect";
 import { sectionOf, parseSeats } from "./council";
 import { OPTS, suggest } from "./score";
 import { CRITERIA, SEATS, weightedScore, gateTripped } from "./seats";
@@ -13,7 +14,7 @@ export type DeskSec = { n: number; title: string; by: "data" | "council" | "both
 const f = (v: number | null | undefined, d = 1) => (v == null || !isFinite(v) ? "n/a" : Math.abs(v) >= 1e9 ? `${(v / 1e9).toFixed(1)}bn` : Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}m` : Math.abs(v) >= 1e4 ? Math.round(v).toLocaleString("en-US") : v.toFixed(d));
 const table = (head: string[], rows: (string | number)[][]) => `| ${head.join(" | ")} |\n|${head.map(() => "---").join("|")}|\n${rows.map((r) => `| ${r.map((x) => String(x).replace(/\|/g, "/")).join(" | ")} |`).join("\n")}`;
 const NEED = (what: string) => `*Not yet written: run the Strategic Council to fill ${what}.*`;
-export function composeDesk(d: CaseData, report: string | null): DeskSec[] {
+export function composeDesk(d: CaseData, report: string | null, arch: string | null = null): DeskSec[] {
   const a = draftAnswer(d); const risk = riskMatrix(d); const sec = (h: string) => (report ? sectionOf(report, h) : ""); const seats = report ? parseSeats(report) : []; const seat = (id: string) => seats.find((s) => s.id === id)?.text ?? "";
   const metrics = (domains: string[]) => d.spine.filter((s) => domains.includes(s.met.domain)).map((s) => [s.met.name, s.has ? `${f(s.spine.latest?.v)} (${s.spine.latest?.y})` : "no data", s.spine.change5 != null ? `${s.spine.change5 >= 0 ? "+" : ""}${f(s.spine.change5)}` : "", s.region != null ? f(s.region) : "", s.uae != null ? f(s.uae) : "", s.met.src]);
   const out: DeskSec[] = []; const add = (n: number, title: string, by: DeskSec["by"], body: string, filled = true) => out.push({ n, title, by, body, filled: filled && body.trim().length > 0 });
@@ -43,6 +44,22 @@ export function composeDesk(d: CaseData, report: string | null): DeskSec[] {
   add(22, "Assumptions register and estimative language", "both", `Assumptions are listed in each seat's section. Estimative words follow the proposed Geo Desk lexicon (awaiting approval): almost no chance under 5%, very unlikely 5 to 20%, unlikely 20 to 40%, roughly even 40 to 60%, likely 60 to 80%, very likely 80 to 95%, almost certain over 95%. No seat may state a numeric probability the data cannot support.\n\n${seat("C9") || NEED("the evidence audit and assumptions (seat C9)")}`);
   add(23, "Evidence index and manifest", "data", `Dataset builds: ${(d.deep?.builds ?? []).map((b) => `${b.file} ${b.built?.slice(0, 10) ?? "n/a"}`).join("; ")}. Each dataset keeps its own observation date. Rights: open or attribution-licensed sources only (see the Rights register). Reviewer: none yet; this is working analysis.`);
   add(24, "Annexes", "data", `**Annex A: ten-year trend tables**\n\n${table(["Domain", "Metric", "Status", "Latest", "5y change", "Region median", "UAE"], d.spine.map((s) => [s.met.domain, s.met.name, s.has ? "held" : s.met.cls === "C" ? "capturing" : s.met.cls === "N" ? "no source" : "no data", s.spine.latest ? `${f(s.spine.latest.v)} (${s.spine.latest.y})` : "", s.spine.change5 != null ? f(s.spine.change5) : "", s.region != null ? f(s.region) : "", s.uae != null ? f(s.uae) : ""]))}\n\n**Annex B: exposure register**\n\n${table(["Link", "Reading", "Confidence"], (d.deep?.exposure?.rows ?? []).map((r) => [r.dim.en, r.value?.en ?? "unknown, not zero", r.conf]))}\n\n**Annex C: seats on the council**\n\n${table(["Seat", "Tradition", "Deliverable"], SEATS.map((s) => [`${s.id} ${s.en}`, s.thinkers, s.deliverable]))}`);
+  if (arch) linkArchitect(out, arch);
   return out;
+}
+const PART = { I: "Part I:", II: "Part II:", III: "Part III:", IV: "Part IV:", V: "Part V:", VI: "Part VI:", VII: "Part VII:", VIII: "Part VIII:", IX: "Part IX:", X: "Part X:", XI: "Part XI:", XII: "Part XII:" };
+/** The Statecraft Architect's sections woven into the matching desk sections, each labelled with its source so a reader can tell the Architect's proposals from the data and the council. A section the council has not filled becomes filled when the Architect covers it. */
+function linkArchitect(out: DeskSec[], arch: string) {
+  const part = (p: keyof typeof PART) => sectionOf(arch, PART[p]); const pillar = (n: number) => new RegExp(`^### Pillar ${n}[^\\n]*\\n([\\s\\S]*?)(?=^### |$(?![\\s\\S]))`, "m").exec(part("III"))?.[1].trim() ?? "";
+  const put = (n: number, label: string, text: string, replaceNeed = false) => { const s = out.find((x) => x.n === n); const body = text.trim(); if (!s || !body) return; if (replaceNeed) s.body = s.body.replace(/\*Not yet written:[^\n]*\*\n?/g, "").trim(); s.body = `${s.body}${s.body ? "\n\n" : ""}**${label}**\n\n${body}`.trim(); s.filled = true; s.by = s.by === "data" ? "both" : s.by; };
+  const ARCH = "Statecraft Architect (proposals)";
+  put(8, `${ARCH}: Pillar 4, economic statecraft`, pillar(4)); put(10, `${ARCH}: Pillar 3, hard power and security partnerships (policy level)`, pillar(3)); put(11, `${ARCH}: Pillar 2, soft power`, pillar(2)); put(12, `${ARCH}: Pillar 6, regional and multilateral positioning`, pillar(6));
+  put(14, `${ARCH}: dashboard risks`, (() => { const dash = parseDashboard(arch); return dash?.risks.length ? table(["Risk", "Likelihood", "Impact", "Mitigation"], dash.risks.map((r) => [r.name, r.likelihood, r.impact, r.mitigation])) : ""; })());
+  put(15, `${ARCH}: Part X, foresight and scenarios`, part("X"), true); put(16, `${ARCH}: Part VIII, options A, B and C`, part("VIII"));
+  put(17, `${ARCH}: Deliverable 1, Ministerial Strategic Brief`, deliverableOf(arch, 1), true); put(17, `${ARCH}: Part IX, stress test`, part("IX"));
+  put(18, `${ARCH}: Parts V to VII, the three horizons`, [part("V"), part("VI"), part("VII")].filter(Boolean).map((x, i) => `**${["Short term", "Medium term", "Long term"][i]}**\n\n${x}`).join("\n\n"), true); put(18, `${ARCH}: Deliverable 3, roadmap`, deliverableOf(arch, 3));
+  put(22, `${ARCH}: Deliverable 5, council debate and red-team memorandum`, deliverableOf(arch, 5)); put(22, `${ARCH}: Parts XI and XII, governance and measurement`, [part("XI"), part("XII")].filter(Boolean).join("\n\n"));
+  put(24, `Annex D, ${ARCH}: soft power, hard power and economic statecraft matrix`, deliverableOf(arch, 4)); const dash = parseDashboard(arch);
+  if (dash) put(24, `Annex E, ${ARCH}: decision dashboard (initiatives)`, table(["ID", "Initiative", "Horizon", "Pillar", "Lead (proposed)", "Funding", "Gate", "Dependencies"], dash.initiatives.map((i) => [i.id, i.name, i.horizon, i.pillar, i.lead, i.funding, `${i.gate}${i.gateDate ? ` (${i.gateDate})` : ""}`, i.dependencies.join(", ")])));
 }
 export const deskMarkdown = (name: string, secs: DeskSec[]) => `# Desk Officer Brief: ${name}\n\n${secs.map((s) => `## ${s.n}. ${s.title}\n\n${s.body}`).join("\n\n")}\n`;

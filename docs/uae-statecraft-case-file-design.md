@@ -218,3 +218,24 @@ Executive view gains: value profile, net benefit posture, position-toward-UAE ti
 
 Fits after the data phase: (0) trend and strategy data builders, free; (1) Case File shell with the value profile, position tiles, power and neighbour panels, free; (2) unified fact pack, posture scoring, strategy canvas template; (3) six new hats and the orchestrated run; (4) desk brief sections 1 to 24 and derived Minister and Leader briefs. The deterministic parts cost nothing to read; the council and the written briefs are click-started and capped.
 
+
+## 11 Statecraft Architect (built 25 October 2026)
+
+The master prompt "UAE Statecraft and National Influence Architect" (Parts I to XIII: twelve national interests, country baseline A to F, six pillars, gap analysis, short 0 to 24 months, medium years 3 to 5, long years 5 to 15 and beyond, Options A, B and C, adversarial stress test, four scenarios, implementation and governance, measurement, six deliverables) is implemented as the Architect tab of the Case File. It sits on top of this design rather than replacing it:
+
+| Design element above | Where it lives now |
+|---|---|
+| Value profile | UAE value and position tab; Executive tab |
+| Position toward UAE policy | UAE value and position tab; desk brief section 6 |
+| 66 strategy metrics | Readiness tab |
+| Six new council hats | C13 geoeconomics, C6 negotiation, C19 and C4 regional systems, C12 technology, climate and resources, C14 law, C18 narrative, all in the 20-seat council |
+| Strategy formulation | Strategy tab (scorecard, canvas, three horizons) and the Architect's Parts V to VII |
+| 24-section desk brief | Desk brief tab; the Architect's parts are woven into sections 8, 10 to 12, 14 to 18, 22 and 24, each labelled |
+
+Pipeline and cost: five analysts and an editor, worst case about US$0.92 of the US$1.00 ceiling (the first analyst alone to warm the shared cache; implementation and the editor start only if they still fit). Measured on Egypt: US$0.79.
+
+Boundary: hard power is policy-level, lawful, defensive and consent-based; other actors' proxy use is analysed, never designed for the UAE; the scope guard refuses requests for covert action, proxy support, infiltration, takeover or coercion. Tradecraft is benchmarked to the published ICD 203 standards as a method, not as a claim about any agency, and there is no signals or classified access.
+
+Official versus proposed: the Principles of the 50 and the Ministry of Foreign Affairs strategy 2023 to 2026 are cited as official. A Ministry strategy for 2027 to 2029 could not be confirmed in public sources on 25 October 2026 and is not cited as adopted.
+
+Acceptance tests: AR-01 the six agents' worst cases sum under US$1; AR-02 the system prompt carries the boundary, the tradecraft rules and the unconfirmed-strategy note; AR-03 the dashboard parser drops invalid initiatives and never invents funding; AR-04 a missing editor is shown in the output; AR-05 tradecraft checks are deterministic; AR-06 the review engine fires on posture change, 10-point moves, new alerts or builds, 90 days and a dated gate; AR-07 the desk brief stays 24 sections and the Architect fills sections the council has not; AR-08 the scope guard still refuses proxy and covert-operation requests. All are in `src/lib/architect.test.ts`.

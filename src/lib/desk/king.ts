@@ -1,4 +1,4 @@
-import { DESK_COMMON, DIRECTIVE_SCHEMA, groupRole, jsonBlock, headlineOf, sectionByName, worstOf, type Agent, type Chair, type Group } from "./core";
+import { DESK_COMMON, sectionOfGroup as groupSection, DIRECTIVE_SCHEMA, groupRole, jsonBlock, headlineOf, sectionByName, worstOf, type Agent, type Chair, type Group } from "./core";
 import type { B } from "../case/core";
 import type { Decision } from "../deep/registers";
 import type { Directive } from "./core";
@@ -86,7 +86,7 @@ export function composeKing(parts: { id: string; text: string }[]): string {
   const annex = KING_AGENTS.map((a) => { const grp = KING_GROUPS.find((g) => g.agents.includes(a.id)); const gt = grp ? t(grp.id) : ""; const sec = gt ? sectionOfGroup(gt, a.en) : ""; return sec ? `## ${a.en}\n\n${sec}` : ""; }).filter(Boolean).join("\n\n");
   return [exec, det, `# Specialist Annex\n\n${annex || "> No specialist finished."}`, data].filter(Boolean).join("\n\n");
 }
-const sectionOfGroup = (text: string, name: string) => new RegExp(`^## ${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^\\n]*\\n([\\s\\S]*?)(?=^## |$(?![\\s\\S]))`, "m").exec(text)?.[1].trim().replace(/^#{1,2} /gm, "### ") ?? "";
+const sectionOfGroup = (text: string, name: string) => groupSection(text, name, KING_AGENTS.map((a) => a.en));
 export const kingSection = (report: string, h: "Executive Brief" | "Detailed Brief" | "Specialist Annex") => new RegExp(`^# ${h}[^\\n]*\\n([\\s\\S]*?)(?=^# |$(?![\\s\\S]))`, "m").exec(report)?.[1].trim() ?? "";
 export const kingAnnex = (report: string, a: Agent) => new RegExp(`^## ${a.en.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^\\n]*\\n([\\s\\S]*?)(?=^## |^# |$(?![\\s\\S]))`, "m").exec(report)?.[1].trim() ?? "";
 export { headlineOf, sectionByName };

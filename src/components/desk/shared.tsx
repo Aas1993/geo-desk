@@ -30,7 +30,7 @@ export function CiteChip({ id }: { id: string }) {
 export const Cites = ({ ids }: { ids: string[] }) => (ids.length ? <span className="ms-1 whitespace-nowrap">{ids.map((i) => <CiteChip key={i} id={i} />)}</span> : null);
 /** Text with its [F12] ids as chips, for fields that are plain strings rather than Markdown. */
 export function Rich({ text }: { text: string }) {
-  const parts = text.split(/(\[F\d+(?:\s*[,–-]\s*F?\d+)*\]|\bF\d+\b)/g); return <>{parts.map((p, i) => (/^(\[F\d|F\d)/.test(p) ? <span key={i} className="num">{(p.match(/\d+/g) ?? []).map((n) => <CiteChip key={n} id={`F${n}`} />)}</span> : <span key={i}>{p}</span>))}</>;
+  const { map } = useContext(FactCtx); const parts = text.split(/(\[F\d+(?:\s*[,–-]\s*F?\d+)*\]|\bF\d+\b)/g); return <>{parts.map((p, i) => (/^\[F\d/.test(p) || (/^F\d+$/.test(p) && map.has(p)) ? <span key={i} className="num">{(p.match(/\d+/g) ?? []).map((n) => <CiteChip key={n} id={`F${n}`} />)}</span> : <span key={i}>{p}</span>))}</>;
 }
 
 /** A card that opens in place to its detail. Every item a desk states is one of these. */

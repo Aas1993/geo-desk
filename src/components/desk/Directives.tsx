@@ -57,7 +57,7 @@ export function Directives({ L, iso, name, product, roster, context, storeKey, p
 }
 
 function AnswerCard({ L, a, name, roster, chief, onFollow, onDelete, onRecord, done }: { L: Lang; a: Answer; name: string; roster: Agent[]; chief: string; onFollow: (t: string) => void; onDelete: () => void; onRecord?: () => void; done: boolean }) {
-  const t = useTr(L); const d: Directive | null = a.directive; const [copied, setCopied] = useState(false); const body = a.report.replace(/<directive>[\s\S]*?<\/directive>/g, "").trim();
+  const t = useTr(L); const d: Directive | null = a.directive; const [copied, setCopied] = useState(false); const body = a.report.replace(/<directive>[\s\S]*?(?:<\/directive>|$)/g, "").trim();
   const nameOf = (id: string) => { const x = roster.find((r) => r.id === id); return x ? (L === "ar" ? x.ar : x.en) : id; };
   const kind = a.mode === "update" ? t("Update", "مستجدات") : a.mode === "directive" ? t("Directive", "توجيه") : t("Question", "سؤال");
   return (

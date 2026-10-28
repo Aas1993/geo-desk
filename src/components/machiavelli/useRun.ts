@@ -13,7 +13,7 @@ export function useRun(iso: string | null, storeKey: string | null, onSaved?: (d
   const [agents, setAgents] = useState<AgentLive[]>([]);
   const [phase, setPhase] = useState<Phase>("idle"); const [status, setStatus] = useState(""); const [tail, setTail] = useState(""); const [searches, setSearches] = useState(0); const [sources, setSources] = useState(0);
   const [saved, setSaved] = useState<Saved | null>(null); const [err, setErr] = useState(""); const ac = useRef<AbortController | null>(null);
-  useEffect(() => { const t = setTimeout(() => { setSaved(null); setErr(""); setPhase("idle"); if (!storeKey) return; try { const s = localStorage.getItem(storeKey); if (s) { setSaved(JSON.parse(s) as Saved); setPhase("done"); } } catch { /* nothing saved */ } }, 0); return () => clearTimeout(t); }, [storeKey]);
+  useEffect(() => { ac.current?.abort(); const t = setTimeout(() => { setSaved(null); setErr(""); setPhase("idle"); if (!storeKey) return; try { const s = localStorage.getItem(storeKey); if (s) { setSaved(JSON.parse(s) as Saved); setPhase("done"); } } catch { /* nothing saved */ } }, 0); return () => clearTimeout(t); }, [storeKey]);
   useEffect(() => () => ac.current?.abort(), []);
   const run = useCallback(async (body: Record<string, unknown>, extra?: Record<string, unknown>) => {
     if (!iso) return; ac.current?.abort(); const a = new AbortController(); ac.current = a; setPhase("running"); setErr(""); setStatus(""); setTail(""); setSearches(0); setSources(0);

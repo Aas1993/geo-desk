@@ -8,7 +8,7 @@ import { historyFact } from "./history";
 // What each desk reads beside the shared evidence: the other products already on file, trimmed to their decision-relevant parts and labelled analysis, never evidence. The desks stay separate (their own page, their own roster, their own saved products); this is only what one may read of the other when the person leaves "read what is on file" ticked.
 export type Filed = { council?: string | null; architect?: string | null; kingBrief?: string | null; embIntel?: string | null; embPlan?: string | null };
 const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, t.lastIndexOf(" ", n) > n * 0.6 ? t.lastIndexOf(" ", n) : n)}…` : t);
-const strip = (t: string) => t.replace(/<(king|mission1|mission2|ambassador|architect|directive)>[\s\S]*?<\/\1>/g, "").replace(/<\/?[a-zA-Z_][^>]*>/g, "");
+const strip = (t: string) => t.replace(/<(king|mission1|mission2|ambassador|architect|directive)>[\s\S]*?(?:<\/\1>|$)/g, "").replace(/<\/?[a-zA-Z_][^>]*>/g, "");
 /** For THE KING's council: the Strategic Council digest, the ambassador's brief and the mission strategy when they exist. */
 export function kingContext(f: Filed): string {
   const parts: string[] = []; const c = councilDigest(f.council ?? null, 5200); if (c) parts.push(`## Strategic Council (Case File)\n${c}`);

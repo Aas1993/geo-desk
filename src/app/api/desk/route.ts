@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { renderFacts } from "@/lib/ask/facts";
 import { noteText, rejectCrossSite, safeMessage } from "@/lib/guard";
-import { maxRunUsd } from "@/lib/dossier/cost";
+import { maxRunUsd, outputRoom, runUsd } from "@/lib/dossier/cost";
 import { EFFORTS, runModelTask, type Effort, type Source, type Usage } from "@/lib/dossier/run";
 import { refusalFor, REFUSAL_TEXT } from "@/lib/machiavelli/guard";
 import { manifestHash } from "@/lib/deep/consolidate";
@@ -39,19 +39,19 @@ export async function POST(req: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const send = (e: Record<string, unknown>) => { try { controller.enqueue(enc.encode(`data: ${JSON.stringify(e)}\n\n`)); } catch {} }; const finish = () => { try { controller.close(); } catch {} };
-      let key = ""; let slot = 0; let refund = () => {}; const pool = directive ? dir : store;
+      let key = ""; let owned = false; let slot = 0; let refund = () => {}; const pool = directive ? dir : store;
       try {
         send({ type: "status", text: "Collecting the shared evidence base…" });
         const [c, snap, res] = await Promise.all([loadCase(iso3), loadSnapshot(iso3).catch(() => null), loadResearch(iso3).catch(() => null)]); if (!c) { send({ type: "error", error: "not_found", message: "Unknown country." }); return finish(); }
         const manifest = manifestHash(snap, null, iso3); key = deskKey(product, iso3, o, manifest, context);
-        const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
+        const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit, agents: hit.agents.map((a: CallOut) => ({ ...a, text: "" })) }); return finish(); }
         if (pool.running.has(key)) { send({ type: "error", error: "busy", message: "This is already being written. Try again in a minute." }); return finish(); }
         pool.runs = pool.runs.filter((t) => Date.now() - t < 3600_000); const lim = directive ? MAX_DIRECTIVES_PER_HOUR : MAX_PER_HOUR;
         if (pool.runs.length >= lim) { send({ type: "error", error: "limit", message: `Limit of ${lim} new ${directive ? "directives" : "detailed briefings"} per hour reached (${directive ? "DESK_MAX_DIRECTIVES_PER_HOUR" : "DOSSIER_MAX_PER_HOUR"}). Cached results are still free.` }); return finish(); }
         if (!directive && store.running.size >= MAX_CONCURRENT) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
         if (directive && dir.running.size >= 3) { send({ type: "error", error: "busy", message: "Other directives are being worked. Try again in a minute." }); return finish(); }
-        slot = Date.now(); pool.runs.push(slot); pool.running.add(key); refund = () => { const i = pool.runs.indexOf(slot); if (i >= 0) pool.runs.splice(i, 1); };
-        const ac = new AbortController(); req.signal.addEventListener("abort", () => ac.abort());
+        slot = Date.now(); pool.runs.push(slot); pool.running.add(key); owned = true; refund = () => { const i = pool.runs.indexOf(slot); if (i >= 0) pool.runs.splice(i, 1); };
+        const ac = new AbortController(); req.signal.addEventListener("abort", () => ac.abort()); if (req.signal.aborted) ac.abort();
         const gathered = await caseFacts(iso3, c, snap, res?.pubs ?? []); if (gathered) for (const x of deskExtraFacts(c)) gathered.facts.push({ id: `F${gathered.facts.length + 1}`, kind: x.kind, text: x.text, src: x.src });
         if (!gathered || gathered.facts.length < 8) { refund(); send({ type: "error", error: "thin", message: "Not enough data on this yet." }); return finish(); }
         send({ type: "facts", count: gathered.facts.length, tiles: [], gaps: gathered.gaps });
@@ -60,11 +60,11 @@ export async function POST(req: Request) {
         const total: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0, fetches: 0, usd: 0 }; let spent = 0; const nameOf = (x: Call) => (o.lang === "ar" ? x.name.ar : x.name.en);
         const effort = (x: Call): Effort => ENV_EFFORT ?? (x.stage === 1 ? "medium" : "low");
         send({ type: "roster", agents: plan.calls.map((x) => ({ id: x.id, name: nameOf(x), stage: x.stage, searches: x.searches })) });
-        const run1 = async (x: Call) => {
+        const run1 = async (x: Call, cap?: number, spentAt?: number) => {
           send({ type: "agent", id: x.id, status: "start" });
           try {
-            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: x.stage === 1 ? CAP : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => spent });
-            const usd = r.usage.usd ?? 0; spent += usd; for (const k of ["input", "output", "cacheRead", "cacheWrite", "searches", "fetches"] as const) total[k] += r.usage[k]; total.usd = spent;
+            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 1 ? CAP : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0)), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => spentAt ?? spent });
+            const usd = r.usage.usd ?? runUsd(r.usage, MODEL); r.usage.usd = usd; spent += usd; for (const k of ["input", "output", "cacheRead", "cacheWrite", "searches", "fetches"] as const) total[k] += r.usage[k]; total.usd = spent;
             for (const s of r.sources) if (!seen.has(s.url)) { seen.add(s.url); sources.push(s); }
             const start = r.report.search(/^#{1,3} /m); const text = (start > 0 && x.stage === 0 ? r.report.slice(start) : r.report).trim(); out[x.id] = text;
             results.push({ id: x.id, name: nameOf(x), text, usd, searches: r.usage.searches, failed: r.failedSteps, status: "done", note: r.costStopped ? "stopped at the cost ceiling" : undefined }); send({ type: "agent", id: x.id, status: "done", usd, searches: r.usage.searches, failed: r.failedSteps });
@@ -77,20 +77,20 @@ export async function POST(req: Request) {
         if (stage0.length > 1) {
           const room = CAP - spent - (fin ? worstOf(fin.maxTokens, fin.searches) * LIKELY : 0); let used = 0; const go: Call[] = [];
           for (const x of stage0.slice(1)) { const w = worstOf(x.maxTokens, x.searches) * LIKELY; if (used + w <= room) { used += w; go.push(x); } else skipped(x, "no money left under the cost ceiling"); }
-          if (go.length) { send({ type: "status", text: `${go.length} more sitting${go.length === 1 ? " is" : "s are"} working in parallel…` }); await Promise.all(go.map(run1)); }
+          if (go.length) { send({ type: "status", text: `${go.length} more sitting${go.length === 1 ? " is" : "s are"} working in parallel…` }); const reserve = fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0; const at = spent; const share = (CAP - at - reserve) / go.length; await Promise.all(go.map((x) => run1(x, at + share, at))); }
         }
-        if (fin) { if (CAP - spent >= worstOf(fin.maxTokens, fin.searches) * LIKELY) { send({ type: "status", text: "Writing the final product…" }); await run1(fin); } else skipped(fin, "no money left under the cost ceiling"); }
+        if (fin) { if (CAP - spent >= worstOf(fin.maxTokens, fin.searches) * LIKELY && outputRoom(spent, CAP, MODEL) >= Math.min(fin.maxTokens * 0.6, 6000)) { send({ type: "status", text: "Writing the final product…" }); await run1(fin); } else skipped(fin, "no money left under the cost ceiling"); }
         const ordered = plan.calls.map((x) => results.find((r) => r.id === x.id)).filter((x): x is CallOut => !!x);
         const known = new Set(gathered.facts.map((f) => f.id)); const report = checkRefs(plan.compose(ordered.map((r) => ({ id: r.id, text: r.text }))), known); const cited = new Set(citedIds(report));
         const done: Done = { product, report, agents: ordered, sources, usage: total, at: new Date().toISOString(), model: MODEL, options: { ...o, kind: product, context: undefined }, name: gathered.name, manifest, facts: gathered.facts.filter((f) => cited.has(f.id)).map((f) => ({ id: f.id, kind: f.kind, text: f.text.slice(0, 1600), src: f.src, url: f.url })) };
         if (ordered.some((a) => a.status === "done")) { cache.set(key, done); while (cache.size > 30) cache.delete(cache.keys().next().value as string); } else refund();
-        send({ type: "done", cached: false, ...done });
+        send({ type: "done", cached: false, ...done, agents: ordered.map((a) => ({ ...a, text: "" })) });
       } catch (e) {
         if (req.signal.aborted) return finish();
         console.error("[desk] run failed:", e instanceof Error ? e.message : e);
         const nocredit = e instanceof Error && /credit balance/i.test(e.message); const authish = e instanceof Error && /authentication|api key|credential|x-api-key|oauth|refresh token|invalid_grant|expired/i.test(e.message);
         send({ type: "error", error: nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError || authish ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : "upstream", message: safeMessage(e) });
-      } finally { if (key) pool.running.delete(key); finish(); }
+      } finally { if (owned) pool.running.delete(key); finish(); }
     },
   });
   return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store, no-transform", Connection: "keep-alive" } });

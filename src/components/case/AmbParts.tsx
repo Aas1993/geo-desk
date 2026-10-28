@@ -2,6 +2,7 @@
 import { openings, type Advantage, type Level } from "@/lib/case/advantage";
 import type { AmbParsed, Contact, Init, Nb, Play } from "@/lib/case/ambassador";
 import type { CaseData } from "@/lib/case/load";
+import { matchCountry } from "@/lib/case/report";
 import { Pill, type Lang } from "../falcon/bits";
 import { Meter, bt, useTr } from "./bits";
 
@@ -63,7 +64,7 @@ export function InfluenceMap({ L, contacts, head }: { L: Lang; contacts: Contact
 /** The country's neighbours: the held facts (UN voting agreement, shared blocs, the UAE's partnership with each) beside the adviser's reading of each relation. */
 export function NeighbourBoard({ L, d, ai }: { L: Lang; d: CaseData; ai: Nb[] }) {
   const t = useTr(L); const rows = [...d.neighbours.ring1.map((n) => ({ n, k: t("border", "حدود") })), ...d.neighbours.ring2.map((n) => ({ n, k: t("strategic", "استراتيجي") }))];
-  const find = (nm: string) => ai.find((x) => nm.toLowerCase().includes(x.country.toLowerCase()) || x.country.toLowerCase().includes(nm.toLowerCase()));
+  const find = (nm: string) => matchCountry(nm, ai, rows.map((r) => r.n.name));
   return (
     <div className="space-y-3">
       <div className="scroll-thin overflow-x-auto rounded-[14px] border border-line bg-bg1"><table className="w-full min-w-[720px] border-collapse text-[12px]"><thead><tr className="text-[10.5px] text-t2"><th className="px-3 py-2 text-start font-semibold">{t("Neighbour", "الجار")}</th><th className="px-2 text-start font-semibold">{t("UN voting agreement", "اتفاق التصويت")}</th><th className="px-2 text-start font-semibold">{t("Shared blocs", "تكتلات مشتركة")}</th><th className="px-2 text-start font-semibold">{t("UAE partnership", "الشراكة مع الإمارات")}</th><th className="px-2 text-start font-semibold">{t("Relation (adviser)", "العلاقة (المستشار)")}</th></tr></thead>

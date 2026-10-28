@@ -19,11 +19,12 @@ export function readFacts(key: string | null): Fact[] { if (!key) return []; try
 
 /** One answered directive, question or update, kept in this browser. */
 export type Answer = { id: string; at: string; mode: "question" | "directive" | "update"; urgency: "routine" | "urgent"; topic: string; agents: string[]; report: string; directive: Directive | null; usd: number | null; searches: number; sources: number; cached: boolean; facts: Fact[]; lang: "en" | "ar" };
+const ANS_EV = "gd-desk-answers";
 export function readAnswers(key: string): Answer[] { try { const j = JSON.parse(localStorage.getItem(key) ?? "[]") as Answer[]; return Array.isArray(j) ? j : []; } catch { return []; } }
 export function useAnswers(key: string | null): [Answer[], (a: Answer) => void, (id: string) => void] {
   const [list, setList] = useState<Answer[]>([]);
-  useEffect(() => { const t0 = setTimeout(() => setList(key ? readAnswers(key) : []), 0); return () => clearTimeout(t0); }, [key]);
-  const add = useCallback((a: Answer) => { if (!key) return; const n = [a, ...readAnswers(key).filter((x) => x.id !== a.id)].slice(0, 25); try { localStorage.setItem(key, JSON.stringify(n)); } catch { /* storage full: drop the oldest */ try { localStorage.setItem(key, JSON.stringify(n.slice(0, 8))); } catch { /* give up */ } } setList(n); }, [key]);
-  const del = useCallback((id: string) => { if (!key) return; const n = readAnswers(key).filter((x) => x.id !== id); try { localStorage.setItem(key, JSON.stringify(n)); } catch { /* ignore */ } setList(n); }, [key]);
+  useEffect(() => { const go = () => setList(key ? readAnswers(key) : []); const t0 = setTimeout(go, 0); window.addEventListener(ANS_EV, go); return () => { clearTimeout(t0); window.removeEventListener(ANS_EV, go); }; }, [key]);
+  const add = useCallback((a: Answer) => { if (!key) return; const n = [a, ...readAnswers(key).filter((x) => x.id !== a.id)].slice(0, 25); try { localStorage.setItem(key, JSON.stringify(n)); } catch { /* storage full: drop the oldest */ try { localStorage.setItem(key, JSON.stringify(n.slice(0, 8))); } catch { /* give up */ } } setList(n); try { window.dispatchEvent(new Event(ANS_EV)); } catch { /* ignore */ } }, [key]);
+  const del = useCallback((id: string) => { if (!key) return; const n = readAnswers(key).filter((x) => x.id !== id); try { localStorage.setItem(key, JSON.stringify(n)); } catch { /* ignore */ } setList(n); try { window.dispatchEvent(new Event(ANS_EV)); } catch { /* ignore */ } }, [key]);
   return [list, add, del];
 }

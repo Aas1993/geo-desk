@@ -9,6 +9,7 @@ import { OPTS, scoreboard, type Edits, type ScoreRow } from "./score";
 import type { Decision } from "../deep/registers";
 import { CRITERIA } from "./seats";
 import { parseAmbassador, type AmbParsed } from "./ambassador";
+import type { EmbDigest } from "../desk/embassy";
 
 // THE KING: the final decision page. It consolidates everything the platform holds on one country into the one thing a decision-maker needs: the question, the four ways the UAE could act, the one the evidence supports and why, what would change that call, what is still missing, what the ambassador recommends, and a record of the decision that is taken.
 // It adds nothing paid: it reads the data, the Strategic Council, the Statecraft Architect and the Ambassador's plan when they exist, and says what is missing when they do not. The decision itself is a named person's, recorded in the decision log with conditions, a review date and, later, the observed result.
@@ -27,7 +28,7 @@ export type KingBrief = {
   checks: Check[]; ready: number; inputsNeeded: number; decisions: { items: string[]; from: "architect" | "council" | "data" };
   risks: string[]; objection: string | null; assumptions: string[]; changeMind: string[]; gates: GateItem[];
   invest: { openings: AdvRow[]; deepen: AdvRow[]; concentration: { who: string; share: number } | null; deals: number };
-  amb: AmbParsed | null; riskLevels: { value: number | null; ability: number | null; risk: number | null; stable: boolean };
+  amb: AmbParsed | null; emb: EmbDigest | null; riskLevels: { value: number | null; ability: number | null; risk: number | null; stable: boolean };
 };
 const one = (s: string, n: number) => { const t = s.replace(/[#*|>_`]/g, "").replace(/\s+/g, " ").trim(); return t.length > n ? `${t.slice(0, t.lastIndexOf(" ", n) > n * 0.6 ? t.lastIndexOf(" ", n) : n).trim()}…` : t; };
 /** The sentence of a text that holds the strongest objection: the red team's strongest argument, else the Council's dissent. */
@@ -35,7 +36,7 @@ export function objectionOf(arch: string | null, council: string | null): string
   const d5 = arch ? deliverableOf(arch, 5) : ""; const m = /(strongest (?:argument|objection|competing explanation)[^.\n]*[.\n][^\n]{0,260})/i.exec(d5); if (m) return one(m[1], 320);
   const k = council ? sectionOf(council, "Risks and Dissent") : ""; return k ? one(k, 320) : null;
 }
-export function kingBrief(x: { d: CaseData; council: string | null; arch: string | null; ambassador: string | null; edit: Edits; weights: Record<string, number>; decisions: Decision[]; today: number; councilAt?: string | null; archAt?: string | null }): KingBrief {
+export function kingBrief(x: { d: CaseData; council: string | null; arch: string | null; ambassador: string | null; emb?: EmbDigest | null; edit: Edits; weights: Record<string, number>; decisions: Decision[]; today: number; councilAt?: string | null; archAt?: string | null }): KingBrief {
   const { d, council, arch } = x; const sb = scoreboard(d, x.edit, x.weights); const rule = d.posture.posture; const best = sb.best;
   const options: Option[] = OPTS.map((o) => { const r = sb.rows.find((q) => q.o === o) as ScoreRow; return { posture: o, name: POSTURE[o].name, sub: POSTURE[o].sub, total: r.total, gates: r.gates, recommended: best?.o === o, rule: rule === o, scores: r.s }; });
   const dec = decisionsOf({ d, arch, council }); const text = `${council ?? ""}\n${arch ?? ""}`; const inputsNeeded = (text.match(/DESK INPUT REQUIRED/g) ?? []).length;
@@ -47,7 +48,7 @@ export function kingBrief(x: { d: CaseData; council: string | null; arch: string
   const checks: Check[] = [
     { id: "council", ok: !!council, en: "The Strategic Council has judged it", ar: "حكم عليه المجلس الاستراتيجي", go: "council" },
     { id: "architect", ok: !!arch, en: "A three-horizon strategy with dated gates is written", ar: "استراتيجية بثلاثة آفاق وبوابات مؤرخة مكتوبة", go: "architect" },
-    { id: "ambassador", ok: !!x.ambassador, en: "The ambassador's plan and investment case are written", ar: "خطة السفير والحالة الاستثمارية مكتوبتان", go: "ambassador" },
+    { id: "ambassador", ok: !!x.ambassador || !!x.emb, en: "The embassy council has reported (the ambassador's brief, plan and investment case)", ar: "رفع مجلس السفارة تقريره (موجز السفير وخطته وحالته الاستثمارية)", go: "ambassador" },
     { id: "fresh", ok: !!council && !!arch && fresh(x.councilAt) && fresh(x.archAt), en: "The Council and strategy are newer than the data builds", ar: "المجلس والاستراتيجية أحدث من إصدارات البيانات" },
     { id: "gates", ok: !best || best.gates.length === 0, en: "No security or legal gate is tripped on the recommended course", ar: "لا بوابة أمنية أو قانونية مفعّلة على المسار الموصى به" },
     { id: "exposure", ok: unknownExp === 0, en: unknownExp ? `${unknownExp} exposure measure(s) are unknown (unknown is not zero)` : "Every exposure measure is known", ar: unknownExp ? `${unknownExp} من مقاييس الانكشاف غير معروفة (وغير المعروف ليس صفرًا)` : "كل مقاييس الانكشاف معروفة" },
@@ -56,7 +57,7 @@ export function kingBrief(x: { d: CaseData; council: string | null; arch: string
   const risks = [...(amb ? [] : []), ...(dash?.risks ?? []).filter((r) => r.impact !== "low").slice(0, 3).map((r) => `${r.name}: ${r.mitigation}`)];
   return { name: d.name, stance: POSTURE[best?.o ?? rule ?? "hold"].name, recommended: best?.o ?? null, rulePosture: rule, differs: !!best && !!rule && best.o !== rule, options, gateWarn: sb.rows.flatMap((r) => r.gates.map((g) => `${r.o}:${g}`)),
     checks, ready: checks.filter((c) => c.ok).length, inputsNeeded, decisions: dec, risks, objection: objectionOf(arch, council), assumptions, changeMind, gates,
-    invest: { openings: openings(adv).slice(0, 3), deepen: toDeepen(adv).slice(0, 3), concentration: adv.concentration, deals: adv.total }, amb, riskLevels: { value: d.posture.value, ability: d.posture.ability, risk: d.posture.risk, stable: d.posture.stable } };
+    invest: { openings: openings(adv).slice(0, 3), deepen: toDeepen(adv).slice(0, 3), concentration: adv.concentration, deals: adv.total }, amb, emb: x.emb ?? null, riskLevels: { value: d.posture.value, ability: d.posture.ability, risk: d.posture.risk, stable: d.posture.stable } };
 }
 export const criterionName = (id: string) => CRITERIA.find((c) => c.id === id);
 

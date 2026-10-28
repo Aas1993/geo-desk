@@ -53,7 +53,7 @@ Standing principles (they explain most design choices):
 
 ### Navigation (top bar on desktop, bottom bar on mobile)
 
-World, **Case File**, Markets, Falcon Eye, Deep Intelligence, Machiavellian, Influence. The Case File is second, right after the map, because it is the final President and Minister view.
+World, **Case File**, **THE KING**, **The Ambassador**, Markets, Falcon Eye, Deep Intelligence, Machiavellian, Influence. The Case File is second, right after the map, because it is the final President and Minister view; THE KING (the head of state's decision room) and The Ambassador (the embassy council) sit beside it as pages of their own.
 
 ### Routes
 
@@ -62,7 +62,9 @@ World, **Case File**, Markets, Falcon Eye, Deep Intelligence, Machiavellian, Inf
 | `/` | World map and country panel (`?sel=ARE&tab=economy#zoom/lat/lng`, `?cmp=ISO3` for compare) |
 | `/markets`, `/markets/ADX/ADCB`, `/markets/DFM/EMAAR` | Equities board and stock pages |
 | `/falcon` | Falcon Eye, ten sections (hash `#council`, `#library`, `#platform` ...) |
-| `/case` | Case File (hash `#priorities`, `#president`, `#minister`, `#detailed/council`, `#detailed/log`, `#reports` ...) |
+| `/case` | Case File (hash `#priorities`, `#president`, `#minister`, `#detailed/council`, `#detailed/log`, `#reports`, `#reports/king` ...; `#king` and `#ambassador` redirect) |
+| `/king` | THE KING: the head of state's decision room (ten specialists and a Decision Chair, directives, UAE history) |
+| `/ambassador` | The Ambassador: the embassy council (Chief of Staff and thirteen desks, mission strategy and plans, power map, partners, directives) |
 | `/deep` | Deep Intelligence (hash `#fe01` to `#fe10`) |
 | `/machiavelli` | Machiavellian module (hash `#indicators:COD` ...) |
 | `/influence` | Global Influence Scorecard |
@@ -112,7 +114,7 @@ Default model: Claude Sonnet 5.5 (`claude-sonnet-5-5`) at low or medium effort.
 | Command | Does |
 |---|---|
 | `npm run dev`, `npm run build`, `npm start` | Develop, build, serve |
-| `npm test` | 20 chained test suites (indicators, research, layers, agreements, flights, investment, media, diplomacy, intel, dossier, integrity, falcon, services, machiavelli, deep, case, architect, case-report and others) |
+| `npm test` | 21 chained test suites (indicators, research, layers, agreements, flights, investment, media, diplomacy, intel, dossier, integrity, falcon, services, machiavelli, deep, case, architect, case-report, case-log, case-king, desk and others) |
 | `npm run typecheck`, `npm run lint`, `npm run check` | Types, lint, all three |
 | `npm run parity` | Regenerates `docs/parity.md` |
 | `node scripts/build-*.mjs` | Dataset builders (list in section 15) |
@@ -240,11 +242,11 @@ Also: **Red Team** (reviews any saved product independently: verdict, strongest 
 
 ## 8. The Case File (`/case`): the President and Minister view
 
-The one place a President or Minister reads a country. Seven views; nothing is shown in two places. **Priorities** is across all countries; the other six are for the chosen country: **THE KING** (final decision), **President**, **Minister**, **Ambassador**, **Detailed**, **Reports**.
+The one place a President or Minister reads a country. Five views; nothing is shown in two places. **Priorities** is across all countries; the other four are for the chosen country: **President**, **Minister**, **Detailed**, **Reports**. **THE KING** (the decision room, section 8.1c) and **The Ambassador** (the embassy council, section 8.1d) are pages of their own in the main navigation; the old links `#king` and `#ambassador` redirect there.
 
 ### 8.1 Header
 
-Country picker (shared), name, region, scorecard, rule-based posture, and two status chips: **Council on file / not run** and **Strategy on file / not written**. Seven large view buttons: **Priorities, THE KING, President, Minister, Ambassador, Detailed, Reports**, and a **what-changed chip** (section 8.1a). With no country chosen the page opens on Priorities. Older links (`#exec`, `#council`, `#architect` ...) still open the right place.
+Country picker (shared), name, region, scorecard, rule-based posture, and two status chips: **Council on file / not run** and **Strategy on file / not written**. Five large view buttons: **Priorities, President, Minister, Detailed, Reports**, links to THE KING and The Ambassador, and a **what-changed chip** (section 8.1a). Status chips also show whether an embassy brief is on file. With no country chosen the page opens on Priorities. Older links (`#exec`, `#council`, `#architect` ...) still open the right place.
 
 ### 8.1a What changed (the chip under the header)
 
@@ -254,13 +256,21 @@ One answer to "has anything moved since this file was last reviewed?". Baseline:
 
 Every country on one board, grouped by the posture rule and sorted by one reading you choose (value, ability, risk, partnership, alerts, name). Three queues on top: **decisions to review**, **changed since the last review**, **high value with no Council yet**. Filters: posture, region, search, only with a file. Rows show value, ability and risk bars, Partnership rank, alerts, leverage, Council and strategy on file, and flags. Click a country to open its President page. There is deliberately no combined priority score. Same `buildCase` as each country's own file; free.
 
-### 8.1c THE KING (the final decision)
+### 8.1c THE KING (`/king`: the head of state's decision room)
 
-The page where a decision-maker decides. It asks one question ("Should the UAE commit in X, in what form and under what conditions?") and brings everything to it: the course the evidence supports (the national-interest scorecard; security and legal are gates that remove a course whatever its total) beside the posture rule's own reading; the four courses with scores, gates and strongest and weakest criteria; a "ready to decide?" checklist (Council, strategy, ambassador's plan, freshness, gates, unknown exposure, desk inputs outstanding); what would change the call, the strongest objection, assumptions to validate; the investment case; what the ambassador advises; and **Take the decision**: approve, approve with conditions (each becomes a milestone), choose another course, defer to a date, or decline, by a **named person**, with a review date (default 90 days). Recorded in the decision log (source "THE KING") and shown on the Priority board as "Decided". Free. The Arabic label is "القرار النهائي".
+A page of its own, top-level in the navigation (Arabic label "القرار النهائي"). Ten specialists in four sittings and a **Decision Chair** analyse the country in every field, and the head of state can put any question or directive to them. Archetypes of PhD-level expertise with decades of practice (no real person is represented): **K1** Geopolitics and Regional Order; **K2** Domestic Politics, Leadership and Succession; **K3** Macroeconomy and Sovereign Finance; **K4** Trade, Investment and UAE Economic Statecraft; **K5** Energy, Food, Water and Critical Resources; **K6** Security, Defence Cooperation and Counter-Terrorism (policy level); **K7** Intelligence Assessment, Indications and the Red Team; **K8** International Law, Treaties, Sanctions and Compliance; **K9** Society, Media, Narrative and Soft Power; **K10** UAE Policy Memory: Precedent, Doctrine and Past Decisions. They use official sources, think tanks (Chatham House, Carnegie, CSIS, IISS, Crisis Group, ECSSR, TRENDS and the country's own), news and wire reporting, reports and indices and the UAE's own strategy and record; there is no compliant social-media access and none is claimed. Standards follow ICD 203 as a method only (bottom line first, likelihood band and separate confidence on every key judgment, assumptions, alternatives, indicators with thresholds, gaps); there is no signals or classified access and the product says so.
 
-### 8.1d Ambassador (the UAE ambassador's desk)
+Convene the Council (click-started, about US$0.55 measured measured on Egypt, under a US$1.00 ceiling; the first sitting runs alone to warm the shared cache). The Chair returns: the **Decision** (deepen, staged, hedge or hold, with confidence, conditions and what happens if wrong), the **Executive Brief** (at most 650 words), the **Detailed Brief** (situation, the UAE's record and precedents, the fields, the four courses, recommendation and conditions, implementation gates, the red team's case, indicators and warnings, gaps) and validated structured data. Tabs: **Decision** (the Council's call above the free national-interest scorecard, readiness checklist, four courses, investment case, what the embassy advises, and **Take the decision** by a named person with conditions and a review date; recorded in the decision log and shown on the Priority board as "Decided"), **Executive brief**, **Detailed brief** (with the four courses, key judgments, risks, indicators and the UAE's precedents), **The Council** (each specialist: mandate, questions, sources, findings; "Ask this specialist"), **UAE history here**, **Ask or direct** and **Prompt library**. Every item opens to its detail and every fact id opens the fact and its source.
 
-Free first: the **UAE investment advantage** (about 40 UAE vehicles against the country's needs in eleven sectors and the UAE deals in the feed: present, openings, where to deepen, concentration) and the neighbours' held facts (UN voting agreement, shared blocs, UAE partnership). Then one click-started run (about US$0.77 measured on Egypt): five advisers (investments first; who to know; the political, security, humanitarian and social hats; neighbours, scenarios and foreign-policy fit; research, media and narrative) and an editor writing the Ambassador's Brief, the **100-day, one-year and three-year plans**, ranked investment plays (enter, expand, protect), a who-to-know map (government, private sector, community, research, media), scenarios by hat and neighbour relations. Boundary: influence is not control; public roles and organisations only; hard power at policy level; no social-media measurement exists and it says so.
+### 8.1d The Ambassador (`/ambassador`: the embassy council)
+
+A page of its own, top-level in the navigation. The UAE ambassador's country team, organised as an embassy is, with a **Chief of Staff** (the Deputy Chief of Mission's role: briefs, keeps the updates, answers) and **thirteen desks**: **E1** Political, **E2** Economic, **E3** Investment and Sovereign Capital, **E4** Commercial and Private Sector, **E5** Power and Stakeholder Mapping, **E6** Security and Defence Cooperation (policy level), **E7** Bilateral, Protocol and Treaty Affairs, **E8** Regional and Multilateral, **E9** Energy, Food, Water and Logistics, **E10** Consular Affairs and the Community, **E11** Culture, Education, Media and Public Diplomacy, **E12** Humanitarian and Development, **E13** Legal, Compliance and Mission Risk. Brief and structure follow the published country-team and Integrated Country Strategy model and ambassadorial briefing books.
+
+Two click-started sittings, each under its own US$1.00 ceiling. **Sitting 1, the intelligence brief** (US$0.98 measured before the final budget trim, expected about 0.85 measured): the Ambassador's Brief, updates and standing instructions, the **power map** (government, security, economic, private-sector, community, research and media institutions and public roles at three levels, each with why they matter, how to engage openly and officially and a caution), **10 to 16 private-sector and state-linked companies to engage** with the UAE counterpart, the win-win logic, the structure and the due diligence first, ranked investment plays (enter, expand, protect, with the local counterpart, structure, protections and due diligence), neighbours, scenarios, risks, indicators, the next 90 days and what the host is likely to ask of the UAE. **Sitting 2, the mission strategy and plans** (US$0.89 measured before the plan prompt was shortened, expected about 0.85 measured): the end state, strategic logic, objectives and measures, the investment and engagement strategy, what the mission will not do, the **100-day, one-year and three-year plans** (each initiative with a proposed owner, actions, KPI with baseline and target, cost "not estimated" unless evidenced, risk, dependencies, due diligence first and a gate), the due-diligence register, decision gates and resources. The Chief of Staff gives an **update** on demand (US$0.20 measured) and answers any question or directive through **Ask or direct**. Tabs: Chief of Staff, Ambassador's brief, Mission strategy and plans, Power map, Private-sector partners, Investments (the free UAE investment advantage plus the desk's plays), The desks, Neighbours and region, UAE history here, Ask or direct, Prompt library. Boundary: influence is not control; public roles and organisations only; hard power at policy level; no social-media measurement exists and it says so.
+
+### 8.1e Ask or direct, UAE history and how the desks run
+
+**Ask or direct** (both pages): a question, a directive or a request for an update on any topic. It is routed to the specialists whose field it touches (or the ones you choose); they answer in one sitting; the Chair or Chief of Staff writes the answer (band and confidence), the recommendation, options, the way forward (ordered steps with proposed owners, due diligence first), risks, what only the ministry can supply and three clickable follow-up questions. About US$0.27 measured each; its own hourly cap (12); answers are kept in this browser; on THE KING an answer can be recorded in the decision log. **UAE history here** (free, no model): the UAE's long record in the country from held data (trade, investment positions, all FDI into the country, UN voting distance since 1990, remittances, deals in the feed with sources, era averages) and what it cannot show; it is also passed to the agents as a fact. **How they run**: one run plan per product (first call alone to warm the cache, the rest in parallel, then the writer), fact ids checked against the evidence pack, cited facts saved with the result, a tolerant JSON reader that keeps what a cut-off answer completed and says so, a ceiling per run with a reserve for the writer, and the shared hourly cap of four full sittings. Leaving the page cancels a run; switching tabs inside the page does not.
 
 ### 8.2 President (one page, no tables)
 
@@ -296,8 +306,8 @@ Seven types:
 | Report | For | Length |
 |---|---|---|
 | President's one-page brief | The answer, three readings, decisions, what could go wrong, next gates, four numbers | 1 page |
-| THE KING: decision memo | The question, four courses with scores and gates, recommendation, readiness, objection, what would change the call, investment case, gates, decision log | 2 to 3 pages |
-| Ambassador's plan pack | Brief, 100-day, one-year and three-year plans, investment plays and advantage, who to know, neighbours, scenarios by hat | 6 to 10 pages |
+| THE KING: decision memo | The question, the Council's call and Executive Brief, four courses with scores and gates, recommendation, readiness, objection, what would change the call, investment case, gates, decision log | 2 to 4 pages |
+| Ambassador's plan pack | Brief, mission strategy and the 100-day, one-year and three-year plans, investment plays and advantage, who holds power, private-sector partners, neighbours, scenarios | 8 to 14 pages |
 | Ministerial brief | Answer, Council judgment, six lenses, strategy by horizon, decisions, decision log and follow-through, risks, gates, indicators, options, position toward UAE policy | 4 to 6 pages |
 | Strategy and roadmap pack | Three-horizon strategy, 0-to-15-year roadmap, power matrix, scenarios, red-team memorandum, indicators | 6 to 10 pages |
 | Desk-officer brief | The 24-section master document with every trend table | 20+ pages |
@@ -469,11 +479,15 @@ The AI routes accept only same-origin JSON and have **no sign-in**. Caps and cac
 | Deep: research synthesis / analyst team | 0.15 to 0.20 / 0.51 |
 | **Case File Strategic Council (20 seats)** | **0.78** |
 | **Statecraft Architect** | **0.79** |
-| **Ambassador's desk** | **0.77** |
+| **THE KING: Council (10 specialists + Chair)** | **about US$0.55 measured** |
+| **THE KING: directive, question or update** | **US$0.27 measured** |
+| **Embassy council: intelligence sitting (13 desks + Chief of Staff)** | **US$0.98 measured before the final budget trim, expected about 0.85** |
+| **Embassy council: plan sitting** | **US$0.89 measured before the plan prompt was shortened, expected about 0.85** |
+| **Embassy council: directive or question / update** | **0.27 / 0.20** |
 | Stock research note (EMAAR) | 0.73 |
 | Case File views and Reports, Full Consolidated Intelligence, all dashboards | 0.00 |
 
-THE KING, the Priority board, the decision log, the what-changed chip and the investment advantage cost nothing. A complete ministerial file for one country (Council plus Architect) costs about US$1.57 once; reports then assemble from them for free. Writing them again in Arabic costs the same again.
+The scorecard and decision form on THE KING, the UAE history panels, the Priority board, the decision log, the what-changed chip and the investment advantage cost nothing. A complete ministerial file for one country (Council plus Architect) costs about US$1.57 once; THE KING's Council and the two embassy sittings are separate products on their own pages; reports then assemble from whatever is on file for free. Writing them again in Arabic costs the same again.
 
 ---
 

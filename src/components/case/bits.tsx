@@ -20,4 +20,5 @@ export const LEVEL_C = { high: "var(--risk)", medium: "var(--warn)", low: "var(-
 export const fmt = (v: number | null | undefined, d = 1) => (v == null || !isFinite(v) ? "n/a" : Math.abs(v) >= 1e9 ? `${(v / 1e9).toFixed(1)}bn` : Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}m` : Math.abs(v) >= 1000 ? Math.round(v).toLocaleString("en-US") : v.toFixed(d));
 const STATUS_AR: Record<string, string> = { done: "تم", run: "يعمل", wait: "ينتظر", skipped: "تخطّى", error: "خطأ", high: "مرتفع", medium: "متوسط", low: "منخفض", unknown: "غير معروف" };
 /** A run or level status word in the page language. */
-export const statusWord = (L: Lang, s: string) => (L === "ar" ? STATUS_AR[s] ?? s : s);
+const STATUS_EN: Record<string, string> = { wait: "waiting", run: "working", done: "done", skipped: "skipped", error: "error" };
+export const statusWord = (L: Lang, s: string) => (L === "ar" ? STATUS_AR[s] ?? s : STATUS_EN[s] ?? s);

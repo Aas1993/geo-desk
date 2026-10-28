@@ -5,10 +5,10 @@ import type { Fact } from "./shared";
 import type { Directive } from "@/lib/desk/core";
 
 // What this browser holds for the two desks, read live. The desks keep separate saved products; each may read the other's finished work when the person leaves "read what is on file" ticked.
-export const deskKey = (p: "king-council" | "emb-intel" | "emb-plan", iso: string) => `gd-desk:${p}:${iso}`;
-export const dirKey = (d: "king" | "embassy", iso: string) => `gd-desk-dir:${d}:${iso}`;
-export type Filed = { council: SavedProduct | null; architect: SavedProduct | null; king: SavedProduct | null; intel: SavedProduct | null; plan: SavedProduct | null };
-const read = (iso: string | null): Filed => (iso ? { council: readProduct(councilKey(iso)), architect: readProduct(architectKey(iso)), king: readProduct(deskKey("king-council", iso)), intel: readProduct(deskKey("emb-intel", iso)), plan: readProduct(deskKey("emb-plan", iso)) } : { council: null, architect: null, king: null, intel: null, plan: null });
+export const deskKey = (p: "king-council" | "emb-intel" | "emb-plan" | "mofa-council", iso: string) => `gd-desk:${p}:${iso}`;
+export const dirKey = (d: "king" | "embassy" | "mofa", iso: string) => `gd-desk-dir:${d}:${iso}`;
+export type Filed = { council: SavedProduct | null; architect: SavedProduct | null; king: SavedProduct | null; intel: SavedProduct | null; plan: SavedProduct | null; mofa: SavedProduct | null };
+const read = (iso: string | null): Filed => (iso ? { council: readProduct(councilKey(iso)), architect: readProduct(architectKey(iso)), king: readProduct(deskKey("king-council", iso)), intel: readProduct(deskKey("emb-intel", iso)), plan: readProduct(deskKey("emb-plan", iso)), mofa: readProduct(deskKey("mofa-council", iso)) } : { council: null, architect: null, king: null, intel: null, plan: null, mofa: null });
 export function useFiled(iso: string | null): Filed {
   const [f, set] = useState<Filed>(() => read(null));
   useEffect(() => { const go = () => set(read(iso)); const t0 = setTimeout(go, 0); window.addEventListener("storage", go); window.addEventListener("focus", go); return () => { clearTimeout(t0); window.removeEventListener("storage", go); window.removeEventListener("focus", go); }; }, [iso]);

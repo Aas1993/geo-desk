@@ -51,25 +51,25 @@ export async function POST(req: Request) {
         const total: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0, fetches: 0, usd: 0 }; let spent = 0; const lang = o.lang; const nameOf = (a: ArchAgent) => (lang === "ar" ? a.ar : a.en);
         const effort = (a: ArchAgent): Effort => ENV_EFFORT ?? (a.id === "EDIT" ? "medium" : "low");
         send({ type: "roster", agents: ARCH_AGENTS.map((a) => ({ id: a.id, name: nameOf(a), stage: a.stage, searches: a.searches, parts: a.parts })), usedCouncil: !!digest });
-        const run1 = async (a: ArchAgent) => {
+        const run1 = async (a: ArchAgent, cap?: number, spentAt?: number) => {
           send({ type: "agent", id: a.id, status: "start" });
           try {
-            const r = await runModelTask({ client, model: MODEL, system: ARCH_SYSTEM, firstText: base, roleText: archRole(a, out), budget: { maxTokens: a.maxTokens, searches: a.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(a), maxUsd: CAP, signal: ac.signal, send: (e) => send({ ...e, agent: a.id }), label: `arch-${a.id}`, spentBefore: () => spent });
+            const r = await runModelTask({ client, model: MODEL, system: ARCH_SYSTEM, firstText: base, roleText: archRole(a, out), budget: { maxTokens: a.maxTokens, searches: a.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(a), maxUsd: cap ?? CAP, signal: ac.signal, send: (e) => send({ ...e, agent: a.id }), label: `arch-${a.id}`, spentBefore: () => spentAt ?? spent, reserveUsd: a.stage === 3 ? 0.01 : undefined });
             const usd = r.usage.usd ?? 0; spent += usd; for (const k of ["input", "output", "cacheRead", "cacheWrite", "searches", "fetches"] as const) total[k] += r.usage[k]; total.usd = spent;
             for (const s of r.sources) if (!seen.has(s.url)) { seen.add(s.url); sources.push(s); }
-            const start = r.report.search(/^#{1,3} /m); const text = (start > 0 && a.id !== "EDIT" && a.id !== "REV" ? r.report.slice(start) : r.report).trim(); out[a.id] = text;
+            const start = r.report.search(/^#{1,3} /m); const text = (start > 0 && a.id !== "EDIT" && a.stage !== 3 ? r.report.slice(start) : r.report).trim(); out[a.id] = text;
             results.push({ id: a.id, name: nameOf(a), text, usd, searches: r.usage.searches, failed: r.failedSteps, status: "done", note: r.costStopped ? "stopped at the cost ceiling" : undefined }); send({ type: "agent", id: a.id, status: "done", usd, searches: r.usage.searches, failed: r.failedSteps });
           } catch (e) { if (ac.signal.aborted) throw e; const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[case-architect] ${a.id} failed:`, msg); results.push({ id: a.id, name: nameOf(a), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); send({ type: "agent", id: a.id, status: "error", message: msg }); }
         };
         const skipped = (a: ArchAgent, why: string) => { results.push({ id: a.id, name: nameOf(a), text: "", usd: 0, searches: 0, failed: 0, status: "skipped", note: why }); send({ type: "agent", id: a.id, status: "skipped", message: why }); };
-        const stage0 = ARCH_AGENTS.filter((a) => a.stage === 0); const EDIT = ARCH_BY.get("EDIT")!; const AR5 = ARCH_BY.get("AR5")!; const REV = ARCH_BY.get("REV")!;
+        const stage0 = ARCH_AGENTS.filter((a) => a.stage === 0); const EDIT = ARCH_BY.get("EDIT")!; const AR5 = ARCH_BY.get("AR5")!; const REVS = ARCH_AGENTS.filter((a) => a.stage === 3); const revWorst = REVS.reduce((s, a) => s + archWorst(a), 0);
         // the first analyst goes alone so the shared evidence is cached before the others read it
         send({ type: "status", text: "The first analyst is reading the evidence and warming the shared cache…" }); await run1(stage0[0]);
-        send({ type: "status", text: "Three analysts are working in parallel: pillars, the three horizons, and options with the stress test…" }); await Promise.all(stage0.slice(1).map(run1));
+        send({ type: "status", text: "Three analysts are working in parallel: pillars, the three horizons, and options with the stress test…" }); await Promise.all(stage0.slice(1).map((a) => run1(a)));
         // implementation and measurement start only if their worst case still leaves the editor's
-        if (CAP - spent - archWorst(EDIT) - archWorst(REV) * 0.7 >= archWorst(AR5)) { send({ type: "status", text: "Implementation, governance and measurement…" }); await run1(AR5); } else skipped(AR5, "would not fit under the cost ceiling");
-        if (CAP - spent - archWorst(REV) * 0.5 >= archWorst(EDIT) * 0.7) { send({ type: "status", text: "The Architect is writing the deliverables and the decision dashboard…" }); await run1(EDIT); } else skipped(EDIT, "no money left under the cost ceiling");
-        if (out.EDIT && CAP - spent >= archWorst(REV) * 0.7) { send({ type: "status", text: "An independent auditor is checking the strategy before it is compiled…" }); await run1(REV); } else skipped(REV, out.EDIT ? "no money left under the cost ceiling" : "nothing to review");
+        if (CAP - spent - archWorst(EDIT) - revWorst * 0.55 >= archWorst(AR5)) { send({ type: "status", text: "Implementation, governance and measurement…" }); await run1(AR5); } else skipped(AR5, "would not fit under the cost ceiling");
+        if (CAP - spent - revWorst * 0.5 >= archWorst(EDIT) * 0.7) { send({ type: "status", text: "The Architect is writing the deliverables and the decision dashboard…" }); await run1(EDIT); } else skipped(EDIT, "no money left under the cost ceiling");
+        if (out.EDIT && CAP - spent >= revWorst * 0.6) { send({ type: "status", text: "Two independent auditors, one for statecraft and one for the reality of the data, are checking the strategy before it is compiled…" }); const at = spent; const share = (CAP - at) / REVS.length; await Promise.all(REVS.map((a) => run1(a, at + share, at))); } else for (const a of REVS) skipped(a, out.EDIT ? "no money left under the cost ceiling" : "nothing to review");
         const ordered = ARCH_AGENTS.map((a) => results.find((r) => r.id === a.id)).filter((x): x is AgentOut => !!x);
         const known = new Set(gathered.facts.map((f) => f.id)); const report = composeArchitect(ordered).replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => ((ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`));
         const done: Done = { report, agents: ordered, sources, usage: total, at: new Date().toISOString(), model: MODEL, options: { ...o, kind: "architect" }, name: gathered.name, manifest, usedCouncil: !!digest };

@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { AUDITORS, SUBJECTS, reviewTail } from "@/lib/review/pair";
+import { pairReserve, runAuditors } from "@/lib/review/run";
 import { renderFacts } from "@/lib/ask/facts";
 import { rejectCrossSite, safeMessage } from "@/lib/guard";
 import { maxRunUsd } from "@/lib/dossier/cost";
@@ -13,7 +15,7 @@ const MODEL = process.env.DOSSIER_MODEL || "claude-sonnet-5-5";
 const ENV_EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as Effort) : null;
 const CAP = maxRunUsd(process.env.DOSSIER_MAX_RUN_USD); // one council, all its agents together, never spends more than this
 const MAX_PER_HOUR = Math.max(1, +(process.env.DOSSIER_MAX_PER_HOUR ?? 4) || 4); const TTL = 6 * 3600_000; const MAX_CONCURRENT = 2;
-type AgentOut = { id: SAgentId; name: string; text: string; usd: number; searches: number; failed: number; status: "done" | "skipped" | "error"; note?: string };
+type AgentOut = { id: SAgentId | "revs" | "revr"; name: string; text: string; usd: number; searches: number; failed: number; status: "done" | "skipped" | "error"; note?: string };
 type Done = { report: string; agents: AgentOut[]; sources: Source[]; tiles: unknown[]; usage: Usage; at: string; model: string; options: unknown; name: string };
 // the hourly cap and the in-flight guard are shared with the dossier route, so a council counts as one new briefing
 const g = globalThis as unknown as { __gdDossier?: { cache: Map<string, unknown>; running: Set<string>; runs: number[] }; __gdSCouncil?: Map<string, Done> };
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
         const client = new Anthropic(); const out: Partial<Record<SAgentId, string>> = {}; const results: AgentOut[] = []; const sources: Source[] = []; const seen = new Set<string>();
         const total: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0, fetches: 0, usd: 0 }; let spent = 0; const lang = o.lang; const nameOf = (a: SAgent) => (lang === "ar" ? a.ar : a.en);
         const effort = (a: SAgent): Effort => ENV_EFFORT ?? (a.id === "chair" ? "medium" : "low");
-        send({ type: "roster", agents: SAGENTS.map((a) => ({ id: a.id, name: nameOf(a), stage: a.stage, searches: a.searches })) });
+        send({ type: "roster", agents: [...SAGENTS.map((a) => ({ id: a.id, name: nameOf(a), stage: a.stage, searches: a.searches })), ...AUDITORS.map((a) => ({ id: a.id, name: lang === "ar" ? a.ar : a.en, stage: 9, searches: a.searches }))] });
         const run = async (a: SAgent) => {
           send({ type: "agent", id: a.id, status: "start" });
           try {
@@ -64,11 +66,12 @@ export async function POST(req: Request) {
         await run(A("g-perspectives"));
         send({ type: "status", text: "The other seat groups are working in parallel…" });
         await Promise.all(SAGENTS.filter((a) => a.stage === 0 && a.id !== "g-perspectives").map(run));
-        const room = CAP - spent - sWorstCase(A("chair")); const both = sWorstCase(A("challenger")) + sWorstCase(A("verifier"));
+        const room = CAP - spent - sWorstCase(A("chair")) - pairReserve(); const both = sWorstCase(A("challenger")) + sWorstCase(A("verifier"));
         if (room >= both) await Promise.all([run(A("challenger")), run(A("verifier"))]); else if (room >= sWorstCase(A("challenger"))) { await run(A("challenger")); skipped(A("verifier"), "would not fit under the cost ceiling"); } else { skipped(A("challenger"), "would not fit under the cost ceiling"); skipped(A("verifier"), "would not fit under the cost ceiling"); }
         if (CAP - spent >= sWorstCase(A("chair")) * 0.7) await run(A("chair")); else skipped(A("chair"), "no money left under the cost ceiling");
-        const ordered = SAGENTS.map((a) => results.find((r) => r.id === a.id)).filter((x): x is AgentOut => !!x);
-        const known = new Set(gathered.facts.map((f) => f.id)); const report = sComposeReport(ordered, lang).replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => ((ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`));
+        const ordered0 = SAGENTS.map((a) => results.find((r) => r.id === a.id)).filter((x): x is AgentOut => !!x);
+        const aud = await runAuditors({ client, model: MODEL, system: SCOUNCIL_SYSTEM, firstText: base, subject: SUBJECTS["machiavelli"], product: ordered0.some((x) => x.status === "done") ? sComposeReport(ordered0 as never, lang) : "", lang: lang, cap: CAP, spent, signal: ac.signal, send, label: "mach-council", effort: ENV_EFFORT ?? "low", sources, total }); spent = aud.spent; const ordered: AgentOut[] = [...ordered0, ...(aud.outs as AgentOut[])];
+        const known = new Set(gathered.facts.map((f) => f.id)); const report = sComposeReport(ordered0 as never, lang) + (reviewTail(ordered) ? `\n\n${reviewTail(ordered)}` : "").replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => ((ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`));
         const done: Done = { report, agents: ordered, sources, tiles: gathered.tiles, usage: total, at: new Date().toISOString(), model: MODEL, options: { ...o, kind: "scouncil" }, name: gathered.name };
         if (ordered.some((a) => a.status === "done")) { cache.set(key, done); while (cache.size > 20) cache.delete(cache.keys().next().value as string); }
         send({ type: "done", cached: false, ...done });

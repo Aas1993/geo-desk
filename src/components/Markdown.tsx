@@ -1,5 +1,6 @@
 "use client";
 import { Fragment, createContext, useContext, type ReactNode } from "react";
+import { stripReviewJson } from "@/lib/review/pair";
 
 /** When a page provides this, a fact id such as [F12] in the text becomes a button that opens the fact; without it the id is plain superscript text. */
 export const CiteContext = createContext<((ids: string[], key: string) => ReactNode) | null>(null);
@@ -28,7 +29,7 @@ const isSep = (r: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/
 
 export function Markdown({ source }: { source: string }) {
   const cite = useContext(CiteContext); const inl = (t: string, k: string) => inline(t, k, cite);
-  const lines = source.replace(/\r/g, "").split("\n"); const blocks: ReactNode[] = []; let i = 0; let k = 0;
+  const lines = stripReviewJson(source).replace(/\r/g, "").split("\n"); const blocks: ReactNode[] = []; let i = 0; let k = 0;
   const key = () => `b${k++}`;
   while (i < lines.length) {
     const line = lines[i];

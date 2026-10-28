@@ -1,4 +1,5 @@
 "use client";
+import { RedFlags, ReviewPair, reviewsOf } from "../desk/Quality";
 import { classification } from "@/lib/case/report";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, Printer } from "lucide-react";
@@ -49,11 +50,12 @@ export function CouncilTab({ L, iso, name, hard, onReport }: { L: Lang; iso: str
         <div className="flex flex-wrap items-center gap-2"><span className="numt text-[11.5px] text-t1">{name} · {s.at.slice(0, 16).replace("T", " ")} UTC · {s.cached ? t("from cache (no cost)", "من الذاكرة (بلا كلفة)") : `${t("cost", "الكلفة")} ${usd(s.usage.usd)}`} · {s.usage.searches} {t("searches", "بحثًا")} · {s.sources.length} {t("sources", "مصدرًا")}</span>
           <span className="ms-auto flex gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(s.report); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Copy size={13} />{copied ? "✓" : t("Copy", "نسخ")}</button><button type="button" onClick={() => printBriefing(html())} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Printer size={13} />{t("Print", "طباعة")}</button></span></div>
         <p className="rounded-[10px] border border-warn/40 bg-warn/10 p-2.5 text-[12px] text-t0" role="note">{t("Working analysis, not reviewed. A named person must review it before it counts as a published product.", "تحليل عمل غير مُراجَع. يجب أن يراجعه شخص مسمّى قبل أن يُحتسب منتجًا منشورًا.")}</p>
+        <RedFlags L={L} reviews={reviewsOf(s.report)} />
         {s.agents && <p className="text-[11px] text-t2">{s.agents.map((a) => `${a.name}: ${statusWord(L, a.status)}${a.usd != null ? ` ${usd(a.usd)}` : ""}${a.note ? ` (${a.note})` : ""}`).join(" · ")}</p>}
         <Tabs<Sub> tabs={[{ id: "brief", label: t("Chair's brief and strategy", "موجز الرئيس والاستراتيجية") }, { id: "seats", label: t("Seat sections", "أقسام المقاعد"), n: secs.length }, { id: "audit", label: t("Audit and red team", "التدقيق والفريق الأحمر") }, { id: "debate", label: t("Debate", "المناظرة") }, { id: "roadmap", label: t("Execution roadmap", "خارطة التنفيذ") }, { id: "text", label: t("Full text and gates", "النص الكامل والبوابات") }, { id: "prompts", label: t("Prompt library", "مكتبة الموجّهات") }]} value={sub} onChange={setSub} label="Council" />
         {sub === "brief" && <Block title={t("Chair: Ministerial Executive Brief and Comprehensive Report", "الرئيس: الموجز الوزاري التنفيذي والتقرير الشامل")}><article><Markdown source={parts.chair} /></article></Block>}
         {sub === "seats" && <Block title={t("Independent seat sections", "أقسام المقاعد المستقلة")}><article><Markdown source={parts.seats || "—"} /></article></Block>}
-        {sub === "audit" && <Block title={t("Evidence audit (C9) and red team (C16)", "تدقيق الأدلة (C9) والفريق الأحمر (C16)")}><article><Markdown source={parts.audit || "—"} /></article></Block>}
+        {sub === "audit" && <div className="space-y-4"><Block title={t("Evidence audit (C9) and red team (C16)", "تدقيق الأدلة (C9) والفريق الأحمر (C16)")}><article><Markdown source={parts.audit || "—"} /></article></Block><ReviewPair L={L} reviews={reviewsOf(s.report)} /></div>}
         {sub === "debate" && <Block title={t("Council debate", "مناظرة المجلس")}><article><Markdown source={parts.debate || "—"} /></article></Block>}
         {sub === "roadmap" && <Block title={t("Execution roadmap (C20)", "خارطة التنفيذ (C20)")}><article><Markdown source={parts.roadmap || "—"} /></article></Block>}
         {sub === "text" && <div className="space-y-4"><Block title={t("Full text", "النص الكامل")}><article><Markdown source={s.report} /></article></Block><GatesPanel md={s.report} kind="other" L={L} iso3={iso} /></div>}

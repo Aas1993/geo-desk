@@ -29,6 +29,6 @@ export function useDeepFilters() {
   return [{ ...DEFAULT_DEEP, ...f }, useCallback((p: Partial<DeepFilters>) => set((x) => ({ ...DEFAULT_DEEP, ...x, ...p })), [set])] as const;
 }
 /** A cost log of the paid runs made from this desk, in this browser: the input to the cost dashboard. */
-export type CostEntry = { at: string; kind: "council" | "research" | "architect" | "ambassador" | "king" | "embassy"; usd: number; cached: boolean; searches: number; fetches: number; cacheRead: number; input: number; output: number; ms: number; scope: string };
+export type CostEntry = { at: string; kind: "council" | "research" | "architect" | "ambassador" | "king" | "embassy" | "mofa"; usd: number; cached: boolean; searches: number; fetches: number; cacheRead: number; input: number; output: number; ms: number; scope: string };
 export const COST_KEY = "gd-deep-costs";
 export const logCost = (e: CostEntry) => { try { const l = JSON.parse(localStorage.getItem(COST_KEY) ?? "[]") as CostEntry[]; localStorage.setItem(COST_KEY, JSON.stringify([...l, e].slice(-200))); window.dispatchEvent(new Event("gd-deep-cost")); } catch { /* storage unavailable */ } };

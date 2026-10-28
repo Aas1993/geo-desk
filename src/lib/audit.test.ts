@@ -11,6 +11,7 @@ import { SCOUNCIL_SYSTEM, SAGENTS } from "./machiavelli/council";
 import { SEATS as MACH_SEATS } from "./machiavelli/seats";
 import { KING_AGENTS, KING_SYSTEM } from "./desk/king";
 import { EMB_AGENTS, EMB_SYSTEM } from "./desk/embassy";
+import { MOFA_AGENTS, MOFA_SYSTEM } from "./desk/mofa";
 import { SOURCE_PLAN } from "./sources";
 import { planFor } from "./desk/plan";
 
@@ -20,22 +21,23 @@ const BAR: Record<string, RegExp> = {
   "likelihood bands with separate confidence": /almost certain/i, "assumptions and alternatives": /assumption/i, "dissent preserved": /dissent|competing hypothes/i, "indicators with thresholds": /indicator|threshold|tripwire/i,
   "boundary: no covert action, proxies or coercion": /covert|proxy|coerc/i, "costs not invented": /not estimated|never invent|do not invent/i, "collection gaps stated": /gap|not found after searching|could not establish/i,
 };
-const PROMPTS: Record<string, string> = { "Strategic Council (Case File)": CASE_SYSTEM, "Statecraft Architect": ARCH_SYSTEM, "Strategy Council (Machiavellian)": SCOUNCIL_SYSTEM, "Deep analyst team": DCOUNCIL_SYSTEM, "Falcon Council and dossiers": DOSSIER_SYSTEM, "THE KING": KING_SYSTEM, "Embassy council": EMB_SYSTEM };
+const PROMPTS: Record<string, string> = { "Strategic Council (Case File)": CASE_SYSTEM, "Statecraft Architect": ARCH_SYSTEM, "Strategy Council (Machiavellian)": SCOUNCIL_SYSTEM, "Deep analyst team": DCOUNCIL_SYSTEM, "Falcon Council and dossiers": DOSSIER_SYSTEM, "THE KING": KING_SYSTEM, "Embassy council": EMB_SYSTEM, "The Ministry's council": MOFA_SYSTEM };
 for (const [name, text] of Object.entries(PROMPTS)) for (const [check, re] of Object.entries(BAR)) assert.ok(re.test(text), `${name} does not meet the bar: it ${check}`);
 for (const [name, text] of Object.entries(PROMPTS)) assert.ok(text.includes(SOURCE_PLAN.slice(0, 120)), `${name} carries the shared source plan`);
 
 // one roster, no repeated ids, every agent named in both languages
-const rosters: Record<string, { id: string; en: string; ar: string }[]> = { Falcon: FALCON, "Case seats": CASE_SEATS as never, Architect: ARCH_AGENTS, "Machiavellian council": SAGENTS as never, "Machiavellian seats": MACH_SEATS as never, "Deep team": DAGENTS as never, "Deep roles": ROLES as never, KING: KING_AGENTS, Embassy: EMB_AGENTS };
+const rosters: Record<string, { id: string; en: string; ar: string }[]> = { Falcon: FALCON, "Case seats": CASE_SEATS as never, Architect: ARCH_AGENTS, "Machiavellian council": SAGENTS as never, "Machiavellian seats": MACH_SEATS as never, "Deep team": DAGENTS as never, "Deep roles": ROLES as never, KING: KING_AGENTS, Embassy: EMB_AGENTS, Ministry: MOFA_AGENTS as never };
 for (const [n, r] of Object.entries(rosters)) { assert.ok(r.length >= 6, `${n} has a real roster`); assert.equal(new Set(r.map((x) => x.id)).size, r.length, `${n}: agent ids are unique`); assert.equal(new Set(r.map((x) => x.en)).size, r.length, `${n}: agent names are unique`); for (const a of r) assert.ok(a.en && a.ar, `${n}/${a.id} is named in English and Arabic`); }
 
 // checks and balances: every module that produces a decision, a strategy or a plan has an independent checker (a verifier, a red team or an auditor) that is not its writer
 const has = (r: { id: string; en: string }[], re: RegExp) => r.some((x) => re.test(`${x.id} ${x.en}`));
 assert.ok(has(FALCON, /verifier/) && has(FALCON, /redteam|red team/), "Falcon Council: verifier and red team"); assert.ok(has(CASE_SEATS as never, /Red-Team/) , "Case Council: red team seat");
 assert.ok(has(SAGENTS as never, /challenger/) && has(SAGENTS as never, /verifier/), "Machiavellian council: challenger and verifier"); assert.ok(has(DAGENTS as never, /challenger/) && has(DAGENTS as never, /verifier/), "Deep team: challenger and verifier");
-assert.ok(has(ARCH_AGENTS, /REV|Auditor/), "Architect: an independent Strategy Auditor reviews the strategy before it is compiled");
-assert.ok(has(KING_AGENTS, /redteam|Red Team/), "THE KING: a red-team specialist"); for (const [p, who] of [["king-council", "review"], ["emb-plan", "review"]] as const) { const calls = planFor(p, { focus: "", topic: "", mode: "question", urgency: "routine", agents: [], lang: "en", useContext: true }, "").calls; const rv = calls.find((c) => c.id === who); assert.ok(rv && rv.stage === 2 && rv.maxTokens >= 3000 && calls.findIndex((c) => c.id === who) === calls.length - 1, `${p}: an independent reviewer runs last`); assert.ok(calls.filter((c) => c.stage < 2).every((c) => c.id !== rv.id), `${p}: the reviewer is not the writer`); }
+assert.ok(has(ARCH_AGENTS, /revs/) && has(ARCH_AGENTS, /revr/), "Architect: the Statecraft Auditor and the Reality Auditor review the strategy before it is compiled");
+for (const [name, r] of [["Falcon", FALCON], ["Case seats", CASE_SEATS as never], ["Machiavellian council", SAGENTS as never], ["Deep team", DAGENTS as never]] as [string, { id: string }[]][]) assert.ok(!r.some((x) => /^rev[sr]$/.test(x.id)), `${name}: the auditor ids are reserved for the pair, which is added by the route`);
+assert.ok(has(KING_AGENTS, /redteam|Red Team/), "THE KING: a red-team specialist"); for (const p of ["king-council", "emb-intel", "emb-plan"] as const) { const calls = planFor(p, { focus: "", topic: "", mode: "question", urgency: "routine", agents: [], lang: "en", useContext: true }, "").calls; const last = calls.slice(-2); assert.deepEqual(last.map((c) => c.id), ["revs", "revr"], `${p}: the Statecraft Auditor and the Reality Auditor run last`); assert.ok(last.every((c) => c.stage === 2 && c.maxTokens >= 2500 && c.agents.length === 0), `${p}: both auditors are independent of every writer`); assert.ok(calls.slice(0, -2).every((c) => !/^rev/.test(c.id)), `${p}: no writer is an auditor`); }
 // the reviewers' own instructions
-assert.ok(/did not (take part|design|write)/.test(planFor("king-council", { focus: "", topic: "", mode: "question", urgency: "routine", agents: [], lang: "en", useContext: true }, "").calls[5].role({})), "the auditor is told it is independent");
+assert.ok(/did not (take part|design|write)/.test(planFor("king-council", { focus: "", topic: "", mode: "question", urgency: "routine", agents: [], lang: "en", useContext: true }, "").calls[5].role({})) && /did not take part/.test(planFor("king-council", { focus: "", topic: "", mode: "question", urgency: "routine", agents: [], lang: "en", useContext: true }, "").calls[6].role({})), "both auditors are told they are independent");
 // every desk and specialist has a mandate, questions and sources, not just a name
 for (const a of [...KING_AGENTS, ...EMB_AGENTS]) assert.ok(a.mandate.length > 80 && a.questions.length >= 4 && a.sources.length >= 2, `${a.id} has a mandate, questions and starting sources`);
 console.log("audit: all checks passed");

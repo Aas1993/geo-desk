@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { AUDITORS, SUBJECTS, reviewTail } from "@/lib/review/pair";
+import { pairReserve, runAuditors } from "@/lib/review/run";
 import { foresightDossierFacts } from "@/lib/dossier/facts";
 import { renderFacts } from "@/lib/ask/facts";
 import { rejectCrossSite, safeMessage } from "@/lib/guard";
@@ -13,7 +15,7 @@ const MODEL = process.env.DOSSIER_MODEL || "claude-sonnet-5-5";
 const ENV_EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as Effort) : null;
 const CAP = maxRunUsd(process.env.DOSSIER_MAX_RUN_USD); // one council, all its agents together, never spends more than this
 const MAX_PER_HOUR = Math.max(1, +(process.env.DOSSIER_MAX_PER_HOUR ?? 4) || 4); const TTL = 6 * 3600_000; const MAX_CONCURRENT = 2;
-type AgentOut = { id: AgentId; name: string; text: string; usd: number; searches: number; failed: number; status: "done" | "skipped" | "error"; note?: string };
+type AgentOut = { id: AgentId | "revs" | "revr"; name: string; text: string; usd: number; searches: number; failed: number; status: "done" | "skipped" | "error"; note?: string };
 type Done = { report: string; agents: AgentOut[]; sources: Source[]; tiles: unknown[]; usage: Usage; at: string; model: string; options: unknown; name: string };
 // the hourly cap and the in-flight guard are shared with the dossier route, so a council counts as one new briefing
 const g = globalThis as unknown as { __gdDossier?: { cache: Map<string, unknown>; running: Set<string>; runs: number[] }; __gdCouncil?: Map<string, Done> };
@@ -44,7 +46,7 @@ export async function POST(req: Request) {
         const total: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0, fetches: 0, usd: 0 }; let spent = 0;
         const lang = o.lang; const nameOf = (a: Agent) => (lang === "ar" ? a.ar : a.en);
         const effort = (a: Agent): Effort => ENV_EFFORT ?? (a.id === "editor" ? "medium" : "low");
-        send({ type: "roster", agents: AGENTS.map((a) => ({ id: a.id, name: nameOf(a), stage: a.stage, searches: a.searches })) });
+        send({ type: "roster", agents: [...AGENTS.map((a) => ({ id: a.id, name: nameOf(a), stage: a.stage, searches: a.searches })), ...AUDITORS.map((a) => ({ id: a.id, name: lang === "ar" ? a.ar : a.en, stage: 9, searches: a.searches }))] });
         const run = async (a: Agent, questions?: string) => {
           send({ type: "agent", id: a.id, status: "start" });
           try {
@@ -65,12 +67,13 @@ export async function POST(req: Request) {
         // stage 2: the UAE analyst and the foresight analyst read the specialists
         await Promise.all([run(A("uae")), run(A("foresight"))]);
         // stage 3: the challenge and the check, only if they still fit under the ceiling with the editor
-        const room = CAP - spent - worstCase(A("editor")); const both = worstCase(A("redteam")) + worstCase(A("verifier"));
+        const room = CAP - spent - worstCase(A("editor")) - pairReserve(); const both = worstCase(A("redteam")) + worstCase(A("verifier"));
         if (room >= both) await Promise.all([run(A("redteam")), run(A("verifier"))]); else if (room >= worstCase(A("redteam"))) { await run(A("redteam")); skipped(A("verifier"), "would not fit under the cost ceiling"); } else { skipped(A("redteam"), "would not fit under the cost ceiling"); skipped(A("verifier"), "would not fit under the cost ceiling"); }
         // stage 4: the editor writes the product
         if (CAP - spent >= worstCase(A("editor")) * 0.7) await run(A("editor")); else skipped(A("editor"), "no money left under the cost ceiling");
-        const ordered = AGENTS.map((a) => results.find((r) => r.id === a.id)).filter((x): x is AgentOut => !!x);
-        const known = new Set(gathered.facts.map((f) => f.id)); const report = composeReport(ordered, lang).replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => ((ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`));
+        const ordered0 = AGENTS.map((a) => results.find((r) => r.id === a.id)).filter((x): x is AgentOut => !!x);
+        const aud = await runAuditors({ client, model: MODEL, system: COUNCIL_SYSTEM, firstText: base, subject: SUBJECTS["falcon"], product: ordered0.some((x) => x.status === "done") ? composeReport(ordered0 as never, lang) : "", lang: lang, cap: CAP, spent, signal: ac.signal, send, label: "falcon-council", effort: ENV_EFFORT ?? "low", sources, total }); spent = aud.spent; const ordered: AgentOut[] = [...ordered0, ...(aud.outs as AgentOut[])];
+        const known = new Set(gathered.facts.map((f) => f.id)); const report = composeReport(ordered0 as never, lang) + (reviewTail(ordered) ? `\n\n${reviewTail(ordered)}` : "").replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => ((ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`));
         const done: Done = { report, agents: ordered, sources, tiles: gathered.tiles, usage: total, at: new Date().toISOString(), model: MODEL, options: { ...o, kind: "council" }, name: gathered.name };
         if (ordered.some((a) => a.status === "done")) { cache.set(key, done); while (cache.size > 20) cache.delete(cache.keys().next().value as string); }
         send({ type: "done", cached: false, ...done });

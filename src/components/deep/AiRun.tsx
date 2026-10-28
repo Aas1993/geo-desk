@@ -1,4 +1,5 @@
 "use client";
+import { ReviewPair, reviewsOf } from "../desk/Quality";
 import { classification } from "@/lib/case/report";
 import { CouncilGuide } from "../case/CouncilGuide";
 import { useEffect, useRef, useState } from "react";
@@ -35,6 +36,7 @@ export function AiRun({ L, iso, question, mode, title, hint, cost, go, storeKey,
           <span className="ms-auto flex gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(s.report); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Copy size={13} />{copied ? "✓" : (L === "ar" ? "نسخ" : "Copy")}</button><button type="button" onClick={() => printBriefing(html())} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Printer size={13} />{L === "ar" ? "طباعة" : "Print"}</button></span></div>
         {roles && Object.keys(roles).length > 0 && <p className="text-[11.5px] leading-snug text-t1"><b className="text-t0">{L === "ar" ? "الفريق المختار ولماذا: " : "Team chosen, and why: "}</b>{Object.entries(roles).map(([k, v]) => `${k}: ${L === "ar" ? v.ar : v.en}`).join(" · ")}</p>}
         {ag.length > 0 && <p className="text-[11px] text-t2">{ag.map((a) => `${a.name}: ${statusWord(L, a.status)}${a.usd != null ? ` ${usd(a.usd)}` : ""}${a.note ? ` (${a.note})` : ""}`).join(" · ")}</p>}
+        <ReviewPair L={L} reviews={reviewsOf(s.report)} flags />
         <article><Markdown source={s.report} /></article>
         <GatesPanel md={s.report} kind="other" L={L} iso3={iso ?? "ARE"} />
       </div>)}

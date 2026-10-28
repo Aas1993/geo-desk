@@ -1,0 +1,93 @@
+// Tests for the Ministry's council (MOFA), the organisation map, the progress tracker, the room's seats and the reviewer pair's server step.
+import assert from "node:assert/strict";
+import { PRODUCTS, PRODUCT_USD, parseReviews } from "./desk/core";
+import { EMB_AGENTS, EMB_INTEL_GROUPS, EMB_PLAN_GROUPS, embDigest } from "./desk/embassy";
+import { embContext, mofaContext } from "./desk/context";
+import { INTERESTS, MOFA_AGENTS, MOFA_BY, MOFA_CHIEF, MOFA_DOMAINS, MOFA_GROUPS, MOFA_SYSTEM, composeMofa, mofaChiefRole, mofaDigest, mofaDirectiveChiefRole, mofaGroupRole, mofaRole, mofaSection, mofaUpdateRole, parseMofa } from "./desk/mofa";
+import { WORST, planFor, routed } from "./desk/plan";
+import { ORG, ORG_BY, KEY_ROLES, VERIFY_NOTE, childrenOf } from "./mofa/org";
+import { counts, nodeProgress, progressOf, progressText, STATUSES } from "./mofa/track";
+import { assess, assessMofa } from "./quality/gate";
+import { AUDITORS } from "./review/pair";
+import { runAuditors } from "./review/run";
+import { COUNCILS, seatCounts, seatsOf } from "./room/seats";
+import { layout } from "./../components/room/RoundTable";
+import { outputRoom } from "./dossier/cost";
+
+const unique = (a: string[]) => new Set(a).size === a.length;
+// ---- the roster: thirteen role-agents, four sittings, each role once, a chief
+assert.equal(MOFA_AGENTS.length, 13); assert.ok(unique(MOFA_AGENTS.map((a) => a.id)) && unique(MOFA_AGENTS.map((a) => a.en)) && unique(MOFA_AGENTS.map((a) => a.ar)), "ids and names are unique in both languages");
+assert.deepEqual(MOFA_AGENTS.map((a) => a.n), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]); assert.ok(MOFA_AGENTS.every((a) => a.desk === "mofa" && a.mandate.length > 120 && a.questions.length >= 4 && a.sources.length >= 2 && /role-lens|منظور دور/.test(a.title.en + a.title.ar)), "every role has a mandate, questions, sources and is marked as a role-lens, not a person");
+assert.deepEqual(MOFA_GROUPS.flatMap((g) => g.agents).sort(), MOFA_AGENTS.map((a) => a.id).sort(), "each role sits exactly once");
+assert.equal(MOFA_GROUPS.length, 4); assert.ok(MOFA_CHIEF.maxTokens >= 12_000 && /Under-Secretary/.test(MOFA_CHIEF.en));
+for (const g of MOFA_GROUPS) { const r = mofaGroupRole(g); assert.ok(r.includes("Ministry's point of view") && g.agents.every((id) => r.includes(MOFA_BY.get(id)!.en)), g.id); }
+assert.ok(/strictly from the Ministry's perspective/.test(mofaChiefRole({}, {})) && mofaChiefRole({ M1: "SEAT" }, { topic: "TOPIC" }).includes("SEAT") && mofaChiefRole({}, { topic: "TOPIC" }).includes("TOPIC"), "the Under-Secretary thinks as the Ministry and reads the roles");
+for (const d of ["Political", "Security", "Social and cultural", "Economic", "Trade", "Logistics", "Finance"]) assert.ok(mofaChiefRole({}, {}).includes(d), `the chief writes the ${d} plan`);
+assert.ok(/no real person|never a named person|not a claim about a named person/i.test(MOFA_SYSTEM) && !MOFA_SYSTEM.includes("`") && !mofaChiefRole({}, {}).includes("`"), "roles are functions; no backticks in prompts");
+assert.ok(mofaUpdateRole("PROGRESS TEXT").includes("PROGRESS TEXT") && mofaDirectiveChiefRole({}, { topic: "T", mode: "directive", urgency: "routine" }).includes("DIRECTIVE from the Minister"));
+// ---- the routing and the plans
+assert.ok(PRODUCTS.includes("mofa-council") && PRODUCTS.includes("mofa-directive") && PRODUCT_USD["mofa-council"] > 0 && WORST["mofa-council"] < 1.25 && WORST["mofa-directive"] < WORST["mofa-council"]);
+const O = (x: object = {}) => ({ focus: "", topic: "", mode: "question" as const, urgency: "routine" as const, agents: [], lang: "en" as const, useContext: true, ...x });
+const mp = planFor("mofa-council", O(), ""); assert.deepEqual(mp.calls.map((c) => c.id), ["M1", "M2", "M3", "M4", "chief", "revs", "revr"], "four sittings, the Under-Secretary, then both auditors"); assert.equal(mp.calls[5].stage, 2); assert.ok(mp.calls[4].searches === 0 && mp.calls.slice(0, 4).every((c) => c.searches >= 2));
+assert.ok(mp.calls[4].role({ M1: "THE M1 TEXT" }).includes("THE M1 TEXT") && mp.calls[5].role({ chief: "THE CHIEF TEXT" }).includes("THE CHIEF TEXT") && /Ministry of Foreign Affairs council/.test(mp.calls[6].role({ chief: "x" })), "the auditors read the Under-Secretary's product and know it is the Ministry's");
+assert.equal(planFor("mofa-council", O({ lang: "ar" }), "").calls[0].maxTokens, Math.round(MOFA_GROUPS[0].maxTokens * 1.3), "Arabic gets a third more output room");
+const rd = routed("mofa-directive", O({ topic: "Should we sign the investment treaty and extend a port loan?" })); assert.ok(rd.length >= 1 && rd.every((r) => MOFA_BY.has(r.id)), "a directive routes to Ministry roles"); assert.ok(rd.some((r) => ["econ", "logfin", "legal"].includes(r.id)), "an economic question reaches the economic roles");
+const md = planFor("mofa-directive", O({ topic: "x", mode: "directive" }), ""); assert.deepEqual(md.calls.map((c) => c.stage), [0, 1]); assert.ok(md.calls[1].role({}).includes("Under-Secretary")); const mu = planFor("mofa-directive", O({ mode: "update", topic: "Progress reported: 2 done" }), ""); assert.equal(mu.calls.length, 1); assert.ok(mu.calls[0].role({}).includes("Progress reported: 2 done"), "an update carries the tracker's progress into the prompt");
+// ---- the structured brief
+const J = { stance: { posture: "staged", headline: "Deepen in stages", rationale: "Because…" },
+  priorities: [{ id: "P2", rank: 2, title: "Open the trade corridor", interest: "economic", why: "Trade", horizon: "1 year", owner: "Economic and Trade Affairs sector", evidence: ["F3"] }, { id: "P1", rank: 1, title: "Secure the port concession", interest: "security", why: "Chokepoint", horizon: "100 days", owner: "Political Affairs sector", evidence: ["F1", "F2"] }, { id: "P3", rank: 3, title: "Weird interest", interest: "gossip", why: "x", horizon: "3 years", owner: "Legal", evidence: [] }, { rank: 4, title: "", interest: "economic" }],
+  goals: [{ id: "G1", priority: "P1", goal: "Sign the port agreement", measure: "Signature", baseline: "", target: "Signed", by: "Q2", owner: "Political Affairs sector", source: "WAM" }, { id: "G2", priority: "P2", goal: "Raise trade 20%", measure: "Bilateral trade", baseline: "US$2bn", target: "US$2.4bn", by: "2028", owner: "Economic and Trade Affairs sector", source: "ITC" }],
+  mission: [{ id: "T1", priority: "P1", task: "Open talks", who: "Chief of Strategy", when: "30 days", measure: "Meeting held" }, { id: "T2", priority: "P2", task: "Trade mission", who: "Trade Attaché", when: "6 months", measure: "Firms met" }],
+  plans: MOFA_DOMAINS.map((d) => ({ domain: d, aim: `Aim ${d}`, actions: [{ action: "Do A", owner: "Embassy", when: "Q1", measure: "m" }, { action: "Do B", owner: "Embassy", when: "Q2", measure: "m" }], risks: ["r"], dependsOn: [] })).concat([{ domain: "bogus" as never, aim: "x", actions: [], risks: [], dependsOn: [] }]),
+  reporting: [{ cadence: "monthly", from: "Mission", to: "Ministry", content: "Progress" }], watch: [{ indicator: "UN vote", signal: "diverge", threshold: "below 60%", action: "update" }], assumptions: ["a"], gaps: ["g"], decisionsAsked: ["d"] };
+const BR = `# Foreign Policy Brief\nBottom line.\n\n# Priorities and Goals\nP1…\n\n# Mission Tasks\nT1…\n\n# Domain Plans\n## Political\nx\n\n# Reporting and Updates\ny\n\n# Structured data\nNote.\n<mofa>${JSON.stringify(J)}</mofa>`;
+const m = parseMofa(BR)!; assert.ok(m && !m.partial); assert.deepEqual(m.priorities.map((p) => p.id), ["P1", "P2", "P3"], "priorities are sorted by rank and one with no title is dropped"); assert.equal(m.priorities[2].interest, "diplomatic standing", "an unknown interest falls back"); assert.ok(INTERESTS.includes(m.priorities[0].interest)); assert.equal(m.goals[0].baseline, "not established", "a missing baseline says so, it is not invented"); assert.equal(m.plans.length, 7, "an unknown domain is dropped, the seven are kept"); assert.equal(m.stance.posture, "staged");
+assert.equal(parseMofa("none"), null); assert.equal(parseMofa(`<mofa>{"stance":{}}</mofa>`), null, "no priorities, goals or plans: not a brief"); assert.equal(parseMofa(`<mofa>${JSON.stringify(J).slice(0, 900)}`)?.partial, true, "a cut-off brief keeps what is complete and says so");
+// ---- composing and the digest the embassy reads
+const parts = [{ id: "M1", text: "## Minister's Office: Intent, Interests and Red Lines\n**Headline.** Interests first.\n\n## Minister of State (Foreign Affairs): Engagement and Visits\n**Headline.** Visit.\n\n## Policy Planning, Goals and Measures\n**Headline.** Goals." }, { id: "chief", text: BR }];
+const cm = composeMofa([...parts, { id: "revs", text: `# Statecraft Review\nOK\n<statecraft_review>${JSON.stringify({ verdict: "approve", standing: "sound", redFlags: [] })}</statecraft_review>` }, { id: "revr", text: `# Reality Review\nOK\n<reality_review>${JSON.stringify({ verdict: "revise", standing: "mixed", redFlags: [{ flag: "A figure is unsourced", severity: "serious" }] })}</reality_review>` }]);
+assert.ok(cm.indexOf("# Foreign Policy Brief") < cm.indexOf("# Priorities and Goals") && cm.indexOf("# Domain Plans") < cm.indexOf("# Role Reports") && cm.indexOf("# Structured data") < cm.indexOf("# Statecraft Review") && cm.indexOf("# Statecraft Review") < cm.indexOf("# Reality Review"), "brief, priorities, tasks, plans, reporting, role reports, data, then both reviews");
+assert.ok(parseMofa(cm) !== null && parseReviews(cm).length === 2 && parseReviews(cm)[1].redFlags.length === 1, "the structured brief and both reviews survive compiling"); assert.ok(mofaSection(cm, "Priorities and Goals").startsWith("P1")); assert.ok(mofaRole(cm, MOFA_BY.get("minister")!).includes("Interests first") && mofaRole(cm, MOFA_BY.get("econ")!) === "", "each role's section is found by name, and an absent role has none");
+assert.ok(composeMofa([]).includes("Not written"), "nothing finished is said plainly");
+const dg = mofaDigest(cm); assert.ok(dg.includes("P1 (rank 1") && dg.includes("G1 for P1") && dg.includes("T1 for P1") && dg.length <= 3700 && mofaDigest(null) === "", "the digest carries priorities, goals and tasks, trimmed");
+// the embassy and the Ministry read each other's work through context, labelled analysis
+const ec = embContext({ mofa: cm }, "emb-intel"); assert.ok(ec.includes("The Ministry of Foreign Affairs: priorities") && ec.includes("P1 (rank 1") && embContext({}, "emb-intel") === "", "the embassy council reads the Ministry's priorities when they exist"); assert.ok(embContext({ mofa: cm }, "emb-plan").includes("the tasks set for the mission"));
+const mc = mofaContext({ mofa: cm, embIntel: "# Ambassador's Brief\nBottom line: X\n" }); assert.ok(mc.includes("earlier priorities") && mc.includes("The ambassador's brief"), "the Ministry reads the embassy's brief and its own earlier priorities");
+// ---- the quality gate
+const SRC = [{ url: "https://www.imf.org/x" }, { url: "https://www.chathamhouse.org/y" }, { url: "https://www.reuters.com/z" }];
+const gm = assessMofa(cm, SRC, "en"); assert.equal(gm.kind, "mofa-council"); assert.ok(gm.checks.find((c) => c.id === "domains")!.ok && gm.checks.find((c) => c.id === "parse")!.ok && gm.checks.find((c) => c.id === "stance")!.ok === false, "all seven domains pass; the stance check fails with one assumption and needs two");
+assert.ok(gm.checks.find((c) => c.id === "goals")!.ok === false && gm.checks.find((c) => c.id === "priorities")!.ok === false && gm.checks.find((c) => c.id === "tasks")!.ok === false, "a thin brief fails the counts (two goals, three priorities, two tasks)"); assert.ok(gm.checks.find((c) => c.id === "links")!.ok === false, "priority P3 has no goal or task");
+assert.equal(gm.reviews.length, 2); assert.equal(gm.redFlags.length, 1); assert.ok(gm.checks.find((c) => c.id === "review-reality")!.ok === false && gm.checks.find((c) => c.id === "review-statecraft")!.ok === true); assert.equal(assess("mofa-council", cm, SRC, "en").kind, "mofa-council");
+assert.ok(assessMofa("", [], null).score <= 40, "an empty product scores low");
+// ---- the organisation map
+assert.ok(ORG.length >= 20 && unique(ORG.map((n) => n.id)) && unique(ORG.map((n) => n.en)), "unique roles"); assert.ok(ORG.every((n) => n.en && n.ar && n.mandate.en.length > 30 && n.mandate.ar.length > 10 && n.roles.length >= 1 && (n.parent === null || ORG_BY.has(n.parent))), "every role has a name and mandate in both languages and a real parent");
+assert.equal(ORG.filter((n) => n.parent === null).length, 1); assert.ok(ORG_BY.get("min")!.tier === 0 && ORG_BY.get("usec")!.parent === "min" && ORG.filter((n) => n.tier === 3).length >= 8 && KEY_ROLES.length >= 8, "a minister at the head, an under-secretary, sectors and key roles");
+for (const n of ORG) { let p = n.parent; let hops = 0; while (p) { assert.ok(hops++ < 8, `${n.id} reaches the Minister`); p = ORG_BY.get(p)!.parent; } assert.ok(n.agent === null || MOFA_BY.has(n.agent) || n.agent === "chief", `${n.id} points at a real agent`); }
+assert.deepEqual(new Set(MOFA_AGENTS.map((a) => a.id)), new Set([...ORG.map((n) => n.agent).filter((x): x is string => !!x && x !== "chief"), ...MOFA_AGENTS.map((a) => a.id)].filter((x) => MOFA_BY.has(x))), "agent ids are consistent"); for (const a of MOFA_AGENTS) assert.ok(ORG.some((n) => n.agent === a.id), `${a.id} sits on the chart`);
+assert.ok(childrenOf("usec").length >= 9 && /no named person|verify/i.test(VERIFY_NOTE.en) && /ar|تحقق/.test(VERIFY_NOTE.ar), "the map says it is a working map built from public roles to be verified");
+// ---- the tracker
+const T = { G1: { status: "done" as const, note: "signed", at: "2026-10-01" }, G2: { status: "risk" as const, note: "", at: "" }, T1: { status: "on" as const, note: "", at: "" } };
+assert.deepEqual([counts(m, T).done, counts(m, T).risk, counts(m, T).on, counts(m, T).todo, counts(m, T).total], [1, 1, 1, 1, 4]); assert.equal(progressOf(m, T), (1 + 0.25 + 0.5 + 0) / 4); assert.equal(progressOf(m, T, "P1"), (1 + 0.5) / 2); assert.equal(progressOf({ ...m, goals: [], mission: [] }, T), null, "nothing to measure is not 0%");
+const pt = progressText(m, T); assert.ok(pt.includes("1 done") && pt.includes("G1 done (signed)") && pt.includes("G2 at risk") && !pt.includes("T2") && pt.length <= 1250, "the progress text lists what moved and leaves out what did not");
+assert.equal(STATUSES.length, 4); assert.ok(nodeProgress(m, T, ORG_BY.get("pol")!).goals >= 1 && nodeProgress(m, T, ORG_BY.get("pol")!).progress === 1, "goals whose owner names Political Affairs count for that sector"); assert.equal(nodeProgress(null, T, ORG_BY.get("pol")!).progress, null);
+// ---- the room
+assert.equal(COUNCILS.length, 9); assert.ok(COUNCILS.every((c) => c.agents.length >= 4 && unique(c.agents.map((a) => a.id)) && unique(c.agents.map((a) => a.code)) && c.auditors), "every council has a real roster, unique seat codes and the auditor pair");
+const kc = COUNCILS.find((c) => c.id === "emb-intel")!; assert.equal(kc.agents.length, EMB_AGENTS.length);
+const idle = seatsOf(COUNCILS[0], {}); assert.ok(idle.every((s) => s.state === "idle") && idle.filter((s) => s.kind === "auditor").length === 2 && idle.filter((s) => s.kind === "chair").length === 1, "an unrun council is all idle with a chair and two auditors");
+const liv = seatsOf(COUNCILS.find((c) => c.id === "mofa")!, { live: [{ id: "M1", status: "done" }, { id: "M2", status: "run" }, { id: "chief", status: "wait" }], groupOf: (id) => MOFA_GROUPS.find((g) => g.agents.includes(id))?.id ?? null });
+assert.equal(liv.find((s) => s.id === "minister")!.state, "done"); assert.equal(liv.find((s) => s.id === "political")!.state, "run"); assert.equal(liv.find((s) => s.id === "econ")!.state, "wait", "a seat whose sitting has not reported waits while a run is live"); assert.equal(liv.find((s) => s.id === "revs")!.state, "wait"); assert.deepEqual([seatCounts(liv).done, seatCounts(liv).run], [3, 3]);
+const done = seatsOf(COUNCILS[0], { done: () => true, chairDone: true, auditorsDone: true }); assert.ok(done.every((s) => s.state === "done"));
+for (const c of COUNCILS) { const pos = layout(seatsOf(c, {})); const s = seatsOf(c, {}); assert.ok(s.every((x) => pos[x.id] && Number.isFinite(pos[x.id].x) && Number.isFinite(pos[x.id].y)), `${c.id}: every seat has a place at the table`); const xy = s.map((x) => `${Math.round(pos[x.id].x)},${Math.round(pos[x.id].y)}`); assert.equal(new Set(xy).size, xy.length, `${c.id}: no two seats share a place`); }
+// ---- a parallel sitting's share of the money must leave it room to write (the default reserve of 0.15 left a US$0.13 share with none, and every sitting was cut off after its first section)
+const share = 0.13; assert.equal(outputRoom(0.235, 0.235 + share, "claude-sonnet-5-5"), 0, "with the default reserve a US$0.13 share has no output room: this is the failure that was found live");
+assert.ok(outputRoom(0.235, 0.235 + share, "claude-sonnet-5-5", 0.03) >= 8000, "with the sitting's own small reserve it can write several sections"); assert.ok(outputRoom(0.8, 0.8 + 0.07, "claude-sonnet-5-5", 0.01) >= 5000, "an auditor with a US$0.07 share can still write its review");
+// ---- the reviewer pair's server step spends nothing when there is nothing to review or no money
+(async () => {
+  const events: Record<string, unknown>[] = []; const total = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0, fetches: 0, usd: 0 };
+  const base = { client: {} as never, model: "m", system: "s", firstText: "f", subject: { product: "p", reader: "r", focus: "x" }, lang: "en" as const, cap: 1, spent: 0, signal: new AbortController().signal, send: (e: Record<string, unknown>) => { events.push(e); }, label: "t", effort: "low" as const, sources: [], total };
+  const none = await runAuditors({ ...base, product: "" }); assert.equal(none.outs.length, 2); assert.ok(none.outs.every((x) => x.status === "skipped" && /nothing to review/.test(x.note ?? "")) && none.spent === 0, "no product, no auditors, no spend");
+  const broke = await runAuditors({ ...base, product: "A finished product.", spent: 0.97 }); assert.ok(broke.outs.every((x) => x.status === "skipped" && /no money left/.test(x.note ?? "")) && broke.spent === 0.97, "no money under the ceiling, no auditors");
+  assert.ok(events.filter((e) => e.status === "skipped").length === 4 && AUDITORS.length === 2);
+  console.log("mofa: all checks passed");
+})();
+void embDigest; void EMB_INTEL_GROUPS; void EMB_PLAN_GROUPS;

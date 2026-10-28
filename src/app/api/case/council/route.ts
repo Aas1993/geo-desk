@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { AUDITORS, SUBJECTS, reviewTail } from "@/lib/review/pair";
+import { pairReserve, runAuditors } from "@/lib/review/run";
 import { renderFacts } from "@/lib/ask/facts";
 import { rejectCrossSite, safeMessage } from "@/lib/guard";
 import { maxRunUsd } from "@/lib/dossier/cost";
@@ -17,7 +19,7 @@ const MODEL = process.env.DOSSIER_MODEL || "claude-sonnet-5-5";
 const ENV_EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as Effort) : null;
 const CAP = maxRunUsd(process.env.DOSSIER_MAX_RUN_USD); // the whole council, every agent together, never spends more than this
 const MAX_PER_HOUR = Math.max(1, +(process.env.DOSSIER_MAX_PER_HOUR ?? 4) || 4); const TTL = 6 * 3600_000; const MAX_CONCURRENT = 2;
-type AgentOut = { id: AgentId; name: string; text: string; usd: number; searches: number; failed: number; status: "done" | "skipped" | "error"; note?: string };
+type AgentOut = { id: AgentId | "revs" | "revr"; name: string; text: string; usd: number; searches: number; failed: number; status: "done" | "skipped" | "error"; note?: string };
 type Done = { report: string; agents: AgentOut[]; sources: Source[]; usage: Usage; at: string; model: string; options: unknown; name: string; seats: string[]; manifest: string };
 // the hourly cap and the in-flight guard are shared with the dossier route, so a council counts as one new briefing
 const g = globalThis as unknown as { __gdDossier?: { cache: Map<string, unknown>; running: Set<string>; runs: number[] }; __gdCCouncil?: Map<string, Done> };
@@ -51,7 +53,7 @@ export async function POST(req: Request) {
         const client = new Anthropic(); const out: Partial<Record<AgentId, string>> = {}; const results: AgentOut[] = []; const sources: Source[] = []; const seen = new Set<string>();
         const total: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0, fetches: 0, usd: 0 }; let spent = 0; const lang = o.lang; const nameOf = (a: Agent) => (lang === "ar" ? a.ar : a.en);
         const plan = planAgents(o.seats); const effort = (a: Agent): Effort => ENV_EFFORT ?? (a.id === "chair" ? "medium" : "low"); const why = activate(o.question, { all: o.all }).why;
-        send({ type: "roster", agents: plan.map((a) => ({ id: a.id, name: nameOf(a), stage: a.stage, searches: a.searches, seats: a.seats })), seats: o.seats.map((id) => ({ id, name: SEAT_BY.get(id)!.en, why: why[id] ?? "Selected" })) });
+        send({ type: "roster", agents: [...plan.map((a) => ({ id: a.id, name: nameOf(a), stage: a.stage, searches: a.searches, seats: a.seats })), ...AUDITORS.map((a) => ({ id: a.id, name: lang === "ar" ? a.ar : a.en, stage: 9, searches: a.searches }))], seats: o.seats.map((id) => ({ id, name: SEAT_BY.get(id)!.en, why: why[id] ?? "Selected" })) });
         const run1 = async (a: Agent) => {
           send({ type: "agent", id: a.id, status: "start" });
           try {
@@ -67,11 +69,12 @@ export async function POST(req: Request) {
         // the first independent group goes alone so the shared evidence is cached before the others read it
         if (stage0.length) { send({ type: "status", text: "Stage 3: the first seats are reading the evidence and warming the shared cache…" }); await run1(stage0[0]); if (stage0.length > 1) { send({ type: "status", text: "Stage 3: the other seat groups are working independently in parallel…" }); await Promise.all(stage0.slice(1).map(run1)); } }
         // stages 4 to 6: audit and red team first, then roadmap, then debate; each starts only if its worst case still leaves the Chair's
-        let room = CAP - spent - worstCase(CHAIR); const go: Agent[] = []; for (const id of ["review", "execution", "debate"] as const) { const a = stage1.find((x) => x.id === id); if (!a) continue; if (room >= worstCase(a)) { go.push(a); room -= worstCase(a); } else skipped(a, "would not fit under the cost ceiling"); }
+        let room = CAP - spent - worstCase(CHAIR) - pairReserve(); const go: Agent[] = []; for (const id of ["review", "execution", "debate"] as const) { const a = stage1.find((x) => x.id === id); if (!a) continue; if (room >= worstCase(a)) { go.push(a); room -= worstCase(a); } else skipped(a, "would not fit under the cost ceiling"); }
         if (go.length) { send({ type: "status", text: "Stages 4 to 6: debate, adversarial review and the execution roadmap…" }); await Promise.all(go.map(run1)); }
         if (CAP - spent >= worstCase(CHAIR) * 0.7) { send({ type: "status", text: "Stage 7: the Chair is writing the decision and the strategy…" }); await run1(CHAIR); } else skipped(CHAIR, "no money left under the cost ceiling");
-        const ordered = plan.map((a) => results.find((r) => r.id === a.id)).filter((x): x is AgentOut => !!x);
-        const known = new Set(gathered.facts.map((f) => f.id)); const report = composeReport(ordered).replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => ((ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`));
+        const ordered0 = plan.map((a) => results.find((r) => r.id === a.id)).filter((x): x is AgentOut => !!x);
+        const aud = await runAuditors({ client, model: MODEL, system: CASE_SYSTEM, firstText: base, subject: SUBJECTS["case-council"], product: ordered0.some((x) => x.status === "done") ? composeReport(ordered0 as never) : "", lang: lang, cap: CAP, spent, signal: ac.signal, send, label: "case-council", effort: ENV_EFFORT ?? "low", sources, total }); spent = aud.spent; const ordered: AgentOut[] = [...ordered0, ...(aud.outs as AgentOut[])];
+        const known = new Set(gathered.facts.map((f) => f.id)); const report = composeReport(ordered0 as never) + (reviewTail(ordered) ? `\n\n${reviewTail(ordered)}` : "").replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => ((ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`));
         const done: Done = { report, agents: ordered, sources, usage: total, at: new Date().toISOString(), model: MODEL, options: { ...o, kind: "casecouncil" }, name: gathered.name, seats: o.seats, manifest };
         if (ordered.some((a) => a.status === "done")) { cache.set(key, done); while (cache.size > 20) cache.delete(cache.keys().next().value as string); }
         send({ type: "done", cached: false, ...done });

@@ -9,7 +9,7 @@ import { loadResearch } from "@/lib/deep/research";
 import { loadSnapshot } from "@/lib/deep/snapshot";
 import { caseFacts } from "@/lib/case/facts";
 import { loadCase } from "@/lib/case/load";
-import { DEFAULT_EMB_FOCUS, DEFAULT_KING_FOCUS, PRODUCTS, checkRefs, citedIds, cleanDeskOptions, deskBase, deskKey, worstOf, type Product } from "@/lib/desk/core";
+import { DEFAULT_EMB_FOCUS, DEFAULT_KING_FOCUS, DEFAULT_MOFA_FOCUS, PRODUCTS, checkRefs, citedIds, cleanDeskOptions, deskBase, deskKey, worstOf, type Product } from "@/lib/desk/core";
 import { deskExtraFacts } from "@/lib/desk/context";
 import { planFor, type Call } from "@/lib/desk/plan";
 
@@ -18,6 +18,7 @@ const MODEL = process.env.DOSSIER_MODEL || "claude-sonnet-5-5";
 const ENV_EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as Effort) : null;
 const CAP = maxRunUsd(process.env.DOSSIER_MAX_RUN_USD); // every call of one run together never spends more than this
 const FINAL_RESERVE = 0.9; // the final writer reads every earlier text and may pay for a cold cache, so the earlier calls never spend the share it needs
+const REV_RESERVE = 0.6; // the two auditors together reserve this share of their worst case: they read one finished text and write little
 const LIKELY = 0.6; // a call uses about this share of its worst-case budget (measured 0.4 to 0.7); the ceiling itself is enforced inside runModelTask, so a call that overruns is stopped, never billed past it
 const MAX_PER_HOUR = Math.max(1, +(process.env.DOSSIER_MAX_PER_HOUR ?? 4) || 4); const MAX_DIRECTIVES_PER_HOUR = Math.max(1, +(process.env.DESK_MAX_DIRECTIVES_PER_HOUR ?? 12) || 12); const TTL = 6 * 3600_000; const MAX_CONCURRENT = 2;
 type CallOut = { id: string; name: string; text: string; usd: number; searches: number; failed: number; status: "done" | "skipped" | "error"; note?: string };
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
   const bad = rejectCrossSite(req); if (bad) return bad;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>; const iso3 = String(body.iso3 ?? "").toUpperCase(); const product = String(body.product ?? "") as Product;
   if (!/^[A-Z]{3}$/.test(iso3) || iso3 === "ARE" || !(PRODUCTS as string[]).includes(product)) return Response.json({ error: "bad_request" }, { status: 400 });
-  const king = product.startsWith("king"); const directive = product.endsWith("directive"); const o = cleanDeskOptions(body, king ? DEFAULT_KING_FOCUS : DEFAULT_EMB_FOCUS);
+  const king = product.startsWith("king"); const directive = product.endsWith("directive"); const o = cleanDeskOptions(body, king ? DEFAULT_KING_FOCUS : product.startsWith("mofa") ? DEFAULT_MOFA_FOCUS : DEFAULT_EMB_FOCUS);
   if (directive && o.mode !== "update" && o.topic.length < 4) return Response.json({ error: "bad_request", message: o.lang === "ar" ? "اكتب السؤال أو التوجيه." : "Write the question or the directive." }, { status: 400 });
   const refusal = refusalFor(`${o.focus} ${o.topic}`); if (refusal) return Response.json({ error: "bad_request", message: REFUSAL_TEXT[o.lang](refusal) }, { status: 400 });
   const refresh = body.refresh === true; const enc = new TextEncoder(); const context = o.useContext && typeof body.context === "string" ? noteText(body.context).slice(0, 24_000) : "";
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
         if (!gathered || gathered.facts.length < 8) { refund(); send({ type: "error", error: "thin", message: "Not enough data on this yet." }); return finish(); }
         send({ type: "facts", count: gathered.facts.length, tiles: [], gaps: gathered.gaps });
         const plan = planFor(product, o, context); const base = deskBase({ facts: renderFacts(gathered.facts, gathered.gaps), asOf: new Date().toISOString(), country: gathered.name, options: o, context, contextLabel: plan.contextLabel });
+        const revs = plan.calls.filter((x) => x.stage === 2); const revReserve = revs.reduce((a, x) => a + worstOf(x.maxTokens, x.searches), 0) * REV_RESERVE; const revLikely = revs.reduce((a, x) => a + worstOf(x.maxTokens, x.searches), 0) * LIKELY;
         const client = new Anthropic(); const out: Record<string, string> = {}; const results: CallOut[] = []; const sources: Source[] = []; const seen = new Set<string>();
         const total: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0, fetches: 0, usd: 0 }; let spent = 0; const nameOf = (x: Call) => (o.lang === "ar" ? x.name.ar : x.name.en);
         const effort = (x: Call): Effort => ENV_EFFORT ?? (x.stage === 1 ? "medium" : "low");
@@ -63,7 +65,7 @@ export async function POST(req: Request) {
         const run1 = async (x: Call, cap?: number, spentAt?: number) => {
           send({ type: "agent", id: x.id, status: "start" });
           try {
-            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 2 ? CAP : x.stage === 1 ? CAP - (rev ? worstOf(rev.maxTokens, rev.searches) * FINAL_RESERVE : 0) : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0) - (rev ? worstOf(rev.maxTokens, rev.searches) * FINAL_RESERVE : 0)), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => spentAt ?? spent });
+            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 2 ? CAP : x.stage === 1 ? CAP - revReserve : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0) - revReserve), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => spentAt ?? spent, reserveUsd: x.stage === 0 ? 0.03 : x.stage === 1 ? 0.05 : 0.01 }); // each tier keeps back only what its own input and searches still need, so a share smaller than the default 0.15 does not shrink to the 1,500-token floor
             const usd = r.usage.usd ?? runUsd(r.usage, MODEL); r.usage.usd = usd; spent += usd; for (const k of ["input", "output", "cacheRead", "cacheWrite", "searches", "fetches"] as const) total[k] += r.usage[k]; total.usd = spent;
             for (const s of r.sources) if (!seen.has(s.url)) { seen.add(s.url); sources.push(s); }
             const start = r.report.search(/^#{1,3} /m); const text = (start > 0 && x.stage === 0 ? r.report.slice(start) : r.report).trim(); out[x.id] = text;
@@ -71,16 +73,20 @@ export async function POST(req: Request) {
           } catch (e) { if (ac.signal.aborted) throw e; const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[desk] ${product} ${x.id} failed:`, msg); results.push({ id: x.id, name: nameOf(x), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); send({ type: "agent", id: x.id, status: "error", message: msg }); }
         };
         const skipped = (x: Call, why: string) => { results.push({ id: x.id, name: nameOf(x), text: "", usd: 0, searches: 0, failed: 0, status: "skipped", note: why }); send({ type: "agent", id: x.id, status: "skipped", message: why }); };
-        const stage0 = plan.calls.filter((x) => x.stage === 0); const fin = plan.calls.find((x) => x.stage === 1); const rev = plan.calls.find((x) => x.stage === 2);
+        const stage0 = plan.calls.filter((x) => x.stage === 0); const fin = plan.calls.find((x) => x.stage === 1);
         // the first call goes alone so the shared evidence is cached before the others read it
         if (stage0.length) { send({ type: "status", text: stage0.length > 1 ? "The first sitting is reading the evidence and warming the shared cache…" : "Working…" }); await run1(stage0[0]); }
         if (stage0.length > 1) {
-          const room = CAP - spent - (fin ? worstOf(fin.maxTokens, fin.searches) * LIKELY : 0) - (rev ? worstOf(rev.maxTokens, rev.searches) * LIKELY : 0); let used = 0; const go: Call[] = [];
+          const room = CAP - spent - (fin ? worstOf(fin.maxTokens, fin.searches) * LIKELY : 0) - revLikely; let used = 0; const go: Call[] = [];
           for (const x of stage0.slice(1)) { const w = worstOf(x.maxTokens, x.searches) * LIKELY; if (used + w <= room) { used += w; go.push(x); } else skipped(x, "no money left under the cost ceiling"); }
-          if (go.length) { send({ type: "status", text: `${go.length} more sitting${go.length === 1 ? " is" : "s are"} working in parallel…` }); const reserve = (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0) + (rev ? worstOf(rev.maxTokens, rev.searches) * FINAL_RESERVE : 0); const at = spent; const share = (CAP - at - reserve) / go.length; await Promise.all(go.map((x) => run1(x, at + share, at))); }
+          if (go.length) { send({ type: "status", text: `${go.length} more sitting${go.length === 1 ? " is" : "s are"} working in parallel…` }); const reserve = (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0) + revReserve; const at = spent; const share = (CAP - at - reserve) / go.length; await Promise.all(go.map((x) => run1(x, at + share, at))); }
         }
-        if (fin) { if (CAP - spent >= worstOf(fin.maxTokens, fin.searches) * LIKELY && outputRoom(spent, CAP, MODEL) >= Math.min(fin.maxTokens * 0.6, 6000)) { send({ type: "status", text: "Writing the final product…" }); await run1(fin); } else skipped(fin, "no money left under the cost ceiling"); }
-        if (rev) { if (fin && out[fin.id] && CAP - spent >= worstOf(rev.maxTokens, rev.searches) * LIKELY && outputRoom(spent, CAP, MODEL) >= 2500) { send({ type: "status", text: "An independent reviewer is checking the product…" }); await run1(rev); } else skipped(rev, fin && out[fin.id] ? "no money left under the cost ceiling" : "nothing to review"); }
+        if (fin) { if (CAP - spent >= worstOf(fin.maxTokens, fin.searches) * LIKELY && outputRoom(spent, CAP - revReserve, MODEL, 0.05) >= Math.min(fin.maxTokens * 0.6, 6000)) { send({ type: "status", text: "Writing the final product…" }); await run1(fin); } else skipped(fin, "no money left under the cost ceiling"); }
+        if (revs.length) {
+          if (fin && out[fin.id] && CAP - spent >= revLikely && outputRoom(spent, CAP, MODEL, 0.01) >= 1800 * revs.length) {
+            send({ type: "status", text: "Two independent auditors, one for statecraft and one for the reality of the data, are checking the product…" }); const at = spent; const share = (CAP - at) / revs.length; await Promise.all(revs.map((x) => run1(x, at + share, at)));
+          } else for (const x of revs) skipped(x, fin && out[fin.id] ? "no money left under the cost ceiling" : "nothing to review");
+        }
         const ordered = plan.calls.map((x) => results.find((r) => r.id === x.id)).filter((x): x is CallOut => !!x);
         const known = new Set(gathered.facts.map((f) => f.id)); const report = checkRefs(plan.compose(ordered.map((r) => ({ id: r.id, text: r.text }))), known); const cited = new Set(citedIds(report));
         const done: Done = { product, report, agents: ordered, sources, usage: total, at: new Date().toISOString(), model: MODEL, options: { ...o, kind: product, context: undefined }, name: gathered.name, manifest, facts: gathered.facts.filter((f) => cited.has(f.id)).map((f) => ({ id: f.id, kind: f.kind, text: f.text.slice(0, 1600), src: f.src, url: f.url })) };

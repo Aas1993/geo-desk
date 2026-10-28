@@ -9,7 +9,7 @@ type Ask = (text: string, agents?: string[]) => void;
 const GROUP_C: Record<string, string> = { government: "#378ADD", security: "#7F77DD", economy: "#BA7517", private: "#D4537E", community: "#1D9E75", research: "#8a94a6", media: "#C0568C" };
 const LEVEL_C: Record<string, string> = { decisive: "var(--accent)", influential: "var(--ok)", useful: "var(--t2)" };
 const GROUP_L: Record<string, [string, string]> = { government: ["Government and institutions", "الحكومة والمؤسسات"], security: ["Security institutions", "المؤسسات الأمنية"], economy: ["Economic institutions", "المؤسسات الاقتصادية"], private: ["Business and private sector", "الأعمال والقطاع الخاص"], community: ["Community and civil society", "المجتمع والمجتمع المدني"], research: ["Research and universities", "الأبحاث والجامعات"], media: ["Media", "الإعلام"] };
-const HAT_C: Record<string, string> = { E1: "#378ADD", E2: "#BA7517", E3: "#D4537E", E4: "#C0568C", E5: "#7F77DD", E6: "#8a94a6", E7: "#378ADD", E8: "#639922", E9: "#BA7517", E10: "#1D9E75", E11: "#C0568C", E12: "#639922", E13: "#8a94a6" };
+const HAT_C: Record<string, string> = { E1: "#378ADD", E2: "#BA7517", E3: "#D4537E", E4: "#C0568C", E5: "#7F77DD", E6: "#8a94a6", E7: "#378ADD", E8: "#639922", E9: "#BA7517", E10: "#1D9E75", E11: "#C0568C", E12: "#639922", E13: "#8a94a6", E14: "#7F77DD", E15: "#D4537E", E16: "#BA7517", E17: "#378ADD" };
 
 /** Who matters, by group and level. Public roles and organisations only; engagement is open, official and reciprocal. */
 export function PowerView({ L, power, head, onAsk }: { L: Lang; power: PowerEntry[]; head: string[]; onAsk: Ask }) {

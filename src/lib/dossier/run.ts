@@ -25,6 +25,8 @@ export type RunOptions = {
   label?: string;
   /** money already spent by sibling runs, so a council shares one ceiling */
   spentBefore?: () => number;
+  /** what to keep back from the output room for the input and searches still to come (default 0.15): a sibling run that was given a small share passes a smaller one, or its room falls to the 1,500-token floor and its answer is cut off */
+  reserveUsd?: number;
 };
 export type RunResult = { report: string; sources: Source[]; usage: Usage; stop: string | null; costStopped: boolean; failedSteps: number; apiSearches: number };
 
@@ -51,7 +53,7 @@ export async function runModelTask(o: RunOptions): Promise<RunResult> {
   };
   for (let turn = 0; turn < MAX_TURNS && !costStopped; turn++) {
     // output room shrinks as money is spent, so one turn can never plan to write past the ceiling
-    const maxTok = Math.max(1500, Math.min(bud.maxTokens, outputRoom(cost() + others(), o.maxUsd, model)));
+    const maxTok = Math.max(1500, Math.min(bud.maxTokens, outputRoom(cost() + others(), o.maxUsd, model, o.reserveUsd)));
     const tac = new AbortController(); signal.addEventListener("abort", () => tac.abort(), { once: true });
     const s = client.beta.messages.stream({
       model, max_tokens: maxTok, system: [{ type: "text", text: o.system, cache_control: { type: "ephemeral" } }], messages: withNote(messages), tools: toolsLeft(), ...(containerId ? { container: containerId } : {}),

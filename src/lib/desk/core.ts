@@ -6,16 +6,16 @@ import type { B } from "../case/core";
 
 // THE DESKS: two separate councils on the same evidence. THE KING's Council serves the head of state, who decides; the Embassy Council serves the UAE ambassador in the country, who executes. Each is a roster of specialists (archetypes of PhD-level, decades-long practice: no real person is represented), written to the standards the public record describes for intelligence assessment (ICD 203: sourcing, uncertainty, separation of information, assumptions and judgments, alternatives, relevance, logical argument, consistency and change, accuracy) and for diplomatic reporting (the country team and integrated country strategy model).
 // Both run in sittings the user clicks, under the US$1.00 ceiling each, and both take directives: a question or an instruction goes to the specialists whose field it touches and comes back as an answer, a recommendation and a way forward. Nothing is sent to anyone; every output is a proposal for a human decision.
-export type Desk = "king" | "embassy";
+export type Desk = "king" | "embassy" | "mofa";
 export type Agent = { id: string; desk: Desk; n: number; en: string; ar: string; title: B; field: B; mandate: string; questions: string[]; sources: string[]; match: RegExp };
 export type Group = { id: string; agents: string[]; searches: number; maxTokens: number; words: number };
 export type Chair = { id: string; en: string; ar: string; title: B; maxTokens: number; words: number };
 export const REVIEW_STAGE = 2;
-export type Product = "king-council" | "king-directive" | "emb-intel" | "emb-plan" | "emb-directive";
-export const PRODUCTS: Product[] = ["king-council", "king-directive", "emb-intel", "emb-plan", "emb-directive"];
+export type Product = "king-council" | "king-directive" | "emb-intel" | "emb-plan" | "emb-directive" | "mofa-council" | "mofa-directive";
+export const PRODUCTS: Product[] = ["king-council", "king-directive", "emb-intel", "emb-plan", "emb-directive", "mofa-council", "mofa-directive"];
 export const DESK_CAP_USD = 1;
 /** What each product typically costs on one country, in US dollars (the ceiling is DESK_CAP_USD). Printed beside every button; replaced with measured figures after a live run. */
-export const PRODUCT_USD: Record<Product, number> = { "king-council": 0.6, "king-directive": 0.3, "emb-intel": 0.9, "emb-plan": 0.85, "emb-directive": 0.3 };
+export const PRODUCT_USD: Record<Product, number> = { "king-council": 0.6, "king-directive": 0.3, "emb-intel": 0.9, "emb-plan": 0.85, "emb-directive": 0.3, "mofa-council": 0.8, "mofa-directive": 0.3 };
 export const worstOf = (maxTokens: number, searches: number) => (maxTokens * 10) / 1e6 + searches * 0.01 + 0.08;
 
 // ---- the universal constitution ----
@@ -62,6 +62,7 @@ export function routeTopic(topic: string, roster: Agent[], fallback: string[]): 
 
 // ---- the directive answer, validated ----
 export type Directive = { answer: string; recommendation: string; confidence: "high" | "moderate" | "low"; options: { name: string; pros: string[]; cons: string[]; cost: string; risk: string }[]; steps: { action: string; owner: string; when: string; detail: string }[]; risks: { name: string; mitigation: string }[]; needs: string[]; follow: string[] };
+export { s as str, arr as list, strs };
 const s = (v: unknown, n = 300) => (typeof v === "string" ? v.replace(/[<>\u0000-\u001F]/g, " ").trim().slice(0, n) : ""); const arr = (v: unknown, n: number) => (Array.isArray(v) ? v.slice(0, n) : []); const strs = (v: unknown, n: number, m = 240) => arr(v, n).map((x) => s(x, m)).filter(Boolean);
 /** Closes a JSON text that was cut off: keeps everything up to the last complete array or object and closes the brackets still open. Returns null when nothing complete remains. */
 export function repairJson(text: string): string | null {
@@ -88,18 +89,28 @@ export function parseDirective(report: string): Directive | null {
   return o.answer || o.recommendation || o.steps.length ? o : null;
 }
 // ---- the independent review: a second pair of eyes before a product is compiled ----
-export type Review = { verdict: "approve" | "revise" | "reject"; summary: string; strengths: string[]; issues: { where: string; severity: "high" | "medium" | "low"; problem: string; fix: string }[]; unsupported: string[]; boundary: string[]; conflicts: string[]; missing: string[]; partial: boolean };
-export const REVIEW_SCHEMA = `After the markdown, write exactly one block of JSON between the tags <review> and </review> and nothing else inside them: {"verdict": "approve", "revise" or "reject" (reject only if the product is unusable or breaches the boundary), "summary": two sentences, "strengths": up to four, "issues": up to ten of {"where" (a section or an id such as D3 or J2), "severity" ("high", "medium" or "low"), "problem", "fix"} ordered by severity, "unsupported": claims that carry no fact id or dated source, "boundary": any passage that breaches the boundary, "conflicts": contradictions between sections or with the evidence, "missing": what a decision-maker would still need}. Strict JSON, double quotes, no trailing commas. Be specific and short; praise nothing that is not verified; do not rewrite the product.`;
-export function parseReview(report: string): Review | null {
-  const jb = jsonBlock(report, "review"); if (!jb) return null; const j = jb.data; const verdict = (["approve", "revise", "reject"] as const).find((v) => v === j.verdict); if (!verdict) return null;
-  return { verdict, summary: s(j.summary, 500), strengths: strs(j.strengths, 4), issues: arr(j.issues, 12).map((x) => { const q = x as Record<string, unknown>; return { where: s(q.where, 60), severity: (["high", "medium", "low"].includes(String(q.severity)) ? q.severity : "medium") as "high" | "medium" | "low", problem: s(q.problem, 300), fix: s(q.fix, 240) }; }).filter((x) => x.problem), unsupported: strs(j.unsupported, 8, 260), boundary: strs(j.boundary, 6, 260), conflicts: strs(j.conflicts, 6, 260), missing: strs(j.missing, 6, 240), partial: jb.partial };
+export type RedFlag = { flag: string; severity: "critical" | "serious"; where: string; why: string; ask: string };
+export type Lens = "statecraft" | "reality" | "decision";
+export type Review = { lens: Lens; verdict: "approve" | "revise" | "reject"; standing: "sound" | "mixed" | "unsound" | null; summary: string; strengths: string[]; issues: { where: string; severity: "high" | "medium" | "low"; problem: string; fix: string }[]; unsupported: string[]; boundary: string[]; conflicts: string[]; missing: string[]; redFlags: RedFlag[]; partial: boolean };
+/** The tag each reviewer writes its structured verdict in. "review" is the single reviewer of products saved before the pair existed. */
+export const REVIEW_TAGS: Record<Lens, string> = { statecraft: "statecraft_review", reality: "reality_review", decision: "review" };
+export const REVIEW_SCHEMA = (lens: Lens = "decision") => `After the markdown, write exactly one block of JSON between the tags <${REVIEW_TAGS[lens]}> and </${REVIEW_TAGS[lens]}> and nothing else inside them: {"verdict": "approve", "revise" or "reject" (reject only if the product is unusable, would harm the UAE's interests if followed, or breaches the boundary), "standing": "sound", "mixed" or "unsound", "summary": two sentences, "strengths": up to four, "issues": up to ten of {"where" (a section or an id such as D3 or J2), "severity" ("high", "medium" or "low"), "problem", "fix"} ordered by severity, "unsupported": claims that carry no fact id or dated source, "boundary": any passage that breaches the boundary, "conflicts": contradictions between sections or with the evidence, "missing": what a decision-maker would still need, "redFlags": [{"flag": the red flag in one line, "severity": "critical" or "serious", "where", "why": what goes wrong for the UAE if this is relied on, "ask": what the desk must do before relying on it}] (an empty list when there is none: a red flag is raised only for a real danger or a real falsehood, never for style)}. Strict JSON, double quotes, no trailing commas. Be specific and short; praise nothing that is not verified; do not rewrite the product.`;
+const REVIEW_PARSE_ORDER: Lens[] = ["statecraft", "reality", "decision"];
+function reviewOf(report: string, lens: Lens): Review | null {
+  const jb = jsonBlock(report, REVIEW_TAGS[lens]); if (!jb) return null; const j = jb.data; const verdict = (["approve", "revise", "reject"] as const).find((v) => v === j.verdict); if (!verdict) return null;
+  return { lens, verdict, standing: (["sound", "mixed", "unsound"] as const).find((v) => v === j.standing) ?? null, summary: s(j.summary, 500), strengths: strs(j.strengths, 4), issues: arr(j.issues, 12).map((x) => { const q = x as Record<string, unknown>; return { where: s(q.where, 60), severity: (["high", "medium", "low"].includes(String(q.severity)) ? q.severity : "medium") as "high" | "medium" | "low", problem: s(q.problem, 300), fix: s(q.fix, 240) }; }).filter((x) => x.problem), unsupported: strs(j.unsupported, 8, 260), boundary: strs(j.boundary, 6, 260), conflicts: strs(j.conflicts, 6, 260), missing: strs(j.missing, 6, 240),
+    redFlags: arr(j.redFlags, 8).map((x) => { const q = x as Record<string, unknown>; return { flag: s(q.flag, 200), severity: (q.severity === "critical" ? "critical" : "serious") as RedFlag["severity"], where: s(q.where, 80), why: s(q.why, 320), ask: s(q.ask, 260) }; }).filter((x) => x.flag), partial: jb.partial };
 }
+/** Every independent review in a product: the Statecraft Auditor's, the Reality Auditor's and, in older products, the single reviewer's. */
+export function parseReviews(report: string): Review[] { return REVIEW_PARSE_ORDER.map((l) => reviewOf(report, l)).filter((r): r is Review => !!r); }
+export const parseReview = (report: string): Review | null => parseReviews(report)[0] ?? null;
 export const DIRECTIVE_SCHEMA = `After the markdown, write exactly one block of JSON between the tags <directive> and </directive> and nothing else inside them: {"answer": the direct answer in two to four sentences, "recommendation": what to do, "confidence": "high", "moderate" or "low", "options": [{"name","pros":[],"cons":[],"cost" ("not estimated" unless evidenced),"risk"}] (two to four), "steps": [{"action","owner" (proposed),"when","detail"}] (the way forward, up to eight, in order), "risks": [{"name","mitigation"}], "needs": [what only the desk or ministry can supply], "follow": [up to three follow-up questions worth asking]}. Strict JSON: double quotes, no trailing commas, no comments.`;
 
 // ---- options, keys and facts shared by both desks ----
 export type DeskOptions = { focus: string; topic: string; mode: "question" | "directive" | "update"; urgency: "routine" | "urgent"; agents: string[]; lang: "en" | "ar"; useContext: boolean };
 const clean = (v: unknown, n: number) => oneLine(typeof v === "string" ? v.replace(/[\u0000-\u001F]/g, " ").trim().slice(0, n) : "", n);
 export const DEFAULT_KING_FOCUS = "Decide the UAE's course toward this country: what to do, in what form, under what conditions, and why.";
+export const DEFAULT_MOFA_FOCUS = "Think strictly as the Ministry of Foreign Affairs: set the UAE's ranked foreign-policy priorities for this country, the goals and measures, the mission's tasks and the plans for the embassy.";
 export const DEFAULT_EMB_FOCUS = "Build the strongest relationship and the best outcome for the UAE in this country: the mission's strategy, its plans and its engagement.";
 export const cleanDeskOptions = (b: Record<string, unknown>, def: string): DeskOptions => ({ focus: clean(b.focus, 400) || def, topic: clean(b.topic, 600), mode: b.mode === "directive" ? "directive" : b.mode === "update" ? "update" : "question", urgency: b.urgency === "urgent" ? "urgent" : "routine", agents: Array.isArray(b.agents) ? b.agents.filter((x): x is string => typeof x === "string" && /^[a-z0-9-]{2,16}$/.test(x)).slice(0, 4) : [], lang: b.lang === "ar" ? "ar" : "en", useContext: b.useContext !== false });
 const hash = (str: string) => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return h >>> 0; };

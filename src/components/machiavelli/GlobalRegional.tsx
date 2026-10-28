@@ -38,7 +38,7 @@ export function PortfolioPanel({ set, L, by }: { set: ProfileSet; L: Lang; by: M
   );
 }
 export function RollPanel({ set, L }: { set: ProfileSet; L: Lang }) {
-  const u = T[L]; return <Block title={u.roll} hint={u.rollH}><Tbl head={[u.region, u.members, "Hard", "Soft", "Economic", "Durability", "Regional", "Position", u.composite]} rows={[...set.rolls].sort((a, b) => b.avg.composite - a.avg.composite).map((r) => [<b key="r" className="text-t0">{L === "ar" ? REGION_AR[r.region] ?? r.region : r.region}</b>, r.n, r.avg.hard, r.avg.soft, r.avg.econ, r.avg.dur, r.avg.region, r.avg.comp, <b key="c" className="num text-t0">{r.avg.composite}</b>])} /></Block>;
+  const u = T[L]; return <Block title={u.roll} hint={u.rollH}><Tbl head={[u.region, u.members, "Hard", "Soft", "Economic", "Durability", "Regional", "Position", "Bilateral trade", "Investment", "Alignment", "Governance", "Market", "Final score", u.composite]} rows={[...set.rolls].sort((a, b) => (b.avg.final ?? 0) - (a.avg.final ?? 0)).map((r) => [<b key="r" className="text-t0">{L === "ar" ? REGION_AR[r.region] ?? r.region : r.region}</b>, r.n, r.avg.hard, r.avg.soft, r.avg.econ, r.avg.dur, r.avg.region, r.avg.comp, r.avg.trade, r.avg.capital, r.avg.align, r.avg.gov, r.avg.market, <b key="f" className="num text-t0">{r.avg.final}</b>, <b key="c" className="num text-t1">{r.avg.composite}</b>])} /></Block>;
 }
 export function GlobalPosition({ L, f, setF, list, by, set }: { L: Lang; f: Filters; setF: (p: Partial<Filters>) => void; list: Country[]; by: Map<string, Country>; set: ProfileSet | null | "err" }) {
   const u = T[L]; const s = set && set !== "err" ? set : null;

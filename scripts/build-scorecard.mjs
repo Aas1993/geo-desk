@@ -1,5 +1,5 @@
-// Builds public/data/scorecard.json: one country scorecard per partner across eleven aspects, in three groups:
-//   the relationship (political friends, business friends, strategic value, UAE leverage),
+// Builds public/data/scorecard.json: one country scorecard per partner across twelve aspects, in three groups:
+//   the relationship (political friends, business friends, bilateral trade, strategic value, UAE leverage),
 //   the country (political, economic, financial, social, security and risk),
 //   weight in the world (UN influence, global influence).
 // Every part is a 0-100 percentile among all countries that have data (or a plain 0/100 flag where it is a yes/no fact), so nothing is scored against an invented standard. Higher is always better for the UAE.
@@ -8,7 +8,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 const D = (f) => { try { return JSON.parse(readFileSync(new URL(`../public/data/${f}`, import.meta.url), "utf8")); } catch { return null; } };
 const cs = D("countries.json"); const countries = cs.filter((c) => c.iso3 !== "ARE").map((c) => c.iso3); const byIso = Object.fromEntries(cs.map((c) => [c.iso3, c]));
-const outlook = D("outlook.json"), gov = D("governance.json"), part = D("partnership.json"), lev = D("leverage.json"), tmp = D("temperature.json"), tone = D("media-tone.json"), aid = D("uae-aid.json"), deals = D("deals.json"), sanc = D("sanctions.json"), rw = D("ransomware.json"), ag = D("agreements.json"), orgs = D("orgs.json"), rv = D("rivals.json");
+const outlook = D("outlook.json"), gov = D("governance.json"), part = D("partnership.json"), lev = D("leverage.json"), tmp = D("temperature.json"), tone = D("media-tone.json"), aid = D("uae-aid.json"), deals = D("deals.json"), sanc = D("sanctions.json"), rw = D("ransomware.json"), ag = D("agreements.json"), orgs = D("orgs.json"), rv = D("rivals.json"), tradeF = D("trade.json"), finc = D("finconditions.json");
 for (const [k, v] of Object.entries({ outlook, gov, part, lev, sanc, ag, orgs })) if (!v) { console.error(`REFUSING TO WRITE: ${k} data missing`); process.exit(1); }
 const thisYear = new Date().getFullYear(); const O = orgs.orgs;
 
@@ -23,6 +23,10 @@ const ol = (c, k, y) => outlook.countries[c]?.[k]?.[y] ?? null;
 const gdpOf = (c) => ol(c, "gdp", thisYear - 1) ?? ol(c, "gdp", thisYear - 2);
 const aidYear = aid ? aid.years[aid.years.length >= 2 ? aid.years.length - 2 : 0] : null;
 const dealN = Object.fromEntries(countries.map((c) => [c, 0])), logiN = { ...dealN }; for (const d of deals?.items ?? []) for (const c of d.c ?? []) if (c in dealN) { dealN[c]++; if (/port|logist|shipping|aviation|transport/i.test(d.sector ?? "")) logiN[c]++; }
+// bilateral trade: UAE-reported goods trade (IMF IMTS, US$ millions): level, three-year growth and the UAE export share of the two-way total
+const tr = (c) => tradeF?.countries?.[c]?.a ?? []; const lastTr = (c) => { const a = tr(c); return a.length ? a[a.length - 1] : null; };
+const growth3 = (c) => { const l = lastTr(c); const p = l && tr(c).find((r) => r[0] === l[0] - 3); const v = l ? l[1] + l[2] : 0; const pv = p ? p[1] + p[2] : 0; return pv > 0 && v > 0 ? Math.pow(v / pv, 1 / 3) - 1 : null; };
+const lastFin = (c, k) => { const s = finc?.countries?.[c]?.[k]?.s; return s?.length ? s[s.length - 1][1] : null; };
 const mem = (c) => Object.keys(O).filter((k) => O[k].includes(c));
 // UN-system bodies almost every state belongs to say nothing about friendship; the clubs the UAE belongs to do
 const SYSTEM = new Set(["unga", "who", "itu", "wto", "opcw", "icj", "icc", "unesco", "fao", "ilo", "imo", "icao", "wipo", "imf", "isa", "itlos", "wbg", "npt", "iaea", "ecosoc"]);
@@ -35,6 +39,8 @@ const raw = {
   growth: pick((c) => ol(c, "growth", thisYear)), infl: pick((c) => { const v = ol(c, "inflation", thisYear); return v == null ? null : -Math.min(v, 100); }), gdp: pick((c) => { const v = gdpOf(c); return v && v > 0 ? Math.log(v) : null; }),
   gdppc: pick((c) => { const v = gdpOf(c), p = byIso[c]?.population?.v; return v && p ? Math.log((v * 1e6) / p) : null; }), pop: pick((c) => { const p = byIso[c]?.population?.v; return p ? Math.log(p) : null; }),
   debt: pick((c) => { const v = ol(c, "debt", thisYear); return v == null ? null : -v; }), ca: pick((c) => ol(c, "ca", thisYear)),
+  tradevol: pick((c) => { const l = lastTr(c); return l && l[1] + l[2] > 0 ? Math.log(l[1] + l[2]) : null; }), tgrowth: pick((c) => growth3(c)), uaeshare: pick((c) => rv?.countries[c]?.uae?.share ?? null), balance: pick((c) => { const l = lastTr(c); return l && l[1] + l[2] > 0 ? l[1] / (l[1] + l[2]) : null; }),
+  unemp: pick((c) => { const v = ol(c, "unemployment", thisYear); return v == null ? null : -v; }), resm: pick((c) => lastFin(c, "resMonths")), npl: pick((c) => { const v = lastFin(c, "npl"); return v == null ? null : -v; }),
   trade: pick((c) => part.countries[c]?.c.trade ?? null), invest: pick((c) => (part.countries[c]?.raw.investment > 0 ? part.countries[c].c.investment : null)), deals: pick((c) => dealN[c]), cepa: pick((c) => cepa[ag.countries[c]?.cepa?.status] ?? 0),
   theirinv: pick((c) => (lev.countries[c]?.raw?.theirInvPctUaeGdp > 0 ? lev.countries[c].raw.theirInvPctUaeGdp : null)),
   connect: pick((c) => part.countries[c]?.c.connectivity ?? null), aid: pick((c) => (aid?.countries[c]?.[aidYear] > 0 ? aid.countries[c][aidYear] : null)),
@@ -54,16 +60,17 @@ const P = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, direct.has(
 // the leverage part is a difference of two percentiles, mapped to 0-100 around the middle
 const levScore = (c) => (raw.lev[c] == null ? null : Math.round(Math.max(0, Math.min(100, (raw.lev[c] + 100) / 2))));
 const DIMS = [
-  { key: "polfriends", group: "relationship", w: 14, parts: ["temp", "tone", "align", "engage", "agree", "shared"] },
-  { key: "bizfriends", group: "relationship", w: 12, parts: ["trade", "invest", "deals", "cepa", "theirinv"] },
-  { key: "strategic", group: "relationship", w: 9, parts: ["share", "logi", "near", "energy"] },
-  { key: "leverage", group: "relationship", w: 12, parts: ["lev"] },
-  { key: "political", group: "country", w: 8, parts: ["pv", "ge", "rl"] },
-  { key: "economic", group: "country", w: 8, parts: ["growth", "infl", "gdp", "gdppc"] },
-  { key: "financial", group: "country", w: 7, parts: ["debt", "ca", "rq", "cc"] },
+  { key: "polfriends", group: "relationship", w: 13, parts: ["temp", "tone", "align", "engage", "agree", "shared"] },
+  { key: "bizfriends", group: "relationship", w: 10, parts: ["trade", "invest", "deals", "cepa", "theirinv"] },
+  { key: "bilateral", group: "relationship", w: 10, parts: ["tradevol", "tgrowth", "share", "uaeshare", "balance"] },
+  { key: "strategic", group: "relationship", w: 8, parts: ["share", "logi", "near", "energy"] },
+  { key: "leverage", group: "relationship", w: 10, parts: ["lev"] },
+  { key: "political", group: "country", w: 7, parts: ["pv", "ge", "rl"] },
+  { key: "economic", group: "country", w: 8, parts: ["growth", "infl", "gdp", "gdppc", "unemp"] },
+  { key: "financial", group: "country", w: 7, parts: ["debt", "ca", "rq", "cc", "resm", "npl"] },
   { key: "social", group: "country", w: 5, parts: ["connect", "aid", "va"] },
-  { key: "security", group: "country", w: 7, parts: ["sanc", "cyber"] },
-  { key: "uninfluence", group: "world", w: 8, parts: ["unsc", "orgs", "blocs"] },
+  { key: "security", group: "country", w: 6, parts: ["sanc", "cyber"] },
+  { key: "uninfluence", group: "world", w: 6, parts: ["unsc", "orgs", "blocs"] },
   { key: "global", group: "world", w: 10, parts: ["gdp", "pop", "tradetot", "forum"] },
 ];
 if (DIMS.reduce((s, d) => s + d.w, 0) !== 100) throw new Error("weights must sum to 100");

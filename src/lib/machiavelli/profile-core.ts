@@ -2,7 +2,11 @@ import { CORRIDORS, RADAR_AXES } from "./content";
 
 // The module's deterministic evidence engine. Everything here is arithmetic on the app's own datasets, with an evidence string for every score: no model call, no cost, reproducible.
 // Scores are 0 to 5. They place countries against each other on stated rules; they are not predictions, and no score combines hard power, soft power and durability into a single "control" number.
-export type DimId = "hard" | "soft" | "econ" | "dur" | "region" | "comp";
+export type DimId = "hard" | "soft" | "econ" | "dur" | "region" | "comp" | "trade" | "capital" | "align" | "gov" | "market";
+/** The pillars that are averaged into the final score. Economic depth is left out because it is the umbrella of the bilateral-trade and investment pillars, which are in. */
+/** Pillar scores as callers hold them: the original six are always there, the newer ones may be missing (an older snapshot). */
+export type DimNums = Record<"hard" | "soft" | "econ" | "dur" | "region" | "comp", number> & Partial<Record<DimId, number>>;
+export const FINAL_PILLARS: DimId[] = ["hard", "soft", "trade", "capital", "dur", "region", "comp", "align", "gov", "market"];
 export type AxisId = "growth" | "corridor" | "durability" | "competition" | "capacity" | "esg";
 export type Scored = { s: number; ev: string };
 export type Tier = "T1" | "T2" | "T3" | "T4" | "T5";
@@ -10,20 +14,24 @@ export type Raw = {
   iso3: string; name: string; nameAr?: string | null; region: string; subregion: string | null;
   trade: [number, number, number][] | null; // [year, UAE exports, UAE imports] in US$ millions
   invOut: number | null; invYear: number | null;
-  pct: { trade: number; engagement: number; agreements: number; connectivity: number; investment: number } | null;
+  pct: { trade: number; engagement: number; agreements: number; connectivity: number; investment: number; alignment?: number } | null;
+  uaeTradeShare?: number | null; // the partner's share of all UAE goods trade, percent (IMF IMTS)
+  polScore?: number | null; econScore?: number | null; // the country scorecard's political-friends and economic-condition scores, 0 to 100
   agr: { security: number; defence: boolean; soft: number; total: number; cepa: { status: string; inForce: string | null; signed: string | null } | null };
   bases: number; aid5: number;
   rivals: { rank: number | null; of: number; uaeShare: number | null; top: { c: string; share: number } | null } | null;
-  gov: { ge: number; rq: number; pv: number; cc: number; rl: number } | null; debt: number | null;
+  gov: { ge: number; rq: number; pv: number; cc: number; rl: number; va?: number } | null; debt: number | null;
   sanc: number; globalScore: number | null; chokepoints: string[];
   deals365: number; tone: { temp: number | null; media: number | null } | null;
 };
 export type Profile = {
   iso3: string; name: string; nameAr?: string | null; region: string; subregion: string | null;
-  dims: Record<DimId, Scored>; axes: Record<AxisId, Scored>; composite: number; tier: Tier | null; recs: string[];
-  facts: { tradeUsdM: number | null; tradeYear: number | null; tradeCagr: number | null; invOutUsd: number | null; aid5Usd: number; rank: number | null; debtPct: number | null; deals365: number; tone: { temp: number | null; media: number | null } | null; gov: Raw["gov"] };
+  dims: Record<DimId, Scored>; axes: Record<AxisId, Scored>; composite: number; final: number; tier: Tier | null; recs: string[];
+  facts: { tradeUsdM: number | null; tradeYear: number | null; tradeCagr: number | null; tradeBalanceUsdM: number | null; partnerShareOfUae: number | null; uaeShareOfPartner: number | null; invOutUsd: number | null; aid5Usd: number; rank: number | null; debtPct: number | null; deals365: number; tone: { temp: number | null; media: number | null } | null; gov: Raw["gov"] };
 };
 export const r1 = (x: number) => Math.round(x * 10) / 10;
+/** The final score: the plain mean of the pillars in FINAL_PILLARS, 0 to 5 with two decimals. */
+export const finalScore = (d: Record<string, number>, ids: DimId[] = FINAL_PILLARS) => { const xs = ids.map((k) => d[k]).filter((v): v is number => typeof v === "number"); return xs.length ? Math.round((xs.reduce((a, v) => a + v, 0) / xs.length) * 100) / 100 : 0; };
 export const clamp = (x: number, lo = 0, hi = 5) => Math.max(lo, Math.min(hi, x));
 export const WEIGHTS: Record<AxisId, number> = Object.fromEntries(RADAR_AXES.map((a) => [a.id, a.weight])) as Record<AxisId, number>;
 /** Weighted composite of the six radar axes with weights in percent (they need not sum to 100: they are re-normalised, so a slider can move without breaking the scale). */
@@ -37,6 +45,12 @@ const cagrScore = (c: number) => (c <= -0.05 ? 0 : c < 0 ? 1 : c < 0.05 ? 2 : c 
 const aidScore = (v: number) => (v <= 0 ? 0 : v < 5e6 ? 1 : v < 25e6 ? 2 : v < 100e6 ? 3 : v < 500e6 ? 4 : 5);
 const softAgrScore = (n: number) => (n <= 0 ? 0 : n <= 2 ? 1 : n <= 5 ? 2 : n <= 9 ? 3 : n <= 15 ? 4 : 5);
 const rankScore = (r: number | null) => (r == null ? 0 : r === 1 ? 5 : r === 2 ? 4 : r === 3 ? 3 : r <= 5 ? 2 : r <= 8 ? 1 : 0);
+const shareUaeScore = (p: number) => (p >= 8 ? 5 : p >= 4 ? 4 : p >= 2 ? 3 : p >= 1 ? 2 : p >= 0.3 ? 1 : 0);
+const uaeShareScore = (p: number) => (p >= 15 ? 5 : p >= 8 ? 4 : p >= 4 ? 3 : p >= 2 ? 2 : p >= 0.5 ? 1 : 0);
+const surplusScore = (x: number) => (x >= 0.7 ? 5 : x >= 0.55 ? 4 : x >= 0.45 ? 3 : x >= 0.3 ? 2 : 1);
+const posScore = (usd: number) => (usd >= 1e9 ? 5 : usd >= 2e8 ? 4 : usd >= 5e7 ? 3 : usd >= 1e7 ? 2 : usd > 0 ? 1 : 0);
+const dealScore = (n: number) => (n <= 0 ? 0 : n <= 2 ? 2 : n <= 5 ? 3 : n <= 10 ? 4 : 5);
+const avg5 = (xs: number[]) => (xs.length ? r1(xs.reduce((a, v) => a + v, 0) / xs.length) : 0);
 const aheadScore = (ahead: number) => (ahead <= 0 ? 5 : ahead === 1 ? 4 : ahead === 2 ? 3 : ahead === 3 ? 2 : ahead <= 5 ? 1 : 0);
 
 /** Trade growth over three years from the UAE-reported IMF series: the compound rate between the last year and three years earlier. */
@@ -50,7 +64,7 @@ export function corridorRole(iso3: string): { s: number; ev: string } | null {
   for (const c of CORRIDORS) { const m = c.members.find((x) => x.iso3 === iso3); if (!m) continue; const base = m.role === "core" ? 5 : m.role === "landing" ? 4 : 3; const live = !/stalled/i.test(c.status); const s = live ? base : Math.min(base, 4); if (!best || s > best.s) best = { s, ev: `${m.role} on ${c.name}${live ? "" : " (stalled, capped at 4)"}` }; }
   return best;
 }
-export function tierHint(p: { composite: number; axes: Record<AxisId, number>; dims: Record<DimId, number> }): Tier | null {
+export function tierHint(p: { composite: number; axes: Record<AxisId, number>; dims: DimNums }): Tier | null {
   const a = p.axes, d = p.dims;
   if (p.composite >= 3.4 && d.econ >= 3.5 && d.dur >= 2.5) return "T1";
   if (a.corridor >= 4) return "T4";
@@ -60,7 +74,7 @@ export function tierHint(p: { composite: number; axes: Record<AxisId, number>; d
   return null;
 }
 /** Up to three "what could be done better" lines from the weakest dimensions, each naming only legitimate instruments from sections 5, 25 and 27 of the specification. */
-export function recommendations(d: Record<DimId, number>, a: Record<AxisId, number>): string[] {
+export function recommendations(d: DimNums, a: Record<AxisId, number>): string[] {
   const out: string[] = [];
   if (d.econ >= 3.5 && d.hard <= 1.5) out.push("Defence and security cooperation lags economic depth: explore consent-based co-production, training and interoperability under a published framework (sections 24 and 27.1).");
   if (a.corridor >= 4 && d.dur <= 3) out.push("The country sits on a priority corridor but the relationship is not yet institutional: coordinate governance and infrastructure financing before adding volume (section 29).");
@@ -95,11 +109,30 @@ export function scoreProfile(raw: Raw): Profile {
   const ahead = rank ? rank - 1 : null; const competition = ahead == null ? 2 : aheadScore(ahead); const competitionEv = ahead == null ? "No rivals comparison: neutral 2" : `${ahead} of ${rv!.of - 1} rival powers have a larger share of the partner's trade than the UAE`;
   let capacity = 0; let capEv = "No governance data"; if (raw.gov) { capacity = (raw.gov.ge + raw.gov.rq) / 2 / 20; const d = raw.debt; const pen = d == null ? 0 : d >= 120 ? 1 : d >= 90 ? 0.5 : d >= 60 ? 0.2 : 0; capacity = r1(clamp(capacity - pen)); capEv = `Government effectiveness ${Math.round(raw.gov.ge)} and regulatory quality ${Math.round(raw.gov.rq)} of 100 (World Bank WGI)${d == null ? "" : `; public debt ${Math.round(d)}% of GDP (IMF WEO)${pen ? `, penalty ${pen}` : ""}`}`; }
   let esg = 0; let esgEv = "No governance data"; if (raw.gov) { esg = (raw.gov.pv + raw.gov.cc + raw.gov.rl) / 3 / 20; const pen = raw.sanc >= 50 ? 1.2 : raw.sanc >= 10 ? 0.7 : raw.sanc >= 1 ? 0.3 : 0; esg = r1(clamp(esg - pen)); esgEv = `Political stability ${Math.round(raw.gov.pv)}, corruption control ${Math.round(raw.gov.cc)}, rule of law ${Math.round(raw.gov.rl)} of 100 (World Bank WGI)${raw.sanc ? `; ${raw.sanc} sanctions-list entries (OFAC and UN), penalty ${pen}` : ""}`; }
-  const dims: Record<DimId, Scored> = { hard: { s: hard, ev: hardEv }, soft: { s: soft, ev: softEv }, econ: { s: econ, ev: econEv }, dur: { s: dur, ev: durEv }, region: { s: region, ev: regionEv }, comp: { s: comp, ev: compEv } };
+  // bilateral trade: five criteria, each 0 to 5, averaged over those that can be computed
+  const last = raw.trade?.length ? raw.trade[raw.trade.length - 1] : null; const exp = last?.[1] ?? 0; const imp = last?.[2] ?? 0; const tot = exp + imp; const balance = last ? exp - imp : null; const tcrit: { n: string; s: number }[] = [];
+  if (hasTrade && pct) tcrit.push({ n: `volume ${Math.round(pct.trade)}th percentile`, s: r1(pct.trade / 20) });
+  if (g.cagr != null) tcrit.push({ n: `three-year growth ${(g.cagr * 100).toFixed(1)}% a year`, s: cagrScore(g.cagr) });
+  if (raw.uaeTradeShare != null && hasTrade) tcrit.push({ n: `${raw.uaeTradeShare.toFixed(2)}% of all UAE goods trade`, s: shareUaeScore(raw.uaeTradeShare) });
+  if (rv?.uaeShare != null) tcrit.push({ n: `the UAE is ${rv.uaeShare}% of the partner's trade`, s: uaeShareScore(rv.uaeShare) });
+  if (tot > 0) tcrit.push({ n: `UAE exports ${Math.round((exp / tot) * 100)}% of the two-way total`, s: surplusScore(exp / tot) });
+  const tradeS = hasTrade ? avg5(tcrit.map((x) => x.s)) : 0; const tradeEv = hasTrade ? `Bilateral goods trade ${usd(tot)} in ${g.year} (UAE exports ${usd(exp)}, imports ${usd(imp)}; balance ${balance! >= 0 ? "+" : "-"}${usd(Math.abs(balance!))}): ${tcrit.map((x) => `${x.n} (${x.s})`).join("; ")}. IMF IMTS and mirror data; includes re-exports` : "No UAE-reported goods trade with this partner in the IMF series";
+  // investment and capital
+  const ccrit: { n: string; s: number }[] = []; if (raw.invOut && raw.invOut > 0) { ccrit.push({ n: `position ${money(raw.invOut)}${raw.invYear ? ` (${raw.invYear})` : ""}`, s: posScore(raw.invOut) }); if (pct) ccrit.push({ n: `investment ${Math.round(pct.investment)}th percentile`, s: r1(pct.investment / 20) }); } ccrit.push({ n: `${raw.deals365} announced deal headline${raw.deals365 === 1 ? "" : "s"} in 12 months`, s: dealScore(raw.deals365) });
+  const capitalS = avg5(ccrit.map((x) => x.s)); const capitalEv = `${ccrit.map((x) => `${x.n} (${x.s})`).join("; ")}${raw.invOut && raw.invOut > 0 ? "" : "; no UAE direct-investment position reported (unknown, not zero)"}. Announcements are not completed investment`;
+  // political alignment
+  const acrit: { n: string; s: number }[] = []; if (pct?.alignment != null) acrit.push({ n: `UN alignment ${Math.round(pct.alignment)}th percentile`, s: r1(pct.alignment / 20) }); if (pct) acrit.push({ n: `engagement ${Math.round(pct.engagement)}th percentile`, s: r1(pct.engagement / 20) }); if (raw.polScore != null) acrit.push({ n: `political-friends score ${Math.round(raw.polScore)}/100`, s: r1(raw.polScore / 20) });
+  const alignS = avg5(acrit.map((x) => x.s)); const alignEv = acrit.length ? `${acrit.map((x) => `${x.n} (${x.s})`).join("; ")} (partnership index, UN votes, GDELT tone, shared clubs)` : "No alignment data";
+  // governance and stability
+  const gv = raw.gov; const govVals = gv ? [gv.pv, gv.ge, gv.rq, gv.rl, gv.cc, gv.va].filter((x): x is number => typeof x === "number") : []; const govS = govVals.length ? r1(govVals.reduce((a, v) => a + v, 0) / govVals.length / 20) : 0;
+  const govEv = gv ? `World Bank WGI percentiles: stability ${Math.round(gv.pv)}, effectiveness ${Math.round(gv.ge)}, regulatory quality ${Math.round(gv.rq)}, rule of law ${Math.round(gv.rl)}, corruption control ${Math.round(gv.cc)}${gv.va != null ? `, voice ${Math.round(gv.va)}` : ""}` : "No governance data";
+  // market size and growth
+  const marketS = raw.econScore != null ? r1(raw.econScore / 20) : 0; const marketEv = raw.econScore != null ? `Economic-condition score ${Math.round(raw.econScore)}/100 (growth, inflation, GDP and GDP per head as percentiles among countries; IMF WEO and World Bank)` : "No economic-condition score";
+  const dims: Record<DimId, Scored> = { hard: { s: hard, ev: hardEv }, soft: { s: soft, ev: softEv }, econ: { s: econ, ev: econEv }, dur: { s: dur, ev: durEv }, region: { s: region, ev: regionEv }, comp: { s: comp, ev: compEv }, trade: { s: tradeS, ev: tradeEv }, capital: { s: capitalS, ev: capitalEv }, align: { s: alignS, ev: alignEv }, gov: { s: govS, ev: govEv }, market: { s: marketS, ev: marketEv } };
   const axes: Record<AxisId, Scored> = { growth: { s: growth, ev: growthEv }, corridor: { s: corridor, ev: corEv }, durability: { s: dur, ev: durEv }, competition: { s: competition, ev: competitionEv }, capacity: { s: capacity, ev: capEv }, esg: { s: esg, ev: esgEv } };
-  const ax = Object.fromEntries(Object.entries(axes).map(([k, v]) => [k, v.s])) as Record<AxisId, number>; const dm = Object.fromEntries(Object.entries(dims).map(([k, v]) => [k, v.s])) as Record<DimId, number>;
-  const comp2 = composite(ax);
-  return { iso3: raw.iso3, name: raw.name, nameAr: raw.nameAr, region: raw.region, subregion: raw.subregion, dims, axes, composite: comp2, tier: tierHint({ composite: comp2, axes: ax, dims: dm }), recs: recommendations(dm, ax), facts: { tradeUsdM: g.value, tradeYear: g.year, tradeCagr: g.cagr, invOutUsd: raw.invOut, aid5Usd: raw.aid5, rank, debtPct: raw.debt, deals365: raw.deals365, tone: raw.tone, gov: raw.gov } };
+  const ax = Object.fromEntries(Object.entries(axes).map(([k, v]) => [k, v.s])) as Record<AxisId, number>; const dm = Object.fromEntries(Object.entries(dims).map(([k, v]) => [k, v.s])) as DimNums;
+  const comp2 = composite(ax); const fin = finalScore(dm);
+  return { iso3: raw.iso3, name: raw.name, nameAr: raw.nameAr, region: raw.region, subregion: raw.subregion, dims, axes, composite: comp2, final: fin, tier: tierHint({ composite: comp2, axes: ax, dims: dm }), recs: recommendations(dm, ax), facts: { tradeUsdM: g.value, tradeYear: g.year, tradeCagr: g.cagr, tradeBalanceUsdM: balance, partnerShareOfUae: raw.uaeTradeShare ?? null, uaeShareOfPartner: rv?.uaeShare ?? null, invOutUsd: raw.invOut, aid5Usd: raw.aid5, rank, debtPct: raw.debt, deals365: raw.deals365, tone: raw.tone, gov: raw.gov } };
 }
 /** Herfindahl-Hirschman index (0 to 10,000) and top shares of a set of non-negative values: how concentrated the UAE's exposure is across partners (MI13). */
 export function concentration(vals: { id: string; v: number }[]): { hhi: number; top1: number; top5: number; top: { id: string; share: number }[]; n: number } {
@@ -110,13 +143,13 @@ export function concentration(vals: { id: string; v: number }[]): { hhi: number;
 /** Cadence of the Country Brief by opportunity tier (section 43.2): anchor markets monthly, growth frontiers quarterly, the rest twice a year. */
 export const BRIEF_CADENCE_DAYS: Record<Tier | "none", number> = { T1: 30, T2: 90, T3: 182, T4: 182, T5: 182, none: 182 };
 export const briefDue = (tier: Tier | null, lastIso: string | null, now = Date.now()) => { const cad = BRIEF_CADENCE_DAYS[tier ?? "none"]; if (!lastIso) return { cadence: cad, days: null as number | null, due: true, overdue: false }; const days = Math.floor((now - Date.parse(lastIso)) / 86400e3); return { cadence: cad, days, due: days >= cad, overdue: days >= cad * 1.5 }; };
-export type Snap = { at: string; dims: Record<DimId, number>; axes: Record<AxisId, number>; composite: number; tier: Tier | null; built: Record<string, string | null> };
-export const snapOf = (p: Profile, built: Record<string, string | null>, at = new Date().toISOString()): Snap => ({ at, dims: Object.fromEntries(Object.entries(p.dims).map(([k, v]) => [k, v.s])) as Record<DimId, number>, axes: Object.fromEntries(Object.entries(p.axes).map(([k, v]) => [k, v.s])) as Record<AxisId, number>, composite: p.composite, tier: p.tier, built });
+export type Snap = { at: string; dims: DimNums; axes: Record<AxisId, number>; composite: number; tier: Tier | null; built: Record<string, string | null> };
+export const snapOf = (p: Profile, built: Record<string, string | null>, at = new Date().toISOString()): Snap => ({ at, dims: Object.fromEntries(Object.entries(p.dims).map(([k, v]) => [k, v.s])) as DimNums, axes: Object.fromEntries(Object.entries(p.axes).map(([k, v]) => [k, v.s])) as Record<AxisId, number>, composite: p.composite, tier: p.tier, built });
 export type Change = { id: string; kind: "dimension" | "axis" | "composite" | "tier" | "dataset"; from: string; to: string; delta: number | null };
 /** What moved between two profile snapshots, and whether that is enough to escalate (section 43.1): any dimension or radar axis moving by 0.5 or more, the composite by 0.3, a change of tier, or a dataset rebuilt since. Escalation is raised only for scorecard-moving or rank-changing developments, never on a routine refresh. */
 export function changeCheck(prev: Snap, cur: Snap): { changes: Change[]; flagged: boolean; reason: string } {
   const changes: Change[] = []; const mv = (a: number, b: number) => Math.round((b - a) * 10) / 10;
-  for (const k of Object.keys(cur.dims) as DimId[]) { const d = mv(prev.dims[k] ?? 0, cur.dims[k]); if (Math.abs(d) >= 0.5) changes.push({ id: k, kind: "dimension", from: String(prev.dims[k]), to: String(cur.dims[k]), delta: d }); }
+  for (const k of Object.keys(cur.dims) as DimId[]) { const pv = prev.dims[k]; const cv = cur.dims[k]; if (pv == null || cv == null) continue; const d = mv(pv, cv); if (Math.abs(d) >= 0.5) changes.push({ id: k, kind: "dimension", from: String(pv), to: String(cv), delta: d }); }
   for (const k of Object.keys(cur.axes) as AxisId[]) { const d = mv(prev.axes[k] ?? 0, cur.axes[k]); if (Math.abs(d) >= 0.5 && k !== "durability") changes.push({ id: k, kind: "axis", from: String(prev.axes[k]), to: String(cur.axes[k]), delta: d }); }
   const dc = Math.round((cur.composite - prev.composite) * 100) / 100; if (Math.abs(dc) >= 0.3) changes.push({ id: "composite", kind: "composite", from: String(prev.composite), to: String(cur.composite), delta: dc });
   if (prev.tier !== cur.tier) changes.push({ id: "tier", kind: "tier", from: prev.tier ?? "none", to: cur.tier ?? "none", delta: null });

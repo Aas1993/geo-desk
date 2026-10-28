@@ -40,7 +40,7 @@ export function useRun(iso: string | null, storeKey: string | null, onSaved?: (d
   const clear = useCallback(() => { if (storeKey) { try { localStorage.removeItem(storeKey); window.dispatchEvent(new Event("storage")); } catch { /* ignore */ } } setSaved(null); setPhase("idle"); }, [storeKey]);
   return { phase, status, tail, searches, sources, saved, err, run, cancel, clear, agents };
 }
-export type ProfileSet = { builtAt: string; sources: Record<string, string | null>; profiles: Profile[]; portfolio: Portfolio; rolls: Roll[] };
+export type ProfileSet = { builtAt: string; sources: Record<string, string | null>; profiles: Profile[]; portfolio: Portfolio; rolls: Roll[]; average: import("@/lib/machiavelli/profile").Average };
 let cache: Promise<ProfileSet> | null = null;
 /** The strategic profiles of every country from /api/machiavelli/profile, loaded once per page. */
 export function useProfiles(): ProfileSet | null | "err" {

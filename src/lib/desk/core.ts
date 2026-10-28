@@ -1,4 +1,5 @@
 import { COMMON } from "../dossier/strategy";
+import { SOURCE_PLAN } from "../sources";
 import { SEARCH_RECIPE } from "../foresight";
 import { oneLine } from "../guard";
 import type { B } from "../case/core";
@@ -9,6 +10,7 @@ export type Desk = "king" | "embassy";
 export type Agent = { id: string; desk: Desk; n: number; en: string; ar: string; title: B; field: B; mandate: string; questions: string[]; sources: string[]; match: RegExp };
 export type Group = { id: string; agents: string[]; searches: number; maxTokens: number; words: number };
 export type Chair = { id: string; en: string; ar: string; title: B; maxTokens: number; words: number };
+export const REVIEW_STAGE = 2;
 export type Product = "king-council" | "king-directive" | "emb-intel" | "emb-plan" | "emb-directive";
 export const PRODUCTS: Product[] = ["king-council", "king-directive", "emb-intel", "emb-plan", "emb-directive"];
 export const DESK_CAP_USD = 1;
@@ -17,13 +19,7 @@ export const PRODUCT_USD: Record<Product, number> = { "king-council": 0.6, "king
 export const worstOf = (maxTokens: number, searches: number) => (maxTokens * 10) / 1e6 + searches * 0.01 + 0.08;
 
 // ---- the universal constitution ----
-export const SOURCE_PLAN = `# Sources to use (in this order of weight)
-1 Primary and official: constitutions and statutes, ministry, central bank, parliament and court publications, official statistics, IMF Article IV and programme documents, World Bank, regional development banks, UN bodies, treaty texts, company filings and exchange disclosures, and the UAE's own publications (WAM, the Ministry of Foreign Affairs, ADFD, UAE company announcements).
-2 Think tanks and research: Chatham House, Carnegie, CSIS, IISS, Brookings, Atlantic Council, Middle East Institute, AGSIW, International Crisis Group, Gulf Research Center, ECSSR, TRENDS, the country's own research institutes and universities. Say which paper you read and what it argues; keep the publication's argument apart from your assessment.
-3 News and wire reporting: Reuters, AP, AFP, Bloomberg, Financial Times, the regional and national press. Date every item. Prefer two independent outlets for a contested fact.
-4 Reports and indices: governance, corruption, freedom, risk, rating and trade reports as publicly summarised. Date and name each.
-5 Social media: there is no compliant access to X, Telegram or similar and you never present anything as measured social-media sentiment. You may cite what credible outlets or research report about online discourse, labelled as second-hand.
-6 The UAE's own record: the Principles of the 50 and the Ministry of Foreign Affairs strategy for 2023 to 2026 are official; "We the UAE 2031" and the other national plans are official where cited. UAE decisions in this country and in comparable cases (deposits, concessions, mediation, aid, port and energy deals, defence and humanitarian roles) are precedents to verify by search, never to assume.`;
+export { SOURCE_PLAN };
 export const TRADECRAFT = `# Tradecraft (benchmarked to the published ICD 203 standards; a method, not a claim about any agency, and you have no signals or classified access)
 - Bottom line first. Key judgments each carry a likelihood band (almost no chance, very unlikely, unlikely, roughly even, likely, very likely, almost certain) and a separate confidence (high, moderate, low) with the reason, and name what the judgment rests on.
 - Say how good the sources are. Keep information, assumptions and judgments apart and list the key assumptions with what would break each.
@@ -90,6 +86,13 @@ export function parseDirective(report: string): Directive | null {
     steps: arr(j.steps, 10).map((x) => { const q = x as Record<string, unknown>; return { action: s(q.action, 200), owner: s(q.owner, 100), when: s(q.when, 60), detail: s(q.detail, 300) }; }).filter((x) => x.action),
     risks: arr(j.risks, 6).map((x) => { const q = x as Record<string, unknown>; return { name: s(q.name, 140), mitigation: s(q.mitigation, 220) }; }).filter((x) => x.name), needs: strs(j.needs, 6), follow: strs(j.follow, 3, 200) };
   return o.answer || o.recommendation || o.steps.length ? o : null;
+}
+// ---- the independent review: a second pair of eyes before a product is compiled ----
+export type Review = { verdict: "approve" | "revise" | "reject"; summary: string; strengths: string[]; issues: { where: string; severity: "high" | "medium" | "low"; problem: string; fix: string }[]; unsupported: string[]; boundary: string[]; conflicts: string[]; missing: string[]; partial: boolean };
+export const REVIEW_SCHEMA = `After the markdown, write exactly one block of JSON between the tags <review> and </review> and nothing else inside them: {"verdict": "approve", "revise" or "reject" (reject only if the product is unusable or breaches the boundary), "summary": two sentences, "strengths": up to four, "issues": up to ten of {"where" (a section or an id such as D3 or J2), "severity" ("high", "medium" or "low"), "problem", "fix"} ordered by severity, "unsupported": claims that carry no fact id or dated source, "boundary": any passage that breaches the boundary, "conflicts": contradictions between sections or with the evidence, "missing": what a decision-maker would still need}. Strict JSON, double quotes, no trailing commas. Be specific and short; praise nothing that is not verified; do not rewrite the product.`;
+export function parseReview(report: string): Review | null {
+  const jb = jsonBlock(report, "review"); if (!jb) return null; const j = jb.data; const verdict = (["approve", "revise", "reject"] as const).find((v) => v === j.verdict); if (!verdict) return null;
+  return { verdict, summary: s(j.summary, 500), strengths: strs(j.strengths, 4), issues: arr(j.issues, 12).map((x) => { const q = x as Record<string, unknown>; return { where: s(q.where, 60), severity: (["high", "medium", "low"].includes(String(q.severity)) ? q.severity : "medium") as "high" | "medium" | "low", problem: s(q.problem, 300), fix: s(q.fix, 240) }; }).filter((x) => x.problem), unsupported: strs(j.unsupported, 8, 260), boundary: strs(j.boundary, 6, 260), conflicts: strs(j.conflicts, 6, 260), missing: strs(j.missing, 6, 240), partial: jb.partial };
 }
 export const DIRECTIVE_SCHEMA = `After the markdown, write exactly one block of JSON between the tags <directive> and </directive> and nothing else inside them: {"answer": the direct answer in two to four sentences, "recommendation": what to do, "confidence": "high", "moderate" or "low", "options": [{"name","pros":[],"cons":[],"cost" ("not estimated" unless evidenced),"risk"}] (two to four), "steps": [{"action","owner" (proposed),"when","detail"}] (the way forward, up to eight, in order), "risks": [{"name","mitigation"}], "needs": [what only the desk or ministry can supply], "follow": [up to three follow-up questions worth asking]}. Strict JSON: double quotes, no trailing commas, no comments.`;
 

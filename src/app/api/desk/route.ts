@@ -63,7 +63,7 @@ export async function POST(req: Request) {
         const run1 = async (x: Call, cap?: number, spentAt?: number) => {
           send({ type: "agent", id: x.id, status: "start" });
           try {
-            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 1 ? CAP : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0)), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => spentAt ?? spent });
+            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 2 ? CAP : x.stage === 1 ? CAP - (rev ? worstOf(rev.maxTokens, rev.searches) * FINAL_RESERVE : 0) : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0) - (rev ? worstOf(rev.maxTokens, rev.searches) * FINAL_RESERVE : 0)), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => spentAt ?? spent });
             const usd = r.usage.usd ?? runUsd(r.usage, MODEL); r.usage.usd = usd; spent += usd; for (const k of ["input", "output", "cacheRead", "cacheWrite", "searches", "fetches"] as const) total[k] += r.usage[k]; total.usd = spent;
             for (const s of r.sources) if (!seen.has(s.url)) { seen.add(s.url); sources.push(s); }
             const start = r.report.search(/^#{1,3} /m); const text = (start > 0 && x.stage === 0 ? r.report.slice(start) : r.report).trim(); out[x.id] = text;
@@ -71,15 +71,16 @@ export async function POST(req: Request) {
           } catch (e) { if (ac.signal.aborted) throw e; const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[desk] ${product} ${x.id} failed:`, msg); results.push({ id: x.id, name: nameOf(x), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); send({ type: "agent", id: x.id, status: "error", message: msg }); }
         };
         const skipped = (x: Call, why: string) => { results.push({ id: x.id, name: nameOf(x), text: "", usd: 0, searches: 0, failed: 0, status: "skipped", note: why }); send({ type: "agent", id: x.id, status: "skipped", message: why }); };
-        const stage0 = plan.calls.filter((x) => x.stage === 0); const fin = plan.calls.find((x) => x.stage === 1);
+        const stage0 = plan.calls.filter((x) => x.stage === 0); const fin = plan.calls.find((x) => x.stage === 1); const rev = plan.calls.find((x) => x.stage === 2);
         // the first call goes alone so the shared evidence is cached before the others read it
         if (stage0.length) { send({ type: "status", text: stage0.length > 1 ? "The first sitting is reading the evidence and warming the shared cache…" : "Working…" }); await run1(stage0[0]); }
         if (stage0.length > 1) {
-          const room = CAP - spent - (fin ? worstOf(fin.maxTokens, fin.searches) * LIKELY : 0); let used = 0; const go: Call[] = [];
+          const room = CAP - spent - (fin ? worstOf(fin.maxTokens, fin.searches) * LIKELY : 0) - (rev ? worstOf(rev.maxTokens, rev.searches) * LIKELY : 0); let used = 0; const go: Call[] = [];
           for (const x of stage0.slice(1)) { const w = worstOf(x.maxTokens, x.searches) * LIKELY; if (used + w <= room) { used += w; go.push(x); } else skipped(x, "no money left under the cost ceiling"); }
-          if (go.length) { send({ type: "status", text: `${go.length} more sitting${go.length === 1 ? " is" : "s are"} working in parallel…` }); const reserve = fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0; const at = spent; const share = (CAP - at - reserve) / go.length; await Promise.all(go.map((x) => run1(x, at + share, at))); }
+          if (go.length) { send({ type: "status", text: `${go.length} more sitting${go.length === 1 ? " is" : "s are"} working in parallel…` }); const reserve = (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0) + (rev ? worstOf(rev.maxTokens, rev.searches) * FINAL_RESERVE : 0); const at = spent; const share = (CAP - at - reserve) / go.length; await Promise.all(go.map((x) => run1(x, at + share, at))); }
         }
         if (fin) { if (CAP - spent >= worstOf(fin.maxTokens, fin.searches) * LIKELY && outputRoom(spent, CAP, MODEL) >= Math.min(fin.maxTokens * 0.6, 6000)) { send({ type: "status", text: "Writing the final product…" }); await run1(fin); } else skipped(fin, "no money left under the cost ceiling"); }
+        if (rev) { if (fin && out[fin.id] && CAP - spent >= worstOf(rev.maxTokens, rev.searches) * LIKELY && outputRoom(spent, CAP, MODEL) >= 2500) { send({ type: "status", text: "An independent reviewer is checking the product…" }); await run1(rev); } else skipped(rev, fin && out[fin.id] ? "no money left under the cost ceiling" : "nothing to review"); }
         const ordered = plan.calls.map((x) => results.find((r) => r.id === x.id)).filter((x): x is CallOut => !!x);
         const known = new Set(gathered.facts.map((f) => f.id)); const report = checkRefs(plan.compose(ordered.map((r) => ({ id: r.id, text: r.text }))), known); const cited = new Set(citedIds(report));
         const done: Done = { product, report, agents: ordered, sources, usage: total, at: new Date().toISOString(), model: MODEL, options: { ...o, kind: product, context: undefined }, name: gathered.name, manifest, facts: gathered.facts.filter((f) => cited.has(f.id)).map((f) => ({ id: f.id, kind: f.kind, text: f.text.slice(0, 1600), src: f.src, url: f.url })) };

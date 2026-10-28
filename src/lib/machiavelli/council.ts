@@ -1,3 +1,4 @@
+import { SOURCE_PLAN } from "../sources";
 import { COMMON } from "../dossier/strategy";
 import { cleanOptions, type DossierOptions } from "../dossier/options";
 import { oneLine } from "../guard";
@@ -40,7 +41,9 @@ ${COMMON}
 - Every seat names what it could not establish. A seat whose evidence is thin writes "not established" in its indicator table rather than a number. Indicators: ${MI}.
 - The Realist seat reasons in the balance-of-power, linkage-diplomacy and order-over-ideology tradition; the Machiavellian seat applies the module's critical-lens adaptations. Neither writes a quotation or a first-person statement attributed to a real person.
 - Recommended instruments come only from: ${INSTR}; each is legitimate, disclosed, consent-based and reversible.
-${SEARCH_RECIPE}`;
+${SEARCH_RECIPE}
+
+${SOURCE_PLAN}`;
 
 const seatBlock = (g: SeatGroup) => GROUP_SEATS(g).map((s) => `- ${s.en}: answers "${s.question}" Owns indicators: ${s.owns.length ? s.owns.join(", ") : "none"}. Guardrail: ${s.guardrail}.`).join("\n");
 const SEAT_FORMAT = (n: number, seats: number) => `Write one block per seat, in this order, each at most ${Math.floor(n / seats)} words, exactly in this form:

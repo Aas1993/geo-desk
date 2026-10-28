@@ -51,6 +51,8 @@ const surplusScore = (x: number) => (x >= 0.7 ? 5 : x >= 0.55 ? 4 : x >= 0.45 ? 
 const posScore = (usd: number) => (usd >= 1e9 ? 5 : usd >= 2e8 ? 4 : usd >= 5e7 ? 3 : usd >= 1e7 ? 2 : usd > 0 ? 1 : 0);
 const dealScore = (n: number) => (n <= 0 ? 0 : n <= 2 ? 2 : n <= 5 ? 3 : n <= 10 ? 4 : 5);
 const avg5 = (xs: number[]) => (xs.length ? r1(xs.reduce((a, v) => a + v, 0) / xs.length) : 0);
+/** Weighted mean over the criteria that exist (the weights of missing criteria drop out and the rest are re-normalised). */
+const wavg = (xs: { s: number; w: number }[]) => { const t = xs.reduce((a, x) => a + x.w, 0); return t ? r1(xs.reduce((a, x) => a + x.s * x.w, 0) / t) : 0; };
 const aheadScore = (ahead: number) => (ahead <= 0 ? 5 : ahead === 1 ? 4 : ahead === 2 ? 3 : ahead === 3 ? 2 : ahead <= 5 ? 1 : 0);
 
 /** Trade growth over three years from the UAE-reported IMF series: the compound rate between the last year and three years earlier. */
@@ -110,19 +112,19 @@ export function scoreProfile(raw: Raw): Profile {
   let capacity = 0; let capEv = "No governance data"; if (raw.gov) { capacity = (raw.gov.ge + raw.gov.rq) / 2 / 20; const d = raw.debt; const pen = d == null ? 0 : d >= 120 ? 1 : d >= 90 ? 0.5 : d >= 60 ? 0.2 : 0; capacity = r1(clamp(capacity - pen)); capEv = `Government effectiveness ${Math.round(raw.gov.ge)} and regulatory quality ${Math.round(raw.gov.rq)} of 100 (World Bank WGI)${d == null ? "" : `; public debt ${Math.round(d)}% of GDP (IMF WEO)${pen ? `, penalty ${pen}` : ""}`}`; }
   let esg = 0; let esgEv = "No governance data"; if (raw.gov) { esg = (raw.gov.pv + raw.gov.cc + raw.gov.rl) / 3 / 20; const pen = raw.sanc >= 50 ? 1.2 : raw.sanc >= 10 ? 0.7 : raw.sanc >= 1 ? 0.3 : 0; esg = r1(clamp(esg - pen)); esgEv = `Political stability ${Math.round(raw.gov.pv)}, corruption control ${Math.round(raw.gov.cc)}, rule of law ${Math.round(raw.gov.rl)} of 100 (World Bank WGI)${raw.sanc ? `; ${raw.sanc} sanctions-list entries (OFAC and UN), penalty ${pen}` : ""}`; }
   // bilateral trade: five criteria, each 0 to 5, averaged over those that can be computed
-  const last = raw.trade?.length ? raw.trade[raw.trade.length - 1] : null; const exp = last?.[1] ?? 0; const imp = last?.[2] ?? 0; const tot = exp + imp; const balance = last ? exp - imp : null; const tcrit: { n: string; s: number }[] = [];
-  if (hasTrade && pct) tcrit.push({ n: `volume ${Math.round(pct.trade)}th percentile`, s: r1(pct.trade / 20) });
-  if (g.cagr != null) tcrit.push({ n: `three-year growth ${(g.cagr * 100).toFixed(1)}% a year`, s: cagrScore(g.cagr) });
-  if (raw.uaeTradeShare != null && hasTrade) tcrit.push({ n: `${raw.uaeTradeShare.toFixed(2)}% of all UAE goods trade`, s: shareUaeScore(raw.uaeTradeShare) });
-  if (rv?.uaeShare != null) tcrit.push({ n: `the UAE is ${rv.uaeShare}% of the partner's trade`, s: uaeShareScore(rv.uaeShare) });
-  if (tot > 0) tcrit.push({ n: `UAE exports ${Math.round((exp / tot) * 100)}% of the two-way total`, s: surplusScore(exp / tot) });
-  const tradeS = hasTrade ? avg5(tcrit.map((x) => x.s)) : 0; const tradeEv = hasTrade ? `Bilateral goods trade ${usd(tot)} in ${g.year} (UAE exports ${usd(exp)}, imports ${usd(imp)}; balance ${balance! >= 0 ? "+" : "-"}${usd(Math.abs(balance!))}): ${tcrit.map((x) => `${x.n} (${x.s})`).join("; ")}. IMF IMTS and mirror data; includes re-exports` : "No UAE-reported goods trade with this partner in the IMF series";
+  const last = raw.trade?.length ? raw.trade[raw.trade.length - 1] : null; const exp = last?.[1] ?? 0; const imp = last?.[2] ?? 0; const tot = exp + imp; const balance = last ? exp - imp : null; const tcrit: { n: string; s: number; w: number }[] = [];
+  if (hasTrade && pct) tcrit.push({ n: `volume ${Math.round(pct.trade)}th percentile`, s: r1(pct.trade / 20), w: 30 });
+  if (g.cagr != null) tcrit.push({ n: `three-year growth ${(g.cagr * 100).toFixed(1)}% a year`, s: cagrScore(g.cagr), w: 15 });
+  if (raw.uaeTradeShare != null && hasTrade) tcrit.push({ n: `${raw.uaeTradeShare.toFixed(2)}% of all UAE goods trade`, s: shareUaeScore(raw.uaeTradeShare), w: 20 });
+  if (rv?.uaeShare != null) tcrit.push({ n: `the UAE is ${rv.uaeShare}% of the partner's trade`, s: uaeShareScore(rv.uaeShare), w: 20 });
+  if (tot > 0) tcrit.push({ n: `UAE exports ${Math.round((exp / tot) * 100)}% of the two-way total`, s: surplusScore(exp / tot), w: 15 });
+  const tradeS = hasTrade ? wavg(tcrit) : 0; const tradeEv = hasTrade ? `Bilateral goods trade ${usd(tot)} in ${g.year} (UAE exports ${usd(exp)}, imports ${usd(imp)}; balance ${balance! >= 0 ? "+" : "-"}${usd(Math.abs(balance!))}): ${tcrit.map((x) => `${x.n} (${x.s}, weight ${x.w})`).join("; ")}. Weighted mean; IMF IMTS and mirror data; includes re-exports` : "No UAE-reported goods trade with this partner in the IMF series";
   // investment and capital
   const ccrit: { n: string; s: number }[] = []; if (raw.invOut && raw.invOut > 0) { ccrit.push({ n: `position ${money(raw.invOut)}${raw.invYear ? ` (${raw.invYear})` : ""}`, s: posScore(raw.invOut) }); if (pct) ccrit.push({ n: `investment ${Math.round(pct.investment)}th percentile`, s: r1(pct.investment / 20) }); } ccrit.push({ n: `${raw.deals365} announced deal headline${raw.deals365 === 1 ? "" : "s"} in 12 months`, s: dealScore(raw.deals365) });
   const capitalS = avg5(ccrit.map((x) => x.s)); const capitalEv = `${ccrit.map((x) => `${x.n} (${x.s})`).join("; ")}${raw.invOut && raw.invOut > 0 ? "" : "; no UAE direct-investment position reported (unknown, not zero)"}. Announcements are not completed investment`;
   // political alignment
-  const acrit: { n: string; s: number }[] = []; if (pct?.alignment != null) acrit.push({ n: `UN alignment ${Math.round(pct.alignment)}th percentile`, s: r1(pct.alignment / 20) }); if (pct) acrit.push({ n: `engagement ${Math.round(pct.engagement)}th percentile`, s: r1(pct.engagement / 20) }); if (raw.polScore != null) acrit.push({ n: `political-friends score ${Math.round(raw.polScore)}/100`, s: r1(raw.polScore / 20) });
-  const alignS = avg5(acrit.map((x) => x.s)); const alignEv = acrit.length ? `${acrit.map((x) => `${x.n} (${x.s})`).join("; ")} (partnership index, UN votes, GDELT tone, shared clubs)` : "No alignment data";
+  const acrit: { n: string; s: number; w: number }[] = []; if (pct?.alignment != null) acrit.push({ n: `UN alignment ${Math.round(pct.alignment)}th percentile`, s: r1(pct.alignment / 20), w: 45 }); if (pct) acrit.push({ n: `engagement ${Math.round(pct.engagement)}th percentile`, s: r1(pct.engagement / 20), w: 30 }); if (raw.polScore != null) acrit.push({ n: `political-friends score ${Math.round(raw.polScore)}/100`, s: r1(raw.polScore / 20), w: 25 });
+  const alignS = wavg(acrit); const alignEv = acrit.length ? `${acrit.map((x) => `${x.n} (${x.s}, weight ${x.w})`).join("; ")} (weighted mean; partnership index, UN votes, GDELT tone, shared clubs)` : "No alignment data";
   // governance and stability
   const gv = raw.gov; const govVals = gv ? [gv.pv, gv.ge, gv.rq, gv.rl, gv.cc, gv.va].filter((x): x is number => typeof x === "number") : []; const govS = govVals.length ? r1(govVals.reduce((a, v) => a + v, 0) / govVals.length / 20) : 0;
   const govEv = gv ? `World Bank WGI percentiles: stability ${Math.round(gv.pv)}, effectiveness ${Math.round(gv.ge)}, regulatory quality ${Math.round(gv.rq)}, rule of law ${Math.round(gv.rl)}, corruption control ${Math.round(gv.cc)}${gv.va != null ? `, voice ${Math.round(gv.va)}` : ""}` : "No governance data";

@@ -1,5 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { benchmark, type BenchSet } from "./benchmarks";
 import { FINAL_PILLARS, concentration, finalScore, scoreProfile, type DimId, type Profile, type Raw } from "./profile-core";
 
 // Server side: builds a strategic profile for every country from the app's datasets. The browser reads the result through /api/machiavelli/profile.
@@ -10,7 +11,7 @@ export type Roll = { region: string; n: number; avg: Record<string, number>; wit
 export type Portfolio = { tradeYear: number | null; trade: ReturnType<typeof concentration>; invest: ReturnType<typeof concentration>; regionShare: { region: string; trade: number; invest: number }[]; built: Obj<string | null> };
 /** The average over all scored countries: the mean final score, the same weighted by each partner's share of UAE trade, and the mean of every pillar. */
 export type Average = { n: number; final: number; finalTradeWeighted: number | null; dims: Record<string, number>; pillars: DimId[]; best: { iso3: string; name: string; final: number }[]; worst: { iso3: string; name: string; final: number }[] };
-export type ProfileSet = { builtAt: string; sources: Obj<string | null>; profiles: Profile[]; portfolio: Portfolio; rolls: Roll[]; average: Average };
+export type ProfileSet = { builtAt: string; sources: Obj<string | null>; profiles: Profile[]; portfolio: Portfolio; rolls: Roll[]; average: Average; benchmarks: BenchSet };
 let memo: { at: number; key: string; v: ProfileSet } | null = null;
 
 export async function getProfiles(): Promise<ProfileSet | null> {
@@ -54,7 +55,12 @@ export async function getProfiles(): Promise<ProfileSet | null> {
   const average: Average = { n: scored.length, final: scored.length ? Math.round((scored.reduce((a, p) => a + p.final, 0) / scored.length) * 100) / 100 : 0, finalTradeWeighted: wsum > 0 ? Math.round((wt.reduce((a, p) => a + p.final * p.facts.tradeUsdM!, 0) / wsum) * 100) / 100 : null,
     dims: Object.fromEntries(Object.keys(profiles[0].dims).map((k) => [k, Math.round((scored.reduce((a, p) => a + p.dims[k as DimId].s, 0) / Math.max(1, scored.length)) * 100) / 100])), pillars: FINAL_PILLARS,
     best: [...scored].sort((a, b) => b.final - a.final).slice(0, 5).map((p) => ({ iso3: p.iso3, name: p.name, final: p.final })), worst: [...scored].sort((a, b) => a.final - b.final).slice(0, 5).map((p) => ({ iso3: p.iso3, name: p.name, final: p.final })) };
-  const v: ProfileSet = { builtAt: new Date().toISOString(), sources, profiles, portfolio: { tradeYear: last, trade: concentration(tv), invest: concentration(iv), regionShare, built: sources }, rolls, average };
+  const gdpOf = (c: string) => { const g = outlook?.countries[c] as { gdp?: Obj<number> } | undefined; return g?.gdp?.[String(new Date().getFullYear() - 1)] ?? g?.gdp?.[String(new Date().getFullYear() - 2)] ?? null; };
+  const un = new Map<string, number | null>(); const bRows = profiles.map((p) => { const wg = p.facts.gov; const wv = wg ? [wg.pv, wg.ge, wg.rq, wg.rl, wg.cc, (wg as { va?: number }).va].filter((x): x is number => typeof x === "number") : []; const pc = part.countries[p.iso3] as { score?: number; c?: { alignment?: number }; raw?: { alignment?: number } } | undefined; void un;
+    return { iso3: p.iso3, name: p.name, final: p.final, dims: Object.fromEntries(Object.entries(p.dims).map(([k, x]) => [k, x.s])), tradeUsdM: p.facts.tradeUsdM, partnershipScore: pc?.score ?? null, scorecardOverall: (sc as unknown as { countries: Obj<{ overall?: number }> } | null)?.countries[p.iso3]?.overall ?? null, gdpUsdM: gdpOf(p.iso3), wgiMean: wv.length ? wv.reduce((a, x) => a + x, 0) / wv.length : null, unAgreement: pc?.raw?.alignment ?? null }; });
+  const topPartners = [...profiles].filter((p) => (p.facts.tradeUsdM ?? 0) > 0).sort((a, b) => b.facts.tradeUsdM! - a.facts.tradeUsdM!).slice(0, 15).map((p) => p.iso3);
+  const benchmarks = benchmark(bRows, topPartners);
+  const v: ProfileSet = { builtAt: new Date().toISOString(), sources, profiles, portfolio: { tradeYear: last, trade: concentration(tv), invest: concentration(iv), regionShare, built: sources }, rolls, average, benchmarks };
   memo = { at: Date.now(), key, v }; return v;
 }
 export const profileOf = async (iso3: string) => (await getProfiles())?.profiles.find((p) => p.iso3 === iso3) ?? null;

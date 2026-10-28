@@ -1,3 +1,4 @@
+import { SOURCE_PLAN } from "../sources";
 import { COMMON } from "../dossier/strategy";
 import { SEARCH_RECIPE } from "../foresight";
 import { oneLine } from "../guard";
@@ -56,7 +57,9 @@ Intellectual standard:
 - Recommended instruments come only from: ${INSTR}; each is legitimate, disclosed, consent-based and reversible. No takeover, infiltration, proxy support, identity targeting, coercion or operational military content, ever.
 - Unknown exposure is unknown, never zero. Trade figures are customs-based and include UAE re-exports; investment positions are stocks; an announced deal is not completed investment.
 - Human decision-makers keep final authority.
-${SEARCH_RECIPE}`;
+${SEARCH_RECIPE}
+
+${SOURCE_PLAN}`;
 
 const SEAT_FORMAT = (words: number, n: number) => `Write one section per seat, in the order listed, each at most ${Math.floor(words / Math.max(1, n))} words, each starting exactly with "### <id> — <seat name>" and then these labelled lines (a line with nothing to add says "not established"): **Judgment:** one sentence. **Facts:** verified facts with fact ids and dates. **Framework:** the analysis in your seat's tradition. **Actors:** interests, capabilities, constraints and likely responses. **UAE implications:** what it means for UAE interests. **Options:** one to three, each with its trade-off. **Risks:** counterarguments and unintended effects. **Recommendation:** your seat's, and why. **Indicators:** what to watch and what would change your view. **Confidence:** high, moderate or low, and the gaps.`;
 const seatBlock = (ids: SeatId[]) => ids.map((id) => { const s = SEAT_BY.get(id)!; return `- ${id}, ${s.en} (tradition: ${s.thinkers}). Mandate: ${s.mandate} It must ask: ${s.asks} Deliverable: ${s.deliverable}.`; }).join("\n");

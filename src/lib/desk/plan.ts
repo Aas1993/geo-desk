@@ -1,11 +1,11 @@
 import type { B } from "../case/core";
 import { routeTopic, worstOf, type DeskOptions, type Product } from "./core";
 import { INTEL_MARK } from "./context";
-import { EMB_AGENTS, EMB_BY, EMB_CHIEF, EMB_INTEL_GROUPS, EMB_PLAN_CHIEF, EMB_PLAN_GROUPS, EMB_SYSTEM, composeIntel, composePlan, embDirectiveChiefRole, embDirectiveGroupRole, embIntelChiefRole, embIntelGroupRole, embPlanChiefRole, embPlanGroupRole, embUpdateRole } from "./embassy";
-import { KING_AGENTS, KING_BY, KING_CHAIR, KING_GROUPS, KING_SYSTEM, composeKing, kingChairRole, kingDirectiveChairRole, kingDirectiveGroupRole, kingGroupRole } from "./king";
+import { EMB_AGENTS, EMB_BY, EMB_INSPECTOR, embInspectorRole, EMB_CHIEF, EMB_INTEL_GROUPS, EMB_PLAN_CHIEF, EMB_PLAN_GROUPS, EMB_SYSTEM, composeIntel, composePlan, embDirectiveChiefRole, embDirectiveGroupRole, embIntelChiefRole, embIntelGroupRole, embPlanChiefRole, embPlanGroupRole, embUpdateRole } from "./embassy";
+import { KING_AGENTS, KING_AUDITOR, KING_BY, kingAuditorRole, KING_CHAIR, KING_GROUPS, KING_SYSTEM, composeKing, kingChairRole, kingDirectiveChairRole, kingDirectiveGroupRole, kingGroupRole } from "./king";
 
 // One description of every paid desk run, shared by the route that executes it and the screens that show what it costs and what it does. A run is a list of calls: the first call of stage 0 goes alone so the shared evidence is cached before the others read it, the rest of stage 0 go in parallel, and the final call (the Decision Chair or the Chief of Staff) writes the product from what they produced.
-export type Call = { id: string; agents: string[]; name: B; role: (prior: Record<string, string>) => string; searches: number; maxTokens: number; stage: 0 | 1 };
+export type Call = { id: string; agents: string[]; name: B; role: (prior: Record<string, string>) => string; searches: number; maxTokens: number; stage: 0 | 1 | 2 };
 export type DeskPlan = { product: Product; system: string; calls: Call[]; compose: (parts: { id: string; text: string }[]) => string; contextLabel: string; worst: number };
 const b = (en: string, ar: string): B => ({ en, ar });
 const names = (ids: string[], by: Map<string, { en: string; ar: string }>): B => ({ en: ids.map((i) => by.get(i)?.en ?? i).join(" · "), ar: ids.map((i) => by.get(i)?.ar ?? i).join(" · ") });
@@ -23,7 +23,8 @@ export function planFor(product: Product, o: DeskOptions, context: string): Desk
   if (product === "king-council") {
     system = KING_SYSTEM; compose = composeKing;
     calls = [...KING_GROUPS.map((g): Call => ({ id: g.id, agents: g.agents, name: names(g.agents, KING_BY), role: () => kingGroupRole(g), searches: g.searches, maxTokens: g.maxTokens, stage: 0 })),
-      { id: "chair", agents: [], name: b(KING_CHAIR.en, KING_CHAIR.ar), role: (p) => kingChairRole(p, { topic: o.topic }), searches: 0, maxTokens: KING_CHAIR.maxTokens, stage: 1 }];
+      { id: "chair", agents: [], name: b(KING_CHAIR.en, KING_CHAIR.ar), role: (p) => kingChairRole(p, { topic: o.topic }), searches: 0, maxTokens: KING_CHAIR.maxTokens, stage: 1 },
+      { id: KING_AUDITOR.id, agents: [], name: b(KING_AUDITOR.en, KING_AUDITOR.ar), role: (p) => kingAuditorRole(p.chair ?? ""), searches: 0, maxTokens: 3600, stage: 2 }];
   } else if (product === "emb-intel") {
     system = EMB_SYSTEM; compose = composeIntel;
     calls = [...EMB_INTEL_GROUPS.map((g): Call => ({ id: g.id, agents: g.agents, name: names(g.agents, EMB_BY), role: () => embIntelGroupRole(g), searches: g.searches, maxTokens: g.maxTokens, stage: 0 })),
@@ -31,7 +32,8 @@ export function planFor(product: Product, o: DeskOptions, context: string): Desk
   } else if (product === "emb-plan") {
     system = EMB_SYSTEM; compose = composePlan; const at = context.indexOf(INTEL_MARK); const intel = at >= 0 ? context.slice(at + INTEL_MARK.length) : "";
     calls = [...EMB_PLAN_GROUPS.map((g): Call => ({ id: g.id, agents: g.agents, name: names(g.agents, EMB_BY), role: () => embPlanGroupRole(g), searches: g.searches, maxTokens: g.maxTokens, stage: 0 })),
-      { id: "chief", agents: [], name: b(EMB_PLAN_CHIEF.en, EMB_PLAN_CHIEF.ar), role: (p) => embPlanChiefRole(p, intel, { topic: o.topic }), searches: 0, maxTokens: EMB_PLAN_CHIEF.maxTokens, stage: 1 }];
+      { id: "chief", agents: [], name: b(EMB_PLAN_CHIEF.en, EMB_PLAN_CHIEF.ar), role: (p) => embPlanChiefRole(p, intel, { topic: o.topic }), searches: 0, maxTokens: EMB_PLAN_CHIEF.maxTokens, stage: 1 },
+      { id: EMB_INSPECTOR.id, agents: [], name: b(EMB_INSPECTOR.en, EMB_INSPECTOR.ar), role: (p) => embInspectorRole(p.chief ?? ""), searches: 0, maxTokens: 3600, stage: 2 }];
   } else {
     const king = product === "king-directive"; const by = king ? KING_BY : EMB_BY; const chief = king ? KING_CHAIR : EMB_CHIEF; system = king ? KING_SYSTEM : EMB_SYSTEM;
     if (o.mode === "update") {

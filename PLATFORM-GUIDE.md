@@ -374,6 +374,12 @@ A recurring dated brief per country. Tier sets cadence (anchor markets monthly, 
 
 Six dimensions as separate columns for every country, evidence on hover, regional roll-up, multilateral, financial and humanitarian channels, the Brand Finance benchmark and eight consolidated recommendations.
 
+Extended on 29 October 2026: eleven pillars (adding Bilateral trade, Investment and capital, Political alignment, Governance and stability, Market size and growth), a **final score** (mean of ten pillars, economic depth shown but not averaged), the **average across all countries** (also weighted by trade with the UAE, and by pillar), an **index validation** panel (rank correlations against independent references; 8 of 9 held, the final score is 0.97 correlated with the Partnership Index and that redundancy is reported) and a **Non-friendly states** tab (criteria-based watch list: bilateral events, UN voting divergence, sanctions exposure, trade without engagement must agree; distance is not hostility; documented tensions in `public/data/tension-register.json` with sources; an analytic prompt, never a designation).
+
+### Audit and quality bar (29 October 2026)
+
+See `docs/platform-audit-2026-10-29.md`: the smoke test, the inventory and duplication findings (seven overlapping decision councils, six overlapping indices), the single prompt bar (`src/lib/audit.test.ts`), the independent reviewers (Decision Auditor, Plan Inspector, Strategy Auditor), the free Quality check on THE KING and the embassy products, and the audit of this session's own work.
+
 ### Reference check
 
 The specification's key facts were checked on 25 October 2026. Confirmed: UAE 10th in the 2026 soft-power index, 38 CEPAs, third-largest humanitarian donor in 2025, Ras El-Hekma. **Contradicted or out of date:** the UAE left OPEC and OPEC+ on 1 May 2026; the UAE is 8th on diplomatic influence; NIIF's September 2026 close was a first close of about US$2bn anchored by the Government of India; the Fujairah terminals are an agreement in principle; ADIA ranks 5th. Not found: the AED107.5bn India H1 2026 figure.

@@ -1,3 +1,4 @@
+import { SOURCE_PLAN } from "../sources";
 import { COMMON } from "../dossier/strategy";
 import { SEARCH_RECIPE } from "../foresight";
 import { oneLine } from "../guard";
@@ -42,7 +43,9 @@ ${COMMON}
 - Do not infer causation from association or from one event followed by another. Do not give price targets, trading advice or a promise of returns. Do not present a correlation as a causal graph. Do not vote the analysts into a false consensus: preserve unresolved dissent and say which differences change the recommended option and which do not.
 - Every analyst section has exactly these labelled lines: Mandate, Distinct contribution, Evidence (fact ids and sources), Assumptions, Conclusion, Confidence (high, medium or low, and why), Contrary evidence, UAE relevance, Unresolved questions. A role whose evidence is thin writes "not established" rather than a number.
 - Unknown exposure is unknown, never zero. Trade figures are customs-based and include UAE re-exports; investment positions are stocks, not flows; an announced deal is not completed investment.
-${SEARCH_RECIPE}`;
+${SEARCH_RECIPE}
+
+${SOURCE_PLAN}`;
 
 const roleLines = (ids: RoleId[]) => ids.map((r) => `- ${ROLE_BY.get(r)!.en}: lens: ${ROLE_BY.get(r)!.lens}.`).join("\n");
 const SECTION = (n: number, k: number) => `Write one section per role, in the order listed, each at most ${Math.floor(n / Math.max(1, k))} words, each starting with "### Analyst: <role name exactly as listed>" and then the nine labelled lines.`;

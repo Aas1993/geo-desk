@@ -13,7 +13,7 @@ export type RunEvent = Record<string, unknown>;
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export type Effort = (typeof EFFORTS)[number];
 const MAX_TURNS = 4;
-const SEARCH_CAP = 7; const FETCH_CAP = 3; // see toolsLeft: constant tool limits keep the cached prefix identical across calls
+const SEARCH_CAP = 8; const FETCH_CAP = 3; // see toolsLeft: constant tool limits keep the cached prefix identical across calls
 const SEARCH_SLACK = 4; // a margin above the budget the model is told: touching the tool limit ends the whole code step
 const BLOCKED = ["adx.ae", "qe.com.qa"]; // ADX's terms prohibit automated retrieval
 

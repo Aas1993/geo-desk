@@ -38,3 +38,21 @@ export function embContext(f: Filed, product: "emb-intel" | "emb-plan" | "emb-di
 }
 /** The facts layer both desks add to the Case File evidence: the UAE's vehicles and advantage, the neighbours' relations (all computed from held data) and the long view of the UAE in the country. */
 export const deskExtraFacts = (c: CaseData): { kind: string; text: string; src: string }[] => [...ambFactsBlock(c), historyFact(c)];
+/** For the Country Brief: the Strategic Council digest, the Ministry's priorities (what the UAE wants), the ambassador's brief and the mission strategy when they exist. */
+export function countryContext(f: Filed): string {
+  const parts: string[] = []; const c = councilDigest(f.council ?? null, 4500); if (c) parts.push(`## Strategic Council (Case File)\n${c}`);
+  const mf = mofaDigest(f.mofa, 3400); if (mf) parts.push(`## The Ministry of Foreign Affairs: priorities, goals and the tasks set for the mission (the UAE's stated position)\n${mf}`);
+  const eb = f.embIntel ? embSection(f.embIntel, "Ambassador's Brief") : ""; if (eb) parts.push(`## The ambassador's brief (embassy council)\n${cut(strip(eb), 4200)}`);
+  const ms = f.embPlan ? embSection(f.embPlan, "Mission Strategy") : ""; if (ms) parts.push(`## The embassy's mission strategy\n${cut(strip(ms), 2200)}`);
+  return parts.join("\n\n");
+}
+/** For the President's brief: the Country Brief (the whole country), the Strategic Council digest, the Ministry's priorities, the ambassador's brief, the mission strategy and THE KING's executive brief, whichever exist. */
+export function presidentContext(f: Filed & { country?: string | null }): string {
+  const parts: string[] = []; const cb = f.country ? cut(strip(f.country.split("# Specialist Findings")[0]), 5200) : ""; if (cb) parts.push(`## The Country Brief (the whole country, written earlier)\n${cb}`);
+  const c = councilDigest(f.council ?? null, 3500); if (c) parts.push(`## Strategic Council (Case File)\n${c}`);
+  const kb = f.kingBrief ? kingSection(f.kingBrief, "Executive Brief") : ""; if (kb) parts.push(`## THE KING's council: Executive Brief\n${cut(strip(kb), 2600)}`);
+  const mf = mofaDigest(f.mofa, 3000); if (mf) parts.push(`## The Ministry of Foreign Affairs: priorities, goals and mission tasks (the UAE's stated position)\n${mf}`);
+  const eb = f.embIntel ? embSection(f.embIntel, "Ambassador's Brief") : ""; if (eb) parts.push(`## The ambassador's brief\n${cut(strip(eb), 3000)}`);
+  const ms = f.embPlan ? embSection(f.embPlan, "Mission Strategy") : ""; if (ms) parts.push(`## The embassy's mission strategy\n${cut(strip(ms), 1800)}`);
+  return parts.join("\n\n");
+}

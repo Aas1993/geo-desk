@@ -11,11 +11,11 @@ export type Agent = { id: string; desk: Desk; n: number; en: string; ar: string;
 export type Group = { id: string; agents: string[]; searches: number; maxTokens: number; words: number };
 export type Chair = { id: string; en: string; ar: string; title: B; maxTokens: number; words: number };
 export const REVIEW_STAGE = 2;
-export type Product = "king-council" | "king-directive" | "emb-intel" | "emb-plan" | "emb-directive" | "mofa-council" | "mofa-directive";
-export const PRODUCTS: Product[] = ["king-council", "king-directive", "emb-intel", "emb-plan", "emb-directive", "mofa-council", "mofa-directive"];
+export type Product = "king-council" | "king-directive" | "emb-intel" | "emb-plan" | "emb-directive" | "mofa-council" | "mofa-directive" | "country-full" | "president-brief";
+export const PRODUCTS: Product[] = ["king-council", "king-directive", "emb-intel", "emb-plan", "emb-directive", "mofa-council", "mofa-directive", "country-full", "president-brief"];
 export const DESK_CAP_USD = 1;
 /** What each product typically costs on one country, in US dollars (the ceiling is DESK_CAP_USD). Printed beside every button; replaced with measured figures after a live run. */
-export const PRODUCT_USD: Record<Product, number> = { "king-council": 0.6, "king-directive": 0.3, "emb-intel": 0.9, "emb-plan": 0.85, "emb-directive": 0.3, "mofa-council": 0.8, "mofa-directive": 0.3 };
+export const PRODUCT_USD: Record<Product, number> = { "king-council": 0.6, "king-directive": 0.3, "emb-intel": 0.9, "emb-plan": 0.85, "emb-directive": 0.3, "mofa-council": 0.8, "mofa-directive": 0.3, "country-full": 0.9, "president-brief": 0.7 };
 export const worstOf = (maxTokens: number, searches: number) => (maxTokens * 10) / 1e6 + searches * 0.01 + 0.08;
 
 // ---- the universal constitution ----
@@ -111,6 +111,8 @@ export type DeskOptions = { focus: string; topic: string; mode: "question" | "di
 const clean = (v: unknown, n: number) => oneLine(typeof v === "string" ? v.replace(/[\u0000-\u001F]/g, " ").trim().slice(0, n) : "", n);
 export const DEFAULT_KING_FOCUS = "Decide the UAE's course toward this country: what to do, in what form, under what conditions, and why.";
 export const DEFAULT_MOFA_FOCUS = "Think strictly as the Ministry of Foreign Affairs: set the UAE's ranked foreign-policy priorities for this country, the goals and measures, the mission's tasks and the plans for the embassy.";
+export const DEFAULT_COUNTRY_FOCUS = "Write the whole country for the UAE reader: its background and history, its government, economy and society, the UAE's relationship and economic position in it, what each side wants from the other, the latest updates, and the geopolitical and statecraft assessment.";
+export const DEFAULT_PRESIDENT_FOCUS = "Write the three-page brief a head of state wants before deciding on this country: the bottom line, the position on every front, the interests of both sides, the recent events, the corridor the UAE could build, and the decisions to take.";
 export const DEFAULT_EMB_FOCUS = "Build the strongest relationship and the best outcome for the UAE in this country: the mission's strategy, its plans and its engagement.";
 export const cleanDeskOptions = (b: Record<string, unknown>, def: string): DeskOptions => ({ focus: clean(b.focus, 400) || def, topic: clean(b.topic, 600), mode: b.mode === "directive" ? "directive" : b.mode === "update" ? "update" : "question", urgency: b.urgency === "urgent" ? "urgent" : "routine", agents: Array.isArray(b.agents) ? b.agents.filter((x): x is string => typeof x === "string" && /^[a-z0-9-]{2,16}$/.test(x)).slice(0, 4) : [], lang: b.lang === "ar" ? "ar" : "en", useContext: b.useContext !== false });
 const hash = (str: string) => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return h >>> 0; };

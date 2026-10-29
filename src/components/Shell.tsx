@@ -2,7 +2,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Award, Brain, Briefcase, Compass, Crown, Handshake, Landmark, Users, Archive, Binoculars, Layers, Globe2, CandlestickChart, Eye, Share2, LayoutDashboard, Sparkles } from "lucide-react";
+import { Award, Bot, Brain, Briefcase, Compass, Crown, Handshake, Landmark, Users, Archive, Binoculars, Layers, Globe2, CandlestickChart, Eye, Share2, LayoutDashboard, Sparkles } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-store";
 import { RightRail } from "./RightRail";
 import { TopBar } from "./TopBar";
@@ -55,6 +55,7 @@ function MobileNav() {
         <Link href="/room" className={cls(path.startsWith("/room"))}><Users size={19} /><span className="max-w-full truncate">{t("nav_room")}</span></Link>
         <Link href="/archive" className={cls(path.startsWith("/archive"))}><Archive size={19} /><span className="max-w-full truncate">{t("nav_archive")}</span></Link>
         <Link href="/bird" className={cls(path.startsWith("/bird"))}><Binoculars size={19} /><span className="max-w-full truncate">{t("nav_bird")}</span></Link>
+        <Link href="/agent" className={cls(path.startsWith("/agent"))}><Bot size={19} /><span className="max-w-full truncate">{t("nav_agent")}</span></Link>
         {path === "/" && <button onClick={() => setMenu(!menuOpen)} className={cls(menuOpen)}><Layers size={19} />{t("layers")}</button>}
         {path === "/" && <button onClick={() => { select(null); useDashboard.getState().setOpen(true); }} className={cls(false)}><LayoutDashboard size={19} />{lang === "ar" ? "اللوحة" : "Brief"}</button>}
         {path === "/" && <button onClick={() => { select(null); useDashboard.getState().setAsk(true); }} className={cls(false)}><Sparkles size={19} />{lang === "ar" ? "اسأل" : "Ask"}</button>}

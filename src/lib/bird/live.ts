@@ -1,14 +1,14 @@
-import type { Ev, Pid } from "./runner";
+import type { Ev } from "./runner";
 
 // The live desk of Complete the picture: what every agent of every running council is doing, built only from the events the councils already stream (a roster, then one start/done/skipped/error per agent). Nothing here estimates or invents progress.
 export type LiveAgent = { id: string; name: string; stage: number; status: "wait" | "run" | "done" | "skipped" | "error"; t0?: number; t1?: number };
 export type LiveProd = { agents: LiveAgent[]; t0: number; t1?: number };
-export type Live = Partial<Record<Pid, LiveProd>>;
+export type Live = Partial<Record<string, LiveProd>>;
 const MAP: Record<string, LiveAgent["status"]> = { start: "run", done: "done", skipped: "skipped", error: "error" };
 
-export const liveStart = (l: Live, id: Pid, now: number): Live => ({ ...l, [id]: { agents: [], t0: now } });
-export const liveEnd = (l: Live, id: Pid, now: number): Live => { const p = l[id]; return p ? { ...l, [id]: { ...p, t1: now, agents: p.agents.map((a) => (a.status === "run" ? { ...a, status: "done" as const, t1: now } : a)) } } : l; };
-export function liveEvent(l: Live, id: Pid, e: Ev, now: number): Live {
+export const liveStart = (l: Live, id: string, now: number): Live => ({ ...l, [id]: { agents: [], t0: now } });
+export const liveEnd = (l: Live, id: string, now: number): Live => { const p = l[id]; return p ? { ...l, [id]: { ...p, t1: now, agents: p.agents.map((a) => (a.status === "run" ? { ...a, status: "done" as const, t1: now } : a)) } } : l; };
+export function liveEvent(l: Live, id: string, e: Ev, now: number): Live {
   const p = l[id]; if (!p) return l;
   if (e.type === "roster" && Array.isArray(e.agents)) { const have = new Map(p.agents.map((a) => [a.id, a])); return { ...l, [id]: { ...p, agents: (e.agents as { id: string; name?: string; stage?: number }[]).map((a) => have.get(a.id) ?? { id: String(a.id), name: String(a.name ?? a.id), stage: Number(a.stage ?? 0), status: "wait" as const }) } }; }
   if (e.type === "agent" && typeof e.id === "string" && typeof e.status === "string" && MAP[e.status]) {

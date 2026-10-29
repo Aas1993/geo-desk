@@ -3,17 +3,17 @@ import { DEFAULT_FOCUS, stateOf } from "../case/architect";
 import { DEFAULT_QUESTION as CASE_Q } from "../case/council";
 import { activate } from "../case/seats";
 import { DEFAULT_QUESTION as DEEP_Q } from "../deep/council";
-import { DEFAULT_EMB_FOCUS, DEFAULT_KING_FOCUS, DEFAULT_MOFA_FOCUS, PRODUCT_USD } from "../desk/core";
-import { embContext, kingContext, mofaContext } from "../desk/context";
+import { DEFAULT_COUNTRY_FOCUS, DEFAULT_EMB_FOCUS, DEFAULT_KING_FOCUS, DEFAULT_MOFA_FOCUS, PRODUCT_USD } from "../desk/core";
+import { countryContext, embContext, kingContext, mofaContext } from "../desk/context";
 import { COUNCIL_PRESETS } from "../falcon/council";
 import { SCOUNCIL_DEFAULT_QUESTION } from "../machiavelli/council";
 
 // COMPLETE THE PICTURE: runs every AI council of the platform that has no product on file for a country (and, if asked, those older than 30 days), one after another and in the order that lets each read the one before, so the bird's eye view is built on all of them.
 // Each run goes through the same route, with the same US$1.00 ceiling, cache and hourly cap, as when it is started from its own page; the finished product is saved under the same key, so the page of each council shows it. The user starts it with one explicit click after seeing the list and the estimate; it stops on any error and waits when the hourly cap is reached.
-export type Pid = "council" | "architect" | "falcon" | "mach" | "deep" | "intel" | "mofa" | "plan" | "king";
+export type Pid = "council" | "architect" | "falcon" | "mach" | "deep" | "intel" | "mofa" | "country" | "plan" | "king";
 export type Info = { id: Pid; en: string; ar: string; est: number; key: (iso: string) => string; href: string };
 /** The order matters: the Strategic Council and the Architect first (they feed the desks), the embassy and the Ministry next, THE KING last (it reads everything). */
-export const ORDER: Pid[] = ["council", "architect", "falcon", "mach", "deep", "intel", "mofa", "plan", "king"];
+export const ORDER: Pid[] = ["council", "architect", "falcon", "mach", "deep", "intel", "mofa", "country", "plan", "king"];
 export const INFO: Record<Pid, Info> = {
   council: { id: "council", en: "Strategic Council (Case File)", ar: "المجلس الاستراتيجي (ملف الحالة)", est: 0.78, key: (i) => `gd-case-council:${i}`, href: "/case" },
   architect: { id: "architect", en: "Statecraft Architect", ar: "مهندس فن الحكم", est: 0.79, key: (i) => `gd-case-architect:${i}`, href: "/case" },
@@ -22,6 +22,7 @@ export const INFO: Record<Pid, Info> = {
   deep: { id: "deep", en: "Deep Intelligence team", ar: "فريق الاستخبارات المعمّقة", est: 0.7, key: (i) => `gd-deep-council:${i}:full`, href: "/deep" },
   intel: { id: "intel", en: "Embassy intelligence", ar: "استخبارات السفارة", est: 0.94, key: (i) => `gd-desk:emb-intel:${i}`, href: "/ambassador" },
   mofa: { id: "mofa", en: "The Ministry's Council", ar: "مجلس الوزارة", est: PRODUCT_USD["mofa-council"], key: (i) => `gd-desk:mofa-council:${i}`, href: "/mofa" },
+  country: { id: "country", en: "Country brief (statecraft agent)", ar: "موجز الدولة (وكيل فن الحكم)", est: PRODUCT_USD["country-full"], key: (i) => `gd-desk:country-full:${i}`, href: "/bird" },
   plan: { id: "plan", en: "Mission strategy and plans", ar: "استراتيجية البعثة وخططها", est: 0.9, key: (i) => `gd-desk:emb-plan:${i}`, href: "/ambassador" },
   king: { id: "king", en: "THE KING's Council", ar: "مجلس القرار النهائي", est: 0.75, key: (i) => `gd-desk:king-council:${i}`, href: "/king" },
 };
@@ -36,7 +37,7 @@ export function plan(iso: string, now: number, o: { refreshStale: boolean }): { 
 export const BATCH_EST = 0.6;
 export const estimate = (ids: Pid[], batch = false) => Math.round(ids.reduce((a, id) => a + INFO[id].est * (batch ? BATCH_EST : 1), 0) * 100) / 100;
 /** What each council reads from the others (see request() and src/lib/desk/context.ts): a council starts the moment the ones it reads have finished, and not before, so each sees exactly what the one-after-another order gave it, while the independent councils never wait for anyone. */
-export const DEPS: Record<Pid, Pid[]> = { council: [], falcon: [], mach: [], deep: [], intel: ["council"], architect: ["council"], mofa: ["council", "intel"], plan: ["council", "intel", "mofa"], king: ["council", "intel", "plan"] };
+export const DEPS: Record<Pid, Pid[]> = { council: [], falcon: [], mach: [], deep: [], intel: ["council"], architect: ["council"], mofa: ["council", "intel"], country: ["council", "intel", "mofa"], plan: ["council", "intel", "mofa"], king: ["council", "intel", "plan"] };
 /** Runs the ids so that each starts when the ids it reads (those that are in this run) have finished; the others start at once. */
 export async function runDag(ids: Pid[], run: (id: Pid) => Promise<void>, aborted: () => boolean = () => false): Promise<void> {
   const p = new Map<Pid, Promise<void>>(); const go = (id: Pid): Promise<void> => { let q = p.get(id); if (!q) { q = Promise.all(DEPS[id].filter((d) => ids.includes(d)).map(go)).then(() => (aborted() ? undefined : run(id))); p.set(id, q); } return q; };
@@ -56,6 +57,7 @@ export function request(id: Pid, iso: string, lang: "en" | "ar", d: CaseData | n
     case "deep": return { endpoint: "/api/deep/council", body: { iso3: iso, lang, question: DEEP_Q, mode: "full", consequential: true, horizonYears: 3, audience: "analyst", roles: [], refresh } };
     case "intel": return { endpoint: "/api/desk", body: { product: "emb-intel", iso3: iso, lang, focus: DEFAULT_EMB_FOCUS, topic: "", useContext: true, context: embContext({ council: filed.council, kingBrief: filed.kingBrief, mofa: filed.mofa }, "emb-intel"), refresh } };
     case "mofa": return { endpoint: "/api/desk", body: { product: "mofa-council", iso3: iso, lang, focus: DEFAULT_MOFA_FOCUS, topic: "", useContext: true, context: mofaContext(filed), refresh } };
+    case "country": return { endpoint: "/api/desk", body: { product: "country-full", iso3: iso, lang, focus: DEFAULT_COUNTRY_FOCUS, topic: "", useContext: true, context: countryContext({ council: filed.council, embIntel: filed.embIntel, embPlan: filed.embPlan, mofa: filed.mofa }), refresh } };
     case "plan": return { endpoint: "/api/desk", body: { product: "emb-plan", iso3: iso, lang, focus: DEFAULT_EMB_FOCUS, topic: "", useContext: true, context: embContext({ council: filed.council, kingBrief: filed.kingBrief, embIntel: filed.embIntel, mofa: filed.mofa }, "emb-plan"), refresh } };
     case "king": return { endpoint: "/api/desk", body: { product: "king-council", iso3: iso, lang, focus: DEFAULT_KING_FOCUS, topic: "", useContext: true, context: kingContext({ council: filed.council, architect: filed.architect, embIntel: filed.embIntel, embPlan: filed.embPlan }), refresh } };
   }

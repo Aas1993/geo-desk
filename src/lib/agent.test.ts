@@ -1,0 +1,40 @@
+// Tests for the Desk Agent (catalogue, plan validation, fallback routing), the Country Brief and the President's brief (plans, parser, PDF page).
+import assert from "node:assert/strict";
+import { DEPTS, DEPT_BY, FORMATS } from "./agent/catalog";
+import { MAX_STEPS, cleanPlan, fallbackPlan, needsCountry, parsePlanText, planEst } from "./agent/plan";
+import { planFor } from "./desk/plan";
+import { PRODUCTS } from "./desk/core";
+import { parsePresident } from "./desk/president";
+import { SUBJECTS } from "./review/pair";
+import { presidentHtml } from "./bird/presidentHtml";
+import { ORDER } from "./bird/runner";
+
+// ---- the catalogue
+assert.equal(new Set(DEPTS.map((d) => d.id)).size, DEPTS.length, "department ids are unique"); assert.ok(DEPTS.every((d) => d.href.startsWith("/") && d.est >= 0), "every department has a tab and a cost");
+for (const d of DEPTS.filter((x) => x.kind === "directive" || x.kind === "country")) assert.ok(d.product && (PRODUCTS as string[]).includes(d.product) && d.endpoint === "/api/desk", `${d.id} points at a real desk product`);
+assert.ok(FORMATS.length >= 6 && FORMATS.every((f) => f.rule.length > 20));
+// ---- plan validation: the agent can only route to what exists
+const p = cleanPlan({ intent: "task", iso3: "jor", steps: [{ dept: "king", why: "x", ask: "Advise on the corridor", mode: "directive" }, { dept: "nonsense", ask: "y" }, { dept: "king", ask: "dup" }, { dept: "falcon", ask: "Security view" }, { dept: "mofa", ask: "m" }, { dept: "deep", ask: "d" }], format: "memo", length: "short" }, "msg", null);
+assert.equal(p.iso3, "JOR"); assert.deepEqual(p.steps.map((s) => s.dept), ["king", "falcon", "mofa"], "unknown and duplicate departments are dropped and at most three remain"); assert.ok(p.steps.length <= MAX_STEPS && p.format === "memo" && p.length === "short");
+assert.equal(cleanPlan({ iso3: "ARE", steps: [] }, "m", null).iso3, null, "the UAE itself is never the country"); assert.equal(cleanPlan({ format: "poem" }, "m", null).format, "answer", "an unknown format falls back"); assert.equal(cleanPlan("junk", "m", "EGY").iso3, "EGY");
+assert.equal(parsePlanText("no json here", "m", null), null); const t = parsePlanText('Here: {"steps":[{"dept":"data","ask":"trade?"}],"format":"table"} thanks', "m", "JOR"); assert.ok(t && t.steps[0].dept === "data" && t.format === "table" && t.iso3 === "JOR");
+assert.equal(planEst({ ...p, steps: [{ dept: "data", why: "", ask: "", mode: "question" }] }), 0.08, "a free step costs only the writer"); assert.equal(planEst({ ...p, steps: [] }), 0); assert.ok(needsCountry(p) && !needsCountry({ ...p, steps: [] }));
+const fb = fallbackPlan("What is the security threat? Five bullet points please", "IRQ"); assert.equal(fb.steps[0].dept, "falcon"); assert.equal(fb.format, "bullets"); assert.equal(fallbackPlan("hello", null).steps[0].dept, "king", "the head-of-state desk is the default"); assert.ok(DEPT_BY.has(fb.steps[0].dept));
+// ---- the two new desk products are planned like the others: sittings, a writer and the two auditors
+for (const prod of ["country-full", "president-brief"] as const) {
+  assert.ok(SUBJECTS[prod], `${prod} has a reviewer subject`); const plan = planFor(prod, { focus: "", topic: prod === "president-brief" ? "Should we build a corridor?" : "", mode: "question", urgency: "routine", agents: [], lang: "en", useContext: true }, "");
+  assert.ok(plan.calls.filter((c) => c.stage === 0).length >= 3 && plan.calls.some((c) => c.id === "chief" && c.stage === 1) && plan.calls.filter((c) => c.stage === 2).length === 2, `${prod}: sittings, a writer and two auditors`);
+  assert.ok(plan.calls.filter((c) => c.stage > 0).every((c) => c.searches >= 1), `${prod}: the writer and auditors carry the search tool so they read the sittings' cached evidence`); assert.ok(plan.worst > 0.5 && plan.finalReserve === 0.85, `${prod}: reserve for the writer`);
+  const chief = plan.calls.find((c) => c.id === "chief")!; const role = chief.role({ P1: "text one", C1: "text one" }); assert.ok(role.includes("text one"));
+  if (prod === "president-brief") { assert.ok(role.includes("Should we build a corridor?") && role.includes("directiveAnswer"), "the directive reaches the writer"); assert.ok(plan.calls.find((c) => c.id === "P1")!.role({}).includes("Should we build a corridor?"), "and the specialists"); const none = planFor(prod, { focus: "", topic: "", mode: "question", urgency: "routine", agents: [], lang: "en", useContext: true }, "").calls.find((c) => c.id === "chief")!.role({}); assert.ok(none.includes("set \"directiveAnswer\" to null")); }
+  else assert.ok(role.includes("# 13. Gaps and Sources") && role.includes("ALL THIRTEEN"), "the Country Brief writer must finish all thirteen sections");
+}
+assert.ok(ORDER.includes("country"), "the country brief is part of Complete the picture");
+// ---- the President's brief parser: damaged JSON is repaired, bad values are cleaned, nothing is invented
+const json = { headline: "A <b>headline</b>", bottomLine: "Bottom", directiveAnswer: "Yes, in stages.", overlap: "o", scorecard: [{ dim: "security", status: "weak", reading: "r" }, { dim: "bogus", status: "odd", reading: "x" }], uaeInterests: [{ interest: "i", priority: 9, note: "n" }], theirInterests: [], events: [{ date: "2026-10-01", domain: "trade", signal: "risk", text: "e", source: "s" }], presence: { political: ["a"], security: [], economic: [] }, history: [{ year: "1974", event: "ties" }], visits: [], corridor: { name: "C", concept: "k", legs: [{ from: "A", to: "B", mode: "sea", status: "existing", note: "n" }, { from: "B", to: "C", mode: "teleport", status: "?", note: "" }], uaeAssets: ["p"], gaps: [], rivals: [], financing: "f", firstMoves: ["1", "2", "3"], risks: [] }, decisions: [{ decision: "D", options: ["a", "b", "c"], recommendation: "a", by: "Q1", ifNot: "x" }], recommendations: [{ action: "do", owner: "MoFA", when: "now" }], watch: [{ indicator: "w", threshold: "t" }] };
+const pb = parsePresident(`# For the President\n\ntext\n\n# Structured data\n\n<president>${JSON.stringify(json)}</president>`)!; assert.ok(pb && !pb.headline.includes("<") && pb.scorecard[1].dim === "political" && pb.scorecard[1].status === "mixed", "enums are cleaned"); assert.equal(pb.uaeInterests[0].priority, 5, "priority is clamped"); assert.deepEqual(pb.corridor!.legs.map((l) => [l.mode, l.status]), [["sea", "existing"], ["road", "proposed"]], "unknown corridor modes and statuses fall back");
+const cut = JSON.stringify(json).slice(0, JSON.stringify(json).indexOf('"corridor"') - 1); const rep = parsePresident(`<president>${cut}`); assert.ok(rep && rep.headline && rep.corridor === null, "a brief cut off mid-way keeps what was complete"); assert.equal(parsePresident("# For the President\n\nno json"), null);
+// ---- the three-page PDF: exactly three fixed-height pages, escaped, the chosen option marked
+const html = presidentHtml(pb, "en", { title: "T", country: "Jordan", foot: "f", classification: "c", date: "2026-10-29", choice: { 0: 1 }, directive: "Should we?" }); assert.equal((html.match(/class="pg"/g) ?? []).length, 3, "three pages"); assert.ok(html.includes('class="opt on"') && html.includes("Yes, in stages.") && !html.includes("<b>headline</b>") && html.includes("<svg"), "the choice, the directive answer and the corridor are drawn; text is escaped");
+assert.ok(presidentHtml(pb, "ar", { title: "T", country: "الأردن", foot: "f", classification: "c", date: "d", choice: {}, directive: "" }).includes('dir="rtl"'));
+console.log("agent: all checks passed");

@@ -14,6 +14,9 @@ export type Group = "desk" | "case" | "influence" | "deep" | "falcon" | "dossier
 export const KINDS: Record<string, { en: string; ar: string; group: Group }> = {
   "mofa-council": { en: "The Ministry's Council: foreign policy brief", ar: "مجلس الوزارة: موجز السياسة الخارجية", group: "desk" },
   "king-council": { en: "THE KING's Council: decision brief", ar: "مجلس القرار النهائي: موجز القرار", group: "desk" },
+  "agent-answer": { en: "Desk agent answer", ar: "إجابة وكيل المكتب", group: "other" },
+  "president-brief": { en: "The President's brief", ar: "موجز الرئيس", group: "desk" },
+  "country-full": { en: "Country brief (full)", ar: "موجز الدولة الكامل", group: "desk" },
   "emb-intel": { en: "Embassy intelligence brief", ar: "موجز استخبارات السفارة", group: "desk" },
   "emb-plan": { en: "Mission strategy and plans", ar: "استراتيجية البعثة وخططها", group: "desk" },
   directive: { en: "Directive or question: answer", ar: "توجيه أو سؤال: الإجابة", group: "desk" },
@@ -50,7 +53,7 @@ const arabic = (t: string) => (t.match(/[؀-ۿ]/g) ?? []).length > (t.match(/[A-
 
 // ---- reading what the browser holds
 const FAMILIES: { re: RegExp; kind: (m: RegExpExecArray) => string; iso: (m: RegExpExecArray) => string; lang?: (m: RegExpExecArray) => "en" | "ar" | undefined }[] = [
-  { re: /^gd-desk:(king-council|emb-intel|emb-plan|mofa-council):([A-Z]{3})$/, kind: (m) => m[1], iso: (m) => m[2] },
+  { re: /^gd-desk:(king-council|emb-intel|emb-plan|mofa-council|country-full|president-brief):([A-Z]{3})$/, kind: (m) => m[1], iso: (m) => m[2] },
   { re: /^gd-case-council:([A-Z]{3})$/, kind: () => "case-council", iso: (m) => m[1] },
   { re: /^gd-case-architect:([A-Z]{3})$/, kind: () => "architect", iso: (m) => m[1] },
   { re: /^gd-scouncil:([A-Z]{3})$/, kind: () => "mach-council", iso: (m) => m[1] },

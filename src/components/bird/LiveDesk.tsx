@@ -1,17 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import { liveCounts, liveStages, type Live, type LiveAgent, type LiveProd } from "@/lib/bird/live";
-import type { Pid } from "@/lib/bird/runner";
 import type { Lang } from "../falcon/bits";
 
 const clock = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 const COLOR: Record<LiveAgent["status"], string> = { wait: "var(--t2)", run: "var(--accent)", done: "var(--ok)", skipped: "var(--t2)", error: "var(--risk)" };
 
 /** THE LIVE DESK: every agent of every council that is running, drawn from the events the councils stream: waiting, working (pulsing, with its own clock), done (with how long it took), skipped or failed. Stages read left to right, the independent auditors last. It shows what is happening; it never estimates progress. */
-export function LiveDesk({ L, live, running, startedAt, names, queued = [] }: { L: Lang; live: Live; running: boolean; startedAt: number; names: Record<string, string>; queued?: { id: Pid; waitsFor: Pid[] }[] }) {
+export function LiveDesk({ L, live, running, startedAt, names, queued = [] }: { L: Lang; live: Live; running: boolean; startedAt: number; names: Record<string, string>; queued?: { id: string; waitsFor: string[] }[] }) {
   const t = (en: string, ar: string) => (L === "ar" ? ar : en); const [now, setNow] = useState(0);
   useEffect(() => { const k = setInterval(() => setNow(Date.now()), 500); const f = setTimeout(() => setNow(Date.now()), 0); return () => { clearInterval(k); clearTimeout(f); }; }, [running]);
-  const c = liveCounts(live); const ids = Object.keys(live) as Pid[]; const pct = c.total ? Math.round((c.done / c.total) * 100) : 0;
+  const c = liveCounts(live); const ids = Object.keys(live); const pct = c.total ? Math.round((c.done / c.total) * 100) : 0;
   const ends = ids.map((i) => live[i]?.t1 ?? 0); const allEnded = ids.length > 0 && ends.every((e) => e > 0); const end = allEnded ? Math.max(...ends) : now;
   return (
     <section aria-label={t("Live desk", "غرفة المتابعة المباشرة")} className="mt-4 rounded-[12px] border border-line bg-bg2 p-3">

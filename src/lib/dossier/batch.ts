@@ -12,8 +12,8 @@ const bundleAls = ((G as { __gdBundleALS?: AsyncLocalStorage<boolean> }).__gdBun
 export const inBundle = () => bundleAls.getStore() === true;
 /** Wraps a route handler: a request that carries the header x-geo-batch: 1 runs all of its model calls through the batch transport. */
 export function withBatch(handler: (req: Request) => Promise<Response>): (req: Request) => Promise<Response> { return (req) => { const batch = req.headers.get("x-geo-batch") === "1"; const bundle = batch || req.headers.get("x-geo-bundle") === "1"; if (!bundle) return handler(req); if (batch) console.warn("[batch] a request is running its model calls through the batch transport"); const inner = () => bundleAls.run(true, () => handler(req)); return batch ? als.run(true, inner) : inner(); }; }
-// the limit is one count shared by every council: a bundle is nine full sittings, so 27 lets a bundle run again within the hour after earlier runs or a partial retry
-const BATCH_PER_HOUR = Math.max(1, +(process.env.DOSSIER_BATCH_MAX_PER_HOUR ?? 27) || 27); const BATCH_CONCURRENT = Math.max(1, +(process.env.DOSSIER_BATCH_MAX_CONCURRENT ?? 6) || 6);
+// the limit is one count shared by every council: a bundle is nine full sittings, so 30 lets a bundle of ten run three times within the hour after earlier runs or a partial retry
+const BATCH_PER_HOUR = Math.max(1, +(process.env.DOSSIER_BATCH_MAX_PER_HOUR ?? 30) || 30); const BATCH_CONCURRENT = Math.max(1, +(process.env.DOSSIER_BATCH_MAX_CONCURRENT ?? 6) || 6);
 /** The hourly and concurrent limits of full sittings. A batch run mostly waits and costs about 40% less, and it is only started by the explicit "Complete the picture" click, so its limits are higher (DOSSIER_BATCH_MAX_PER_HOUR, DOSSIER_BATCH_MAX_CONCURRENT); every run still keeps its own US$1.00 ceiling. */
 export const hourlyCap = (normal: number) => (inBundle() ? Math.max(normal, BATCH_PER_HOUR) : normal);
 export const concurrentCap = (normal: number) => (inBundle() ? Math.max(normal, BATCH_CONCURRENT) : normal);

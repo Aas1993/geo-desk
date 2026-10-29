@@ -26,6 +26,7 @@ export function sourceDigest(i: Inputs, b: Bird, max = 14_000): string {
   const add = (label: string, p: { at: string; usd: number | null } | null, body: string) => { if (p && body.trim()) out.push(`### ${label} (saved ${p.at.slice(0, 10)}${p.usd != null ? `, US$${p.usd.toFixed(2)}` : ""})\n${cut(body.trim(), 1800)}`); else if (!p) out.push(`### ${label}\nNOT ON FILE.`); };
   add("THE KING", P.king, kingExec(P.king)); add("The Ministry", P.mofa, `${mofaBriefText(P.mofa)}\n${mofaPrioritiesText(P.mofa)}`);
   add("Embassy intelligence", P.intel, P.intel ? `${embSection(P.intel.report, "Ambassador's Brief")}\n${embSection(P.intel.report, "Trade and Investment Gaps")}` : ""); add("Mission strategy", P.plan, P.plan ? embSection(P.plan.report, "Mission Strategy") : "");
+  if (P.country) add("Country brief", P.country, embSection(P.country.report, "Country Brief"));
   for (const [label, p] of [["Statecraft Architect", P.architect], ["Strategic Council", P.council], ["Falcon Council", P.falcon], ["Deep Intelligence", P.deep], ["Machiavellian council", P.mach]] as const) add(label, p, p ? p.report.replace(/<(\w+)>[\s\S]*?(?:<\/\1>|$)/g, "").slice(0, 1500) : "");
   out.push(`### Free Case File facts\n${b.facts.map((f) => `- ${f.label.en}: ${f.value}`).join("\n") || "none"}`);
   return cut(out.join("\n\n"), max);

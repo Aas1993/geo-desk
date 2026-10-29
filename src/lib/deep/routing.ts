@@ -1,6 +1,6 @@
 // Analyst roles and the routing rule that picks the team for a question (FALCON EYE section 10). The coordinator starts from a small default team and expands only when the question or the evidence calls for it:
 // ten agents are never run for a simple lookup. Professional roles, not invented people. Roles are methodological lenses; running several in one model call is allowed and cheaper, as long as each keeps its own section and its own evidence.
-export type RoleId = "research" | "country" | "macro" | "financial" | "equity" | "trade" | "foresight" | "policy" | "challenger" | "verifier";
+export type RoleId = "research" | "country" | "macro" | "financial" | "equity" | "trade" | "foresight" | "policy" | "challenger" | "verifier" | "natsec" | "energysec" | "foodsec";
 export type Role = { id: RoleId; en: string; ar: string; lens: string; invoke: { en: string; ar: string }; group: "evidence" | "economy" | "outlook" | "review" };
 export const ROLES: Role[] = [
   { id: "research", group: "evidence", en: "Research synthesis analyst", ar: "محلل تركيب الأبحاث", lens: "UAE and global research comparison and source dependence", invoke: { en: "Any research-based dossier", ar: "أي ملف قائم على الأبحاث" } },
@@ -9,6 +9,9 @@ export const ROLES: Role[] = [
   { id: "financial", group: "economy", en: "Financial conditions analyst", ar: "محلل الأحوال المالية", lens: "banking, credit, rates, liquidity and contagion", invoke: { en: "Material financing or stability questions", ar: "أسئلة تمويل أو استقرار جوهرية" } },
   { id: "equity", group: "economy", en: "Equity and sector analyst", ar: "محلل الأسهم والقطاعات", lens: "filings, valuation, market structure and firm exposures", invoke: { en: "Securities or listed-sector scope", ar: "نطاق أوراق مالية أو قطاع مدرج" } },
   { id: "trade", group: "economy", en: "Trade and investment analyst", ar: "محلل التجارة والاستثمار", lens: "flows, concentration, routes, barriers and commercial feasibility", invoke: { en: "Trade or investment scope", ar: "نطاق تجارة أو استثمار" } },
+  { id: "natsec", group: "outlook", en: "National security analyst", ar: "محلل الأمن الوطني", lens: "threats to UAE people, infrastructure and routes: terrorism, cyber, interference and illicit finance (policy level, public sources)", invoke: { en: "Every package (the UAE's national security is checked on all of them)", ar: "كل حزمة (يُفحص الأمن الوطني الإماراتي في جميعها)" } },
+  { id: "energysec", group: "economy", en: "Energy security analyst", ar: "محلل أمن الطاقة", lens: "energy supply, routes, prices and the transition, and where UAE energy companies can secure supply or invest", invoke: { en: "Every package", ar: "كل حزمة" } },
+  { id: "foodsec", group: "economy", en: "Food security analyst", ar: "محلل الأمن الغذائي", lens: "staples and agri-inputs a country can supply, routes and export-policy risk, and UAE agri-food investment and offtake", invoke: { en: "Every package", ar: "كل حزمة" } },
   { id: "foresight", group: "outlook", en: "Foresight analyst", ar: "محلل الاستشراف", lens: "alternative futures and nonlinear consequences", invoke: { en: "Medium or long horizon, or high uncertainty", ar: "أفق متوسط أو بعيد أو عدم يقين مرتفع" } },
   { id: "policy", group: "outlook", en: "UAE policy analyst", ar: "محلل السياسة الإماراتية", lens: "feasible UAE options, ownership and trade-offs", invoke: { en: "Every decision package", ar: "كل حزمة قرار" } },
   { id: "challenger", group: "review", en: "Independent challenger", ar: "المُحاجِج المستقل", lens: "counterevidence, model limitations and failure modes", invoke: { en: "Every consequential consolidated package", ar: "كل حزمة موحدة ذات أثر" } },
@@ -28,6 +31,9 @@ const RE = {
 export function selectRoles(i: RouteInput): { roles: RoleId[]; why: Partial<Record<RoleId, { en: string; ar: string }>> } {
   const q = i.question; const why: Partial<Record<RoleId, { en: string; ar: string }>> = {}; const on = (id: RoleId, en: string, ar: string) => { why[id] = { en, ar }; };
   on("policy", "Every decision package needs feasible UAE options.", "كل حزمة قرار تحتاج خيارات إماراتية ممكنة.");
+  on("natsec", "The UAE's national security is checked on every package.", "يُفحص الأمن الوطني الإماراتي في كل حزمة.");
+  on("energysec", "Energy security is checked on every package.", "يُفحص أمن الطاقة في كل حزمة.");
+  on("foodsec", "Food security is checked on every package.", "يُفحص الأمن الغذائي في كل حزمة.");
   on("verifier", "All analytical outputs are checked for freshness, support and arithmetic.", "تُفحص كل المخرجات التحليلية من حيث الحداثة والإسناد والحساب.");
   if (i.consequential) on("challenger", "The package is consequential, so an independent challenger is required.", "الحزمة ذات أثر، فيلزم مُحاجِج مستقل.");
   if (i.iso3) on("country", "A country is in scope.", "دولة ضمن النطاق.");

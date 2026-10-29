@@ -61,9 +61,9 @@ export async function POST(req: Request) {
         const A = (id: AgentId) => AGENT_BY.get(id)!;
         // stage 0: the plan
         await run(A("orchestrator")); const plan = parsePlan(out.orchestrator ?? "");
-        // stage 1: the four specialists in parallel, skipping any the plan calls irrelevant
+        // stage 1: the six specialists in parallel, skipping any the plan calls irrelevant
         send({ type: "status", text: "The specialists are working in parallel…" });
-        await Promise.all((["geo", "econ", "energy", "tech"] as const).map((id) => (plan.skip.includes(id) ? Promise.resolve(skipped(A(id), "the plan judged it irrelevant here")) : run(A(id), plan.questions[id]))));
+        await Promise.all((["geo", "econ", "energy", "natsec", "food", "tech"] as const).map((id) => (plan.skip.includes(id) ? Promise.resolve(skipped(A(id), "the plan judged it irrelevant here")) : run(A(id), plan.questions[id]))));
         // stage 2: the UAE analyst and the foresight analyst read the specialists
         await Promise.all([run(A("uae")), run(A("foresight"))]);
         // stage 3: the challenge and the check, only if they still fit under the ceiling with the editor

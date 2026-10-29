@@ -17,7 +17,7 @@ export const maxDuration = 800;
 const MODEL = process.env.DOSSIER_MODEL || "claude-sonnet-5-5";
 const ENV_EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as Effort) : null;
 const CAP = maxRunUsd(process.env.DOSSIER_MAX_RUN_USD); // every call of one run together never spends more than this
-const FINAL_RESERVE = 0.9; // the final writer reads every earlier text and may pay for a cold cache, so the earlier calls never spend the share it needs
+const FINAL_RESERVE = 1.15; // the final writer reads every earlier text and may pay for a cold cache, so the earlier calls never spend the share it needs
 const REV_RESERVE = 0.6; // the two auditors together reserve this share of their worst case: they read one finished text and write little
 const LIKELY = 0.6; // a call uses about this share of its worst-case budget (measured 0.4 to 0.7); the ceiling itself is enforced inside runModelTask, so a call that overruns is stopped, never billed past it
 const MAX_PER_HOUR = Math.max(1, +(process.env.DOSSIER_MAX_PER_HOUR ?? 4) || 4); const MAX_DIRECTIVES_PER_HOUR = Math.max(1, +(process.env.DESK_MAX_DIRECTIVES_PER_HOUR ?? 12) || 12); const TTL = 6 * 3600_000; const MAX_CONCURRENT = 2;

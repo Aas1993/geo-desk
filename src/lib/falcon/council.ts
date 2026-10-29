@@ -1,4 +1,5 @@
 import { SYSTEM } from "../dossier/prompt";
+import { SOURCE_PLAN } from "../sources";
 import { cleanOptions, type DossierOptions } from "../dossier/options";
 import { STATECRAFT } from "../statecraft";
 import { TRADECRAFT } from "../tradecraft";
@@ -7,22 +8,24 @@ import { FORESIGHT, SEARCH_RECIPE } from "../foresight";
 import { IMPACT_AREAS, UAE_MANDATE } from "../uae-advantage";
 
 // The Falcon Council: bounded analytical agents that work from one shared evidence base, in stages, and hand typed text to the next stage.
-//   orchestrator -> [geo, econ, energy, tech] in parallel -> [uae, foresight] in parallel -> [redteam, verifier] in parallel -> editor
+//   orchestrator -> [geo, econ, energy, natsec, food, tech] in parallel -> [uae, foresight] in parallel -> [redteam, verifier] in parallel -> editor
 // Every agent has the same system prompt and the same cached first block (the facts and the request), so the evidence is paid for once and read at the cache price by the rest; only the role instruction after the cache point differs.
 // The council preserves disagreement: the editor must report where the agents differed and which challenges changed a judgment. Agreement between agents is not independent evidence, because they share the facts and the model.
-export type AgentId = "orchestrator" | "geo" | "econ" | "energy" | "tech" | "uae" | "foresight" | "redteam" | "verifier" | "editor";
+export type AgentId = "orchestrator" | "geo" | "econ" | "energy" | "natsec" | "food" | "tech" | "uae" | "foresight" | "redteam" | "verifier" | "editor";
 export type Agent = { id: AgentId; en: string; ar: string; stage: number; searches: number; maxTokens: number; words: number; reads: AgentId[] };
 export const AGENTS: Agent[] = [
   { id: "orchestrator", en: "Chief Intelligence Orchestrator", ar: "منسق الاستخبارات الرئيسي", stage: 0, searches: 0, maxTokens: 1800, words: 350, reads: [] },
-  { id: "geo", en: "Geopolitics, Security and Governance Analyst", ar: "محلل الجيوسياسة والأمن والحوكمة", stage: 1, searches: 2, maxTokens: 3200, words: 450, reads: [] },
-  { id: "econ", en: "Macro, Sovereign Finance and Markets Analyst", ar: "محلل الاقتصاد الكلي والتمويل السيادي والأسواق", stage: 1, searches: 2, maxTokens: 3200, words: 450, reads: [] },
-  { id: "energy", en: "Energy, Resources, Trade and Supply-Chain Analyst", ar: "محلل الطاقة والموارد والتجارة وسلاسل الإمداد", stage: 1, searches: 2, maxTokens: 3200, words: 450, reads: [] },
-  { id: "tech", en: "Technology, Society and Climate Analyst", ar: "محلل التقنية والمجتمع والمناخ", stage: 1, searches: 2, maxTokens: 3200, words: 450, reads: [] },
-  { id: "uae", en: "UAE National Interest and Opportunity Analyst", ar: "محلل المصلحة الوطنية الإماراتية والفرص", stage: 2, searches: 0, maxTokens: 4200, words: 650, reads: ["geo", "econ", "energy", "tech"] },
-  { id: "foresight", en: "Strategic Foresight and Scenario Analyst", ar: "محلل الاستشراف الاستراتيجي والسيناريوهات", stage: 2, searches: 0, maxTokens: 4200, words: 600, reads: ["geo", "econ", "energy", "tech"] },
-  { id: "redteam", en: "Red Team and Competing Hypotheses Analyst", ar: "محلل الفريق الأحمر والفرضيات المتنافسة", stage: 3, searches: 2, maxTokens: 4200, words: 600, reads: ["geo", "econ", "energy", "tech", "uae", "foresight"] },
-  { id: "verifier", en: "Evidence Verification and Source Quality Analyst", ar: "محلل التحقق من الأدلة وجودة المصادر", stage: 3, searches: 2, maxTokens: 4200, words: 500, reads: ["geo", "econ", "energy", "tech", "uae", "foresight"] },
-  { id: "editor", en: "Executive Intelligence Editor", ar: "محرر الاستخبارات التنفيذي", stage: 4, searches: 0, maxTokens: 9000, words: 1700, reads: ["orchestrator", "geo", "econ", "energy", "tech", "uae", "foresight", "redteam", "verifier"] },
+  { id: "geo", en: "Geopolitics, Defence and Governance Analyst", ar: "محلل الجيوسياسة والدفاع والحوكمة", stage: 1, searches: 2, maxTokens: 3000, words: 420, reads: [] },
+  { id: "econ", en: "Macro, Sovereign Finance and Markets Analyst", ar: "محلل الاقتصاد الكلي والتمويل السيادي والأسواق", stage: 1, searches: 1, maxTokens: 3000, words: 420, reads: [] },
+  { id: "energy", en: "Energy Security Analyst", ar: "محلل أمن الطاقة", stage: 1, searches: 1, maxTokens: 2800, words: 400, reads: [] },
+  { id: "natsec", en: "National Security Analyst", ar: "محلل الأمن الوطني", stage: 1, searches: 1, maxTokens: 2800, words: 400, reads: [] },
+  { id: "food", en: "Food Security Analyst", ar: "محلل الأمن الغذائي", stage: 1, searches: 1, maxTokens: 2800, words: 400, reads: [] },
+  { id: "tech", en: "Technology, Society and Climate Analyst", ar: "محلل التقنية والمجتمع والمناخ", stage: 1, searches: 1, maxTokens: 2800, words: 400, reads: [] },
+  { id: "uae", en: "UAE National Interest and Opportunity Analyst", ar: "محلل المصلحة الوطنية الإماراتية والفرص", stage: 2, searches: 0, maxTokens: 4200, words: 650, reads: ["geo", "econ", "energy", "natsec", "food", "tech"] },
+  { id: "foresight", en: "Strategic Foresight and Scenario Analyst", ar: "محلل الاستشراف الاستراتيجي والسيناريوهات", stage: 2, searches: 0, maxTokens: 4200, words: 600, reads: ["geo", "econ", "energy", "natsec", "food", "tech"] },
+  { id: "redteam", en: "Red Team and Competing Hypotheses Analyst", ar: "محلل الفريق الأحمر والفرضيات المتنافسة", stage: 3, searches: 1, maxTokens: 3800, words: 560, reads: ["geo", "econ", "energy", "natsec", "food", "tech", "uae", "foresight"] },
+  { id: "verifier", en: "Evidence Verification and Source Quality Analyst", ar: "محلل التحقق من الأدلة وجودة المصادر", stage: 3, searches: 1, maxTokens: 3800, words: 480, reads: ["geo", "econ", "energy", "natsec", "food", "tech", "uae", "foresight"] },
+  { id: "editor", en: "Executive Intelligence Editor", ar: "محرر الاستخبارات التنفيذي", stage: 4, searches: 0, maxTokens: 9000, words: 1700, reads: ["orchestrator", "geo", "econ", "energy", "natsec", "food", "tech", "uae", "foresight", "redteam", "verifier"] },
 ];
 export const AGENT_BY = new Map(AGENTS.map((a) => [a.id, a]));
 export const COUNCIL_CAP_USD = 1;
@@ -51,6 +54,8 @@ ${EVIDENCE}
 
 ${UAE_MANDATE}
 
+${SOURCE_PLAN}
+
 ${FORESIGHT}
 
 ${STATECRAFT}
@@ -66,10 +71,12 @@ export function councilBase(o: { facts: string; asOf: string; country: string; o
 }
 const SPEC_FORMAT = (n: number) => `Format, at most ${n} words: "## Findings" (four to six numbered findings, each "We judge ..." with its band, confidence and reason, and evidence by fact id or dated link); "## What would change my mind" (two bullets, each an observable); "## UAE implication" (one short paragraph). Put a one-line research note first only if a search failed.`;
 const ROLES: Record<AgentId, (ctx: { questions?: string; prior: string; searches: number; words: number }) => string> = {
-  orchestrator: (c) => `ROLE: Chief Intelligence Orchestrator. Do not search. Plan the council's work from the facts and the question. Output exactly, at most ${c.words} words: "## Plan" with a line "Decision question: ..." (one sentence), then one line per specialist in the form "- agent: geo | questions: <one to three sub-questions this specialist must answer>" and likewise for econ, energy and tech (write "- agent: econ | skip: <why it adds nothing here>" only if a specialist is truly irrelevant); "## Evidence Gaps" (three to five bullets: what the facts do not tell us and which specialist should look); "## Early Hypotheses" (two or three, each with what would refute it).`,
-  geo: (c) => `ROLE: Geopolitics, Security and Governance Analyst (politics and succession by institutional rules only, alignments and great-power competition, conflicts and basing, defence and the military balance, cyber, sanctions exposure, governance and stability). Search budget: ${c.searches} searches. Your sub-questions: ${c.questions || "the most consequential political and security developments and what comes next"}. ${SPEC_FORMAT(c.words)}`,
+  orchestrator: (c) => `ROLE: Chief Intelligence Orchestrator. Do not search. Plan the council's work from the facts and the question. Output exactly, at most ${c.words} words: "## Plan" with a line "Decision question: ..." (one sentence), then one line per specialist in the form "- agent: geo | questions: <one to three sub-questions this specialist must answer>" and likewise for econ, energy, natsec, food and tech (write "- agent: econ | skip: <why it adds nothing here>" only if a specialist is truly irrelevant); "## Evidence Gaps" (three to five bullets: what the facts do not tell us and which specialist should look); "## Early Hypotheses" (two or three, each with what would refute it).`,
+  geo: (c) => `ROLE: Geopolitics, Security and Governance Analyst (politics and succession by institutional rules only, alignments and great-power competition, conflicts and basing, defence and the military balance, sanctions exposure, governance and stability; the UAE's own national security is the National Security Analyst's). Search budget: ${c.searches} searches. Your sub-questions: ${c.questions || "the most consequential political and security developments and what comes next"}. ${SPEC_FORMAT(c.words)}`,
   econ: (c) => `ROLE: Macro, Sovereign Finance and Markets Analyst (growth, inflation, debt and the maturity wall, reserves and the currency, IMF programmes, ratings, capital flows, banking, investment climate, competing sovereign capital). Search budget: ${c.searches} searches. Your sub-questions: ${c.questions || "the fiscal and external position and the financing outlook"}. ${SPEC_FORMAT(c.words)}`,
-  energy: (c) => `ROLE: Energy, Resources, Trade and Supply-Chain Analyst (oil, gas and power, the transition, critical minerals, food and water, ports, routes and chokepoints, trade regimes, dependencies and substitutes). Search budget: ${c.searches} searches. Your sub-questions: ${c.questions || "the energy, trade and supply-chain picture and its chokepoints"}. ${SPEC_FORMAT(c.words)}`,
+  energy: (c) => `ROLE: Energy Security Analyst, a PhD energy economist and security scholar working for the UAE (oil, gas, LNG and power, pipelines, grids and chokepoints, prices, sanctions, the transition and critical minerals; where UAE energy companies can secure supply, invest or sell; threats to the UAE's own export routes and revenues). Search budget: ${c.searches} searches. Your sub-questions: ${c.questions || "the energy balance, routes and prices and what they mean for UAE energy security"}. ${SPEC_FORMAT(c.words)}`,
+  natsec: (c) => `ROLE: National Security Analyst, a PhD security-studies scholar and former senior national-security adviser working for the UAE (terrorism and extremism, cyber and information threats, maritime and border security, foreign interference and espionage on the public record, arms and illicit flows, and the protection of UAE people, infrastructure and routes; policy level, public sources only, nothing operational). Search budget: ${c.searches} searches. Your sub-questions: ${c.questions || "the threats from or through this country that reach the UAE, and the lawful protective options"}. ${SPEC_FORMAT(c.words)}`,
+  food: (c) => `ROLE: Food Security Analyst, a PhD agricultural economist and food-systems scholar working for the UAE (staples and agri-inputs the country can supply, price and export-policy risk, ports, storage and routes, agricultural water, and where UAE agri-food investment and offtake can secure supply without land-rights or reputational harm). Search budget: ${c.searches} searches. Your sub-questions: ${c.questions || "what the country can supply of the UAE's staples, the routes and the shock risks"}. ${SPEC_FORMAT(c.words)}`,
   tech: (c) => `ROLE: Technology, Society and Climate Analyst (digital and AI adoption and technology-bloc choices, cyber capacity, demography, jobs and unrest drivers, health, climate hazards and adaptation). Search budget: ${c.searches} searches. Your sub-questions: ${c.questions || "the technology, social and climate trends that matter"}. ${SPEC_FORMAT(c.words)}`,
   uae: (c) => `ROLE: UAE National Interest and Opportunity Analyst. Do not search. Read the specialists' texts below and decide what they mean for the UAE. Output, at most ${c.words} words: "## UAE Impact" (a table: Interest (one of: ${AREAS}), Effect (exactly one of Opportunity, Exposure, Mixed, Urgent), Size (High, Medium or Low), Horizon, Why; only materially affected areas), "## Opportunities" (a table of four to six: Opportunity, Advantage (economic, diplomatic, security, technology, energy, financial, human capital or strategic positioning), Partners and institutions, Feasibility (High, Medium or Low), Benefit (High, Medium or Low), Constraint), "## Exposures and Costs" (three bullets with the cost to the UAE if each materialises). Test each opportunity for realism and say which you rejected.\n\n${c.prior}`,
   foresight: (c) => `ROLE: Strategic Foresight and Scenario Analyst. Do not search. Read the specialists' texts below. Output, at most ${c.words} words: "## Scenarios" (a table of S1 Baseline, S2 Optimistic, S3 Pessimistic and W Disruptive: Scenario, Weight (percent; the first three sum to 100; W is below ten and outside the sum), What happens, Signposts (three observable), UAE effect), "## Key Uncertainties" (the two axes and why), "## Horizon View" (one line each for 1, 3, 5 and 10 years, with a band and "(range)" where only a range is defensible). Weights are rough judgments, not probabilities.\n\n${c.prior}`,
@@ -85,7 +92,7 @@ export function roleText(a: Agent, o: { questions?: string; prior: Partial<Recor
 /** Reads the orchestrator's plan: the sub-questions per specialist and which specialists to skip. Anything unparseable means every specialist runs with its default questions. */
 export function parsePlan(text: string): { question: string; questions: Partial<Record<AgentId, string>>; skip: AgentId[] } {
   const q: Partial<Record<AgentId, string>> = {}; const skip: AgentId[] = [];
-  for (const l of text.split("\n")) { const m = /agent:\s*(geo|econ|energy|tech)\b\s*\|\s*(questions|skip):\s*(.*)$/i.exec(l.replace(/^[-*\s]+/, "")); if (!m) continue; const id = m[1].toLowerCase() as AgentId; if (m[2].toLowerCase() === "skip") skip.push(id); else q[id] = m[3].trim().slice(0, 400); }
+  for (const l of text.split("\n")) { const m = /agent:\s*(geo|econ|energy|natsec|food|tech)\b\s*\|\s*(questions|skip):\s*(.*)$/i.exec(l.replace(/^[-*\s]+/, "")); if (!m) continue; const id = m[1].toLowerCase() as AgentId; if (m[2].toLowerCase() === "skip") skip.push(id); else q[id] = m[3].trim().slice(0, 400); }
   const dq = /Decision question:\s*(.*)/i.exec(text)?.[1]?.replace(/\*+/g, "").trim() ?? "";
   return { question: dq, questions: q, skip: skip.length >= 4 ? [] : skip };
 }

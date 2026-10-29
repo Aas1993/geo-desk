@@ -53,7 +53,7 @@ assert.ok(!resolveProduct({ kind: "foresight" }, "EGY").invalid && !resolveProdu
   assert.equal(RIGHTS.find((r) => r.id === "comtrade")!.status, "restricted"); assert.equal(RIGHTS.find((r) => r.id === "ransomware")!.status, "restricted");
 
 // ---- the council: a bounded roster with a hard ceiling ----
-assert.equal(AGENTS.length, 10); assert.equal(new Set(AGENTS.map((a) => a.id)).size, 10);
+assert.equal(AGENTS.length, 12); assert.equal(new Set(AGENTS.map((a) => a.id)).size, 12);
 assert.ok(COUNCIL_CAP_USD <= 1, "the council never promises more than the one-dollar ceiling");
 const sum = AGENTS.reduce((a, x) => a + worstCase(x), 0); assert.ok(sum > COUNCIL_CAP_USD, "the pessimistic sum exceeds the ceiling, so the cost guard has real work to do");
 for (const a of AGENTS) { for (const r of a.reads) assert.ok(AGENT_BY.get(r)!.stage < a.stage, `${a.id} only reads agents from earlier stages (${r})`); assert.ok(a.searches <= 2 && a.maxTokens <= 9000, `${a.id} is bounded`); }

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { POWER_GROUPS, deskByCode, type EInit, type Mission1, type Mission2, type PowerEntry } from "@/lib/desk/embassy";
-import { Pill, type Lang } from "../falcon/bits";
+import { Block, Pill, type Lang } from "../falcon/bits";
 import { useTr } from "../case/bits";
 import { BAND_C, Bullets, Drill, Row, word } from "./shared";
 
@@ -9,7 +9,7 @@ type Ask = (text: string, agents?: string[]) => void;
 const GROUP_C: Record<string, string> = { government: "#378ADD", security: "#7F77DD", economy: "#BA7517", private: "#D4537E", community: "#1D9E75", research: "#8a94a6", media: "#C0568C" };
 const LEVEL_C: Record<string, string> = { decisive: "var(--accent)", influential: "var(--ok)", useful: "var(--t2)" };
 const GROUP_L: Record<string, [string, string]> = { government: ["Government and institutions", "الحكومة والمؤسسات"], security: ["Security institutions", "المؤسسات الأمنية"], economy: ["Economic institutions", "المؤسسات الاقتصادية"], private: ["Business and private sector", "الأعمال والقطاع الخاص"], community: ["Community and civil society", "المجتمع والمجتمع المدني"], research: ["Research and universities", "الأبحاث والجامعات"], media: ["Media", "الإعلام"] };
-const HAT_C: Record<string, string> = { E1: "#378ADD", E2: "#BA7517", E3: "#D4537E", E4: "#C0568C", E5: "#7F77DD", E6: "#8a94a6", E7: "#378ADD", E8: "#639922", E9: "#BA7517", E10: "#1D9E75", E11: "#C0568C", E12: "#639922", E13: "#8a94a6", E14: "#7F77DD", E15: "#D4537E", E16: "#BA7517", E17: "#378ADD" };
+const HAT_C: Record<string, string> = { E1: "#378ADD", E2: "#BA7517", E3: "#D4537E", E4: "#C0568C", E5: "#7F77DD", E6: "#8a94a6", E7: "#378ADD", E8: "#639922", E9: "#BA7517", E10: "#1D9E75", E11: "#C0568C", E12: "#639922", E13: "#8a94a6", E14: "#7F77DD", E15: "#D4537E", E16: "#BA7517", E17: "#378ADD", E18: "#639922", E19: "#8a94a6", E20: "#BA7517", E21: "#1D9E75" };
 
 /** Who matters, by group and level. Public roles and organisations only; engagement is open, official and reciprocal. */
 export function PowerView({ L, power, head, onAsk }: { L: Lang; power: PowerEntry[]; head: string[]; onAsk: Ask }) {
@@ -86,4 +86,32 @@ export function CalendarView({ L, cal }: { L: Lang; cal: Mission1["calendar"] })
 export function AskedView({ L, asked, onAsk }: { L: Lang; asked: Mission1["askedOfUs"]; onAsk: Ask }) {
   const t = useTr(L);
   return <div className="space-y-2">{asked.map((a, i) => <Drill key={a.ask + i} L={L} head={a.ask} sub={a.from} onAsk={onAsk} askText={t(`How should the UAE respond to this ask: "${a.ask.slice(0, 140)}"? Options, conditions and a recommendation.`, `كيف ينبغي أن تستجيب الإمارات لهذا الطلب: «${a.ask.slice(0, 140)}»؟ الخيارات والشروط وتوصية.`)}><Row label={t("Our position (proposal)", "موقفنا (مقترح)")} tone="ok">{a.position}</Row><Row label={t("Cost", "الكلفة")}>{a.cost}</Row></Drill>)}</div>;
+}
+
+/** The gaps the embassy should close: trade and investment gaps, the UAE companies that can expand there, the sectors the UAE can support (economic and influence), the companies that could come to the UAE and set up, and the SME programme. Every item names its evidence and a first step; none is a commitment. */
+export function GapsView({ L, m, onAsk }: { L: Lang; m: Mission1; onAsk: Ask }) {
+  const t = useTr(L);
+  return (
+    <div className="space-y-4">
+      <Block title={t("Trade and investment gaps", "فجوات التجارة والاستثمار")} hint={t("Where the UAE and this country trade or invest less than the evidence says they could: what is missing, how big it is (only where evidenced), and what the UAE can do about it.", "حيث تتاجر الإمارات وهذه الدولة أو تستثمر أقل مما تقول الأدلة إنه ممكن: ما الناقص وحجمه (حيث يثبت فقط) وما تستطيع الإمارات فعله.")}>
+        <div className="grid gap-2 lg:grid-cols-2">{m.gaps.map((g, i) => <Drill key={i} L={L} defaultOpen={i < 2} accent={g.kind === "trade" ? "var(--c2)" : "var(--ok)"} head={g.gap} sub={g.opportunity} tags={<><Pill c={g.kind === "trade" ? "var(--c2)" : "var(--ok)"}>{g.kind === "trade" ? t("trade", "تجارة") : t("investment", "استثمار")}</Pill>{g.sector && <Pill c="var(--t2)">{g.sector}</Pill>}{g.desk && <Pill c="var(--t2)">{g.desk}</Pill>}</>} onAsk={onAsk} askText={t(`Close this gap: ${g.gap}. Who acts, with which UAE company, in what order, and what would we measure?`, `سدّ هذه الفجوة: ${g.gap}. من يتحرك ومع أي شركة إماراتية وبأي ترتيب وماذا نقيس؟`)}>
+          <Row label={t("Evidence", "الدليل")}>{g.evidence}</Row><Row label={t("Size", "الحجم")}>{g.size}</Row><Row label={t("What the UAE can do", "ما تستطيع الإمارات فعله")} tone="ok">{g.opportunity}</Row></Drill>)}</div>
+      </Block>
+      <Block title={t("UAE companies that can expand here", "الشركات الإماراتية التي يمكنها التوسع هنا")} hint={t("Named where documented, otherwise a type of vehicle; each with the gap it fills, the local counterpart, the structure and the due diligence first.", "تُسمّى حيث يوجد توثيق وإلا فنوع الجهة؛ ولكل منها الفجوة التي تسدّها والنظير المحلي والهيكل والعناية الواجبة أولًا.")}>
+        <div className="grid gap-2 lg:grid-cols-2">{m.plays.map((p, i) => <Drill key={i} L={L} accent="var(--accent)" head={p.vehicle} sub={p.gap || p.why} tags={<><Pill c={p.kind === "protect" ? "var(--warn)" : "var(--ok)"}>{p.kind === "enter" ? t("enter", "دخول") : p.kind === "expand" ? t("expand", "توسّع") : t("protect", "حماية")}</Pill>{p.sector && <Pill c="var(--c2)">{p.sector}</Pill>}{p.window && <Pill c="var(--t2)">{p.window}</Pill>}</>} onAsk={onAsk} askText={t(`Prepare ${p.vehicle}'s move in ${p.sector}: counterpart, structure, due diligence and the first step.`, `أعدّ خطوة ${p.vehicle} في ${p.sector}: النظير والهيكل والعناية الواجبة وأول خطوة.`)}>
+          <Row label={t("Why", "لماذا")}>{p.why}</Row><Row label={t("Counterpart", "النظير")}>{p.partner}</Row><Row label={t("Structure", "الهيكل")}>{p.structure}</Row><Row label={t("First step", "أول خطوة")}>{p.firstStep}</Row><Bullets label={t("Due diligence first", "العناية الواجبة أولًا")} items={p.dueDiligence} tone="warn" /><Row label={t("Risk", "الخطر")} tone="risk">{p.risk}</Row></Drill>)}</div>
+      </Block>
+      <Block title={t("Sectors the UAE can support here", "القطاعات التي تستطيع الإمارات دعمها هنا")} hint={t("For each sector: what the UAE brings economically, what it earns in standing and access (lawfully and openly), and with which instruments.", "لكل قطاع: ما تقدمه الإمارات اقتصاديًا وما تكسبه من مكانة ونفاذ (بصورة مشروعة ومعلنة) وبأي أدوات.")}>
+        <div className="grid gap-2 lg:grid-cols-2">{m.sectorSupport.map((x, i) => <section key={i} className="rounded-[12px] border border-line bg-bg1 p-3"><h4 className="text-[13px] font-semibold text-t0">{x.sector}</h4><div className="mt-1.5 space-y-1 text-[12px] leading-snug"><Row label={t("Economic", "اقتصاديًا")} tone="ok">{x.economic}</Row><Row label={t("Influence", "النفوذ")}>{x.influence}</Row><Row label={t("Instruments", "الأدوات")}>{x.instruments}</Row><Row label={t("Risk", "الخطر")} tone="risk">{x.risk}</Row><Row label={t("Evidence", "الدليل")}>{x.evidence}</Row></div></section>)}</div>
+      </Block>
+      <Block title={t("Companies that could come to the UAE", "شركات يمكنها القدوم إلى الإمارات")} hint={t("Companies from this country, public and documented, that could set up in the UAE: why the UAE gains, the route (free zone, financial centre, mainland, venture programme) and the due diligence first.", "شركات من هذه الدولة، علنية وموثقة، يمكنها التأسيس في الإمارات: لماذا تكسب الإمارات والمسار (منطقة حرة أو مركز مالي أو بر رئيسي أو برنامج ريادي) والعناية الواجبة أولًا.")}>
+        <div className="grid gap-2 lg:grid-cols-2">{m.inbound.map((c, i) => <Drill key={i} L={L} accent="var(--warn)" head={c.company} sub={c.uaeBenefit} tags={c.sector ? <Pill c="var(--c2)">{c.sector}</Pill> : undefined} onAsk={onAsk} askText={t(`Prepare the case for ${c.company} to set up in the UAE: the route, the incentives we may offer, the due diligence and the first step.`, `أعدّ حالة تأسيس ${c.company} في الإمارات: المسار والحوافز التي يجوز عرضها والعناية الواجبة وأول خطوة.`)}>
+          <Row label={t("Why the UAE gains", "لماذا تكسب الإمارات")}>{c.why}</Row><Row label={t("Route", "المسار")}>{c.route}</Row><Row label={t("First step", "أول خطوة")}>{c.firstStep}</Row><Bullets label={t("Due diligence first", "العناية الواجبة أولًا")} items={c.dueDiligence} tone="warn" /><Row label={t("Source", "المصدر")}>{c.source}</Row></Drill>)}</div>
+      </Block>
+      <Block title={t("SME promotion programme", "برنامج تشجيع المنشآت الصغيرة والمتوسطة")} hint={t("Moves for small and medium enterprises both ways, each through a named public channel and with a measure.", "خطوات للمنشآت الصغيرة والمتوسطة في الاتجاهين، كل منها عبر قناة عامة مسماة وبمقياس.")}>
+        <ul className="grid gap-2 md:grid-cols-2">{m.sme.map((x, i) => <li key={i} className="rounded-[10px] bg-bg2 p-2.5 text-[12px] leading-snug"><Pill c={x.direction === "outbound" ? "var(--ok)" : "var(--warn)"}>{x.direction === "outbound" ? t("UAE SMEs going out", "منشآت إماراتية للخارج") : t("SMEs coming to the UAE", "منشآت قادمة إلى الإمارات")}</Pill> <b className="text-t0">{x.segment}</b><span className="mt-1 block text-t0" dir="auto">{x.idea}</span><span className="mt-0.5 block text-[11px] text-t2">{t("Channel", "القناة")}: {x.channel} · {t("measure", "المقياس")}: {x.measure}</span></li>)}</ul>
+      </Block>
+      <p className="text-[11px] leading-snug text-t2">{t("Candidates and ideas from public, documented sources, each to be checked by the due diligence shown before any introduction or offer. Nothing here is an approval, a commitment or an incentive that has been agreed.", "مرشحون وأفكار من مصادر عامة موثقة، يُفحص كل منها بالعناية الواجبة المبيّنة قبل أي تقديم أو عرض. ولا شيء هنا موافقة أو التزام أو حافز تم الاتفاق عليه.")}</p>
+    </div>
+  );
 }

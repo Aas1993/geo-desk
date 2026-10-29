@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { CaseData } from "@/lib/case/load";
+import { AUDIT_EST_USD } from "@/lib/bird/audit";
 import { INFO, ORDER, STALE_DAYS, estimate, plan, readHeld, runOne, statusOf, type Ev, type Pid } from "@/lib/bird/runner";
 import { Block, Pill, type Lang } from "../falcon/bits";
 import { statusWord, useTr } from "../case/bits";
@@ -16,12 +17,12 @@ export function Complete({ L, iso, name, d, tick, onFinished }: { L: Lang; iso: 
   useEffect(() => () => ac.current?.abort(), [iso]);
   const rows = useMemo(() => ORDER.map((id) => { const h = now ? readHeld(INFO[id].key(iso)) : null; return { id, status: now ? statusOf(h, now) : ("fresh" as const), age: h && now ? Math.round((now - Date.parse(h.at)) / 86_400_000) : null }; }), [now, iso, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const todo = useMemo(() => (now ? plan(iso, now, { refreshStale }).filter((x) => !off.has(x.id)) : []), [now, iso, refreshStale, off, tick]); // eslint-disable-line react-hooks/exhaustive-deps
-  const est = estimate(todo.map((x) => x.id)); const missingN = rows.filter((r) => r.status === "missing").length;
+  const est = todo.length ? Math.round((estimate(todo.map((x) => x.id)) + AUDIT_EST_USD) * 100) / 100 : 0; const missingN = rows.filter((r) => r.status === "missing").length;
   const set = (id: Pid, s: Run, n?: string) => { setSt((x) => ({ ...x, [id]: s })); if (n !== undefined) setNote((x) => ({ ...x, [id]: n })); };
   const onEvent = useCallback((e: Ev) => { if (e.type === "roster") setAgents((e.agents as { id: string; name: string }[]).map((a) => ({ id: a.id, name: a.name, status: "wait" }))); else if (e.type === "agent") setAgents((l) => l.map((a) => (a.id === e.id ? { ...a, status: e.status === "start" ? "run" : (e.status as Agent["status"]) } : a))); else if (e.type === "status") setStatus(String(e.text ?? "")); }, []);
   const start = async () => {
     if (!todo.length || running) return;
-    if (!window.confirm(t(`Run ${todo.length} AI councils for ${name}? Estimated cost about US$${est.toFixed(2)} in total, each run capped at US$1.00. Runs that were already made for this country are served free from cache. Leave this page open until it finishes.`, `تشغيل ${todo.length} مجالس بالذكاء الاصطناعي لـ ${name}؟ الكلفة التقديرية نحو ${est.toFixed(2)} دولار إجمالًا، وكل تشغيل بسقف 1.00 دولار. وما سبق تشغيله لهذه الدولة يُخدَّم مجانًا من الذاكرة. أبقِ هذه الصفحة مفتوحة حتى ينتهي.`))) return;
+    if (!window.confirm(t(`Run ${todo.length} AI councils for ${name}? Estimated cost about US$${est.toFixed(2)} in total (including the three-auditor audit of the bird's eye brief), each run capped at US$1.00. Runs that were already made for this country are served free from cache. Leave this page open until it finishes.`, `تشغيل ${todo.length} مجالس بالذكاء الاصطناعي لـ ${name}؟ الكلفة التقديرية نحو ${est.toFixed(2)} دولار إجمالًا (بما فيها تدقيق المدققين الثلاثة لموجز نظرة الطائر)، وكل تشغيل بسقف 1.00 دولار. وما سبق تشغيله لهذه الدولة يُخدَّم مجانًا من الذاكرة. أبقِ هذه الصفحة مفتوحة حتى ينتهي.`))) return;
     const a = new AbortController(); ac.current = a; setRunning(true); setFatal(""); setSpent(0); setSt(Object.fromEntries(todo.map((x) => [x.id, "queued"]))); setNote({}); let ran = 0; let total = 0;
     for (const x of todo) {
       if (a.signal.aborted) break; set(x.id, "running", ""); setAgents([]); setStatus(""); let tries = 0; let out = await runOne(x.id, iso, lang, d, { refresh: x.status === "stale", signal: a.signal, onEvent });
@@ -34,7 +35,7 @@ export function Complete({ L, iso, name, d, tick, onFinished }: { L: Lang; iso: 
   };
   const stop = () => ac.current?.abort();
   return (
-    <Block title={t("Complete the picture", "أكمل الصورة")} hint={t("Runs every AI council of the platform that has nothing on file for this country (Strategic Council, Architect, Falcon, Machiavellian, Deep Intelligence, embassy intelligence, the Ministry, mission strategy and THE KING), in the order that lets each read the one before, then builds the bird's eye report. You see the list and the estimate first; each run is capped at US$1.00 and the hourly cap pauses it and it resumes by itself.", "يشغّل كل مجلس بالذكاء الاصطناعي في المنصة لا محفوظ له شيء لهذه الدولة (المجلس الاستراتيجي ومهندس فن الحكم والصقر والميكيافيلي والاستخبارات المعمّقة واستخبارات السفارة والوزارة واستراتيجية البعثة والقرار النهائي) بالترتيب الذي يقرأ فيه كل منها ما قبله، ثم يبني تقرير نظرة الطائر. ترى القائمة والتقدير أولًا؛ وكل تشغيل بسقف 1.00 دولار ويوقفه الحد الساعي ثم يستأنف تلقائيًا.")}
+    <Block title={t("Complete the picture", "أكمل الصورة")} hint={t("Runs every AI council of the platform that has nothing on file for this country (Strategic Council, Architect, Falcon, Machiavellian, Deep Intelligence, embassy intelligence, the Ministry, mission strategy and THE KING), in the order that lets each read the one before, then has three independent auditors check the bird's eye brief before building its PDF. You see the list and the estimate first; each run is capped at US$1.00 and the hourly cap pauses it and it resumes by itself.", "يشغّل كل مجلس بالذكاء الاصطناعي في المنصة لا محفوظ له شيء لهذه الدولة (المجلس الاستراتيجي ومهندس فن الحكم والصقر والميكيافيلي والاستخبارات المعمّقة واستخبارات السفارة والوزارة واستراتيجية البعثة والقرار النهائي) بالترتيب الذي يقرأ فيه كل منها ما قبله، ثم يدقق ثلاثة مدققين مستقلين موجز نظرة الطائر قبل بناء ملف PDF. ترى القائمة والتقدير أولًا؛ وكل تشغيل بسقف 1.00 دولار ويوقفه الحد الساعي ثم يستأنف تلقائيًا.")}
       right={<Pill c={missingN === 0 ? "var(--ok)" : "var(--warn)"}>{missingN === 0 ? t("nothing missing", "لا شيء ناقص") : `${missingN} ${t("missing", "ناقص")}`}</Pill>}>
       <ul className="space-y-1.5">{rows.map((r) => { const run = st[r.id]; const inPlan = todo.some((x) => x.id === r.id); return (
         <li key={r.id} className="flex flex-wrap items-center gap-2 rounded-[10px] bg-bg2 p-2 text-[12.5px]">

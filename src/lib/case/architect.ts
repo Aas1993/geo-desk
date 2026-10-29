@@ -147,7 +147,7 @@ export const ARCH_AGENTS: ArchAgent[] = [
   { id: "AR4", stage: 0, en: "Options, stress test and scenarios", ar: "الخيارات واختبار الضغط والسيناريوهات", searches: 1, maxTokens: 6000, words: 1600, parts: "Parts VIII, IX and X" },
   { id: "AR5", stage: 1, en: "Implementation and measurement", ar: "التنفيذ والقياس", searches: 0, maxTokens: 5200, words: 1300, parts: "Parts XI and XII" },
   { id: "EDIT", stage: 2, en: "Architect: deliverables and dashboard", ar: "المهندس: المخرجات واللوحة", searches: 0, maxTokens: 9800, words: 2800, parts: "Part XIII" },
-  ...AUDITORS.map((a): ArchAgent => ({ id: a.id, stage: 3, en: `${a.en}: independent review`, ar: `${a.ar}: مراجعة مستقلة`, searches: a.searches, maxTokens: a.maxTokens, words: 350, parts: a.lens === "statecraft" ? "Deliverable 7a" : "Deliverable 7b" })),
+  ...AUDITORS.map((a): ArchAgent => ({ id: a.id as "revs" | "revr", stage: 3, en: `${a.en}: independent review`, ar: `${a.ar}: مراجعة مستقلة`, searches: a.searches, maxTokens: a.maxTokens, words: 350, parts: a.lens === "statecraft" ? "Deliverable 7a" : "Deliverable 7b" })),
 ];
 export const ARCH_BY = new Map(ARCH_AGENTS.map((a) => [a.id, a]));
 export const ARCH_CAP_USD = 1;

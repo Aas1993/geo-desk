@@ -1,4 +1,5 @@
 "use client";
+import { PdfButton } from "../PdfButton";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Clock, Copy, Printer, Send, Trash2, Zap } from "lucide-react";
 import { PRODUCT_USD, parseDirective, type Agent, type Directive } from "@/lib/desk/core";
@@ -51,12 +52,12 @@ export function Directives({ L, iso, name, product, roster, context, storeKey, p
         <Progress phase={run.phase} status={run.status} tail={run.agents.filter((a) => a.status === "run").length > 1 ? "" : run.tail} searches={run.searches} sources={run.sources} err={run.err} L={L} />
       </Block>
       {answers.length === 0 && run.phase !== "running" && <p className="rounded-[12px] border border-line bg-bg1 p-4 text-[12.5px] text-t1">{t(`No question has been put to ${king ? "the Council" : mofa ? "the Ministry" : "the embassy council"} on ${name} yet. ${king ? "The Chair" : chiefName} will answer here, and every answer stays on this page.`, `لم يُطرح سؤال على ${king ? "المجلس" : mofa ? "الوزارة" : "مجلس السفارة"} بشأن ${name} بعد. وسيجيب ${chiefName} هنا وتبقى كل إجابة في هذه الصفحة.`)}</p>}
-      {answers.map((a) => <AnswerCard key={a.id} L={L} a={a} name={name} roster={roster} chief={chiefName} onFollow={(x) => { setTopic(x); setMode("question"); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} onDelete={() => delAnswer(a.id)} onRecord={onRecord ? () => onRecord(a) : undefined} done={!!recorded?.has(a.id)} />)}
+      {answers.map((a) => <AnswerCard key={a.id} L={L} a={a} iso={iso} desk={king ? "king" : mofa ? "mofa" : "embassy"} name={name} roster={roster} chief={chiefName} onFollow={(x) => { setTopic(x); setMode("question"); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} onDelete={() => delAnswer(a.id)} onRecord={onRecord ? () => onRecord(a) : undefined} done={!!recorded?.has(a.id)} />)}
     </div>
   );
 }
 
-function AnswerCard({ L, a, name, roster, chief, onFollow, onDelete, onRecord, done }: { L: Lang; a: Answer; name: string; roster: Agent[]; chief: string; onFollow: (t: string) => void; onDelete: () => void; onRecord?: () => void; done: boolean }) {
+function AnswerCard({ L, a, iso, desk, name, roster, chief, onFollow, onDelete, onRecord, done }: { L: Lang; a: Answer; iso: string; desk: "king" | "embassy" | "mofa"; name: string; roster: Agent[]; chief: string; onFollow: (t: string) => void; onDelete: () => void; onRecord?: () => void; done: boolean }) {
   const t = useTr(L); const d: Directive | null = a.directive; const [copied, setCopied] = useState(false); const body = a.report.replace(/<directive>[\s\S]*?(?:<\/directive>|$)/g, "").trim();
   const nameOf = (id: string) => { const x = roster.find((r) => r.id === id); return x ? (L === "ar" ? x.ar : x.en) : id; };
   const kind = a.mode === "update" ? t("Update", "مستجدات") : a.mode === "directive" ? t("Directive", "توجيه") : t("Question", "سؤال");
@@ -81,6 +82,7 @@ function AnswerCard({ L, a, name, roster, chief, onFollow, onDelete, onRecord, d
         <div className="mt-3 flex flex-wrap gap-1.5">
           {onRecord && <button type="button" disabled={done} onClick={onRecord} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-accent px-3 text-[12px] font-semibold text-[var(--accent-ink)] disabled:opacity-60"><Send size={13} />{done ? t("Recorded in the decision log", "سُجّل في سجل القرارات") : t("Record in the decision log", "سجّل في سجل القرارات")}</button>}
           <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(body); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Copy size={13} />{copied ? "✓" : t("Copy", "نسخ")}</button>
+          <PdfButton L={L} source={{ kind: "directive", iso, country: name, report: a.report, at: a.at, usd: a.usd, lang: a.lang, idPart: `${desk}-${a.id}`, title: `${desk === "king" ? "THE KING" : desk === "mofa" ? "Ministry" : "Embassy"} · ${a.mode}: ${(a.topic || "").slice(0, 90)}` }} />
           <button type="button" onClick={() => printBriefing(briefingHtml(body, { title: `${a.topic || kind}: ${name}`, rtl: a.lang === "ar", foot: a.at, classification: classification(a.lang) }))} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Printer size={13} />{t("Print", "طباعة")}</button>
           <button type="button" onClick={onDelete} className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] text-t2 hover:text-risk"><Trash2 size={13} />{t("Delete", "حذف")}</button></div>
         <p className="mt-2 text-[11px] leading-snug text-t2">{t("Working analysis of proposals, not reviewed and not adopted policy. Owners are proposed; costs are \"not estimated\" unless evidenced.", "تحليل عمل لمقترحات، غير مُراجَع وليس سياسة معتمدة. المسؤولون مقترحون؛ والتكاليف «غير مقدّرة» ما لم يثبت.")}</p>

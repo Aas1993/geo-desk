@@ -8,7 +8,7 @@ import { ambassadorKey, readProduct, type SavedProduct } from "@/lib/case/saved"
 import { embDigest } from "@/lib/desk/embassy";
 import { useFiled } from "../desk/filed";
 import { briefingHtml, printBriefing, saveBlob } from "@/lib/dossier/export";
-import { downloadPdf } from "@/lib/pdf";
+import { downloadHtmlReport } from "@/lib/reportpdf";
 import { useNow } from "@/lib/use-now";
 import { COST_KEY, type CostEntry } from "../deep/hooks";
 import { Block, Pill, type Lang } from "../falcon/bits";
@@ -36,7 +36,7 @@ export function Reports({ L, d, iso, council, arch, intel, plan, preset, onGo }:
   const toggle = (id: string) => setPick((p) => { const n = new Set(p ?? base); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const miss = rep.missing; const fname = `${d.iso3}-${tpl}-${lang}`;
   const html = (word = false) => briefingHtml(rep.md, { title: `${rep.title}: ${lang === "ar" && d.nameAr ? d.nameAr : d.name}`, rtl: lang === "ar", foot: `Geo Desk · ${d.asOf.slice(0, 10)}`, classification: classification(lang) }, word);
-  const pdf = async () => { setBusy("0%"); try { await downloadPdf(html(), { filename: `${fname}.pdf`, onProgress: (a, b) => setBusy(`${Math.round((a / b) * 100)}%`) }); } finally { setBusy(""); } };
+  const pdf = async () => { setBusy("0%"); try { const at = new Date().toISOString(); await downloadHtmlReport(html(), { id: `case-report:${d.iso3}:${tpl}:${at}`, iso: d.iso3, country: lang === "ar" && d.nameAr ? d.nameAr : d.name, kind: "case-report", title: `${rep.title}: ${lang === "ar" && d.nameAr ? d.nameAr : d.name}`, lang: lang === "ar" ? "ar" : "en", at, usd: null }, `${fname}.pdf`, (a, b) => setBusy(`${Math.round((a / b) * 100)}%`)); } finally { setBusy(""); } };
   const btn = "inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-bg3 px-3 text-[12.5px] text-t1 hover:text-t0 disabled:opacity-50";
   return (
     <div className="space-y-4">

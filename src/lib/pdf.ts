@@ -18,7 +18,7 @@ function quietRow(cv: HTMLCanvasElement, target: number, window: number, forbid:
 }
 
 /** `html` is a complete HTML document (with its own styles). It is shown in a hidden A4-width frame, so its CSS cannot touch the app. */
-export async function downloadPdf(html: string, o: PdfOptions): Promise<void> {
+export async function buildPdf(html: string, o: Pick<PdfOptions, "onProgress">): Promise<Blob> {
   const [{ jsPDF }, { default: html2canvas }] = await Promise.all([import("jspdf"), import("html2canvas")]);
   const frame = document.createElement("iframe"); frame.setAttribute("aria-hidden", "true"); frame.style.cssText = `position:fixed;left:-${PX * 3}px;top:0;width:${PX}px;height:1200px;border:0;pointer-events:none;`; frame.srcdoc = html.replace("</head>", `<style>${BOOST}</style></head>`);
   const loaded = new Promise<void>((res) => { frame.onload = () => res(); }); document.body.appendChild(frame);
@@ -54,6 +54,9 @@ export async function downloadPdf(html: string, o: PdfOptions): Promise<void> {
       const cv = await html2canvas(wrap, { scale: 1.8, backgroundColor: "#ffffff", logging: false, windowWidth: PX }); body.removeChild(wrap); place(cv, forbid, safe, /^H[1-4]$/.test(chunks[i][0].tagName)); o.onProgress?.(i + 1, chunks.length); await new Promise((r) => setTimeout(r, 0));
     }
     for (let p = 1; p <= pages; p++) { pdf.setPage(p); pdf.setFontSize(8); pdf.setTextColor(120); pdf.text(`${p} / ${pages}`, PW / 2, PH - 6, { align: "center" }); }
-    const blob = pdf.output("blob"); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = o.filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60_000); // same download path as the Word and PowerPoint files
+    return pdf.output("blob");
   } finally { document.body.removeChild(frame); }
 }
+/** Saves a finished PDF to the user's disk. The link is revoked a minute later. */
+export function saveBlobAs(blob: Blob, filename: string) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60_000); }
+export async function downloadPdf(html: string, o: PdfOptions): Promise<void> { saveBlobAs(await buildPdf(html, o), o.filename); }

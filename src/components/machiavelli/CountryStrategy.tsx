@@ -1,4 +1,5 @@
 "use client";
+import { PdfButton } from "../PdfButton";
 import { classification } from "@/lib/case/report";
 import { useEffect, useMemo, useState } from "react";
 import { Copy, Download, Printer } from "lucide-react";
@@ -67,7 +68,7 @@ export function CountryStrategy({ L, f, setF, list, by, set, scope }: { L: Lang;
           </Block>
           {s && run.phase !== "running" && (<>
             <div className="flex flex-wrap items-center gap-2"><span className="numt text-[11.5px] text-t1">{c?.flag} {name} · {u.saved} {s.at.slice(0, 16).replace("T", " ")} UTC · {u.spent} {usd(s.usage.usd)} · {s.usage.searches} {L === "ar" ? "بحثًا" : "searches"}{s.cached ? (L === "ar" ? " · من الذاكرة" : " · cached") : ""}</span>
-              <span className="ms-auto flex flex-wrap gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(s.report); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Copy size={13} />{copied ? u.copied : u.copy}</button><button type="button" onClick={() => saveBlob(`${iso}-${mode}-strategy.md`, "text/markdown", s.report)} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Download size={13} />.md</button><button type="button" onClick={() => printBriefing(html())} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Printer size={13} />{u.pdf}</button></span></div>
+              <span className="ms-auto flex flex-wrap gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(s.report); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Copy size={13} />{copied ? u.copied : u.copy}</button><button type="button" onClick={() => saveBlob(`${iso}-${mode}-strategy.md`, "text/markdown", s.report)} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Download size={13} />.md</button><PdfButton L={L} storeKey={iso ? `gd-strat:${iso}:${mode}` : undefined} /><button type="button" onClick={() => printBriefing(html())} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1 hover:text-t0"><Printer size={13} />{u.pdf}</button></span></div>
             <StrategyVisual md={s.report} L={L} iso3={iso} />
           </>)}
         </div>)}

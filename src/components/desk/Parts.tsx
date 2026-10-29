@@ -1,6 +1,7 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import { Copy, Printer, Trash2 } from "lucide-react";
+import { PdfButton } from "../PdfButton";
 import { headlineOf, type Agent } from "@/lib/desk/core";
 import { briefingHtml, printBriefing } from "@/lib/dossier/export";
 import { classification } from "@/lib/case/report";
@@ -32,11 +33,12 @@ export function Sittings({ L, agents }: { L: Lang; agents: AgentLive[] }) {
   return <ul className="mt-3 grid gap-1.5 sm:grid-cols-2" aria-label="Sittings">{agents.map((a) => <li key={a.id} className="flex items-center gap-2 rounded-[10px] bg-bg2 p-2 text-[12px]" style={{ borderInlineStart: `3px solid ${a.status === "done" ? "var(--ok)" : a.status === "run" ? "var(--accent)" : a.status === "error" ? "var(--risk)" : a.status === "skipped" ? "var(--warn)" : "var(--line)"}` }}><span className="min-w-0 flex-1 text-t0" dir="auto">{a.name}</span><span className="numt shrink-0 text-[10.5px] text-t2">{statusWord(L, a.status)}{a.usd != null ? ` · ${usd(a.usd)}` : ""}</span></li>)}</ul>;
 }
 /** What was run, what it cost, and copy, print and clear. */
-export function SavedBar({ L, s, name, title, strip, onClear, partial }: { L: Lang; s: Saved; name: string; title: string; strip: RegExp; onClear: () => void; rtl: boolean; partial?: boolean }) {
+export function SavedBar({ L, s, name, title, strip, onClear, partial, pdfKey }: { L: Lang; s: Saved; name: string; title: string; strip: RegExp; onClear: () => void; rtl: boolean; partial?: boolean; pdfKey?: string }) {
   const t = useTr(L); const [copied, setCopied] = useState(false); const clean = () => s.report.replace(strip, "").trim(); const runLang: Lang = (s.options as { lang?: string } | undefined)?.lang === "ar" ? "ar" : "en";
   return (
     <div className="space-y-2"><div className="flex flex-wrap items-center gap-2"><span className="numt text-[11.5px] text-t1">{name} · {s.at.slice(0, 16).replace("T", " ")} UTC · {s.cached ? t("from cache (no cost)", "من الذاكرة (بلا كلفة)") : `${t("cost", "الكلفة")} ${usd(s.usage.usd)}`} · {s.usage.searches} {t("searches", "بحثًا")} · {s.sources.length} {t("sources", "مصدرًا")}</span>
       <span className="ms-auto flex gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(clean()); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Copy size={13} />{copied ? "✓" : t("Copy", "نسخ")}</button>
+        {pdfKey && <PdfButton L={L} storeKey={pdfKey} />}
         <button type="button" onClick={() => printBriefing(briefingHtml(clean(), { title: `${title}: ${name}`, rtl: runLang === "ar", foot: `${s.model} · ${s.at}`, classification: classification(runLang) }))} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Printer size={13} />{t("Print", "طباعة")}</button>
         <button type="button" onClick={() => { if (window.confirm(t("Remove this saved result from this browser?", "إزالة هذه النتيجة المحفوظة من هذا المتصفح؟"))) onClear(); }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] text-t2 hover:text-risk"><Trash2 size={13} />{t("Remove", "إزالة")}</button></span></div>
       {partial && <PartialNote L={L} />}

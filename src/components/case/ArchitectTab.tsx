@@ -1,4 +1,5 @@
 "use client";
+import { PdfButton } from "../PdfButton";
 import { classification } from "@/lib/case/report";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, Printer } from "lucide-react";
@@ -46,7 +47,7 @@ export function ArchitectTab({ L, d, iso, name, councilReport, onArch }: { L: La
       </Block>
       {s && run.phase !== "running" && <>
         <div className="flex flex-wrap items-center gap-2"><span className="numt text-[11.5px] text-t1">{name} · {s.at.slice(0, 16).replace("T", " ")} UTC · {s.cached ? t("from cache (no cost)", "من الذاكرة (بلا كلفة)") : `${t("cost", "الكلفة")} ${usd(s.usage.usd)}`} · {s.usage.searches} {t("searches", "بحثًا")} · {s.sources.length} {t("sources", "مصدرًا")} · {s.usedCouncil ? t("council read", "قُرئ المجلس") : t("no council", "بلا مجلس")}</span>
-          <span className="ms-auto flex gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(noJson(s.report)); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Copy size={13} />{copied ? "✓" : t("Copy", "نسخ")}</button><button type="button" onClick={() => printBriefing(html())} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Printer size={13} />{t("Print", "طباعة")}</button></span></div>
+          <span className="ms-auto flex gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(noJson(s.report)); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Copy size={13} />{copied ? "✓" : t("Copy", "نسخ")}</button><PdfButton L={L} storeKey={architectKey(iso)} /><button type="button" onClick={() => printBriefing(html())} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Printer size={13} />{t("Print", "طباعة")}</button></span></div>
         <p className="rounded-[10px] border border-warn/40 bg-warn/10 p-2.5 text-[12px] text-t0" role="note">{t("Working analysis of proposals, not reviewed and not adopted UAE policy. Lead institutions are proposed ownership; funding is \"not estimated\" unless the evidence supports a figure. A named person must review it before it counts as a published product.", "تحليل عمل لمقترحات، غير مُراجَع وليس سياسة إماراتية معتمدة. الجهات القائدة ملكية مقترحة؛ والتمويل «غير مقدّر» ما لم يدعم الدليل رقمًا. يجب أن يراجعه شخص مسمّى قبل أن يُحتسب منتجًا منشورًا.")}</p>
         {s.agents && <p className="text-[11px] text-t2">{s.agents.map((a) => `${a.name}: ${statusWord(L, a.status)}${a.usd != null ? ` ${usd(a.usd)}` : ""}${a.note ? ` (${a.note})` : ""}`).join(" · ")}</p>}
       </>}

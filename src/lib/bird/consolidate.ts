@@ -26,7 +26,9 @@ export type Bird = {
 const F = (tab: string, href: string): From => ({ tab, href });
 const FROM = { king: F("THE KING", "/king"), mofa: F("The Ministry", "/mofa"), intel: F("The Ambassador: intelligence", "/ambassador"), plan: F("The Ambassador: strategy", "/ambassador"), arch: F("Case File: Architect", "/case"), council: F("Case File: Strategic Council", "/case"), falcon: F("Falcon Eye", "/falcon"), deep: F("Deep Intelligence", "/deep"), mach: F("Machiavellian", "/machiavelli"), case: F("Case File", "/case") };
 const cut = (t: string, n: number) => { const x = t.replace(/\s+/g, " ").trim(); return x.length > n ? `${x.slice(0, x.lastIndexOf(" ", n) > n * 0.6 ? x.lastIndexOf(" ", n) : n)}…` : x; };
-const firstPara = (md: string, n = 320) => { const body = md.replace(/<(\w+)>[\s\S]*?(?:<\/\1>|$)/g, ""); for (const l of body.split("\n")) { const s = l.replace(/^[#>*\-\s]+/, "").replace(/\*\*/g, "").trim(); if (s.length > 60 && !s.startsWith("|")) return cut(s, n); } return ""; };
+/** A header line such as "Prepared for: … | As of: … | Newest source: …" says who and when, not what the council found. */
+const META = /^(prepared for|prepared by|as of|date|evidence cutoff)\b/i;
+const firstPara = (md: string, n = 320) => { const body = md.replace(/<(\w+)>[\s\S]*?(?:<\/\1>|$)/g, ""); for (const l of body.split("\n")) { const s = l.replace(/^[#>*\-\s]+/, "").replace(/\*\*/g, "").trim(); if (s.length > 60 && !s.startsWith("|") && !META.test(s) && (s.match(/ \| /g) ?? []).length < 2) return cut(s, n); } return ""; };
 const days = (at: string, now: number) => Math.max(0, Math.round((now - Date.parse(at)) / 86_400_000));
 const POS: Record<string, B> = { deepen: { en: "deepen", ar: "تعميق" }, staged: { en: "staged", ar: "على مراحل" }, hedge: { en: "hedge", ar: "تحوّط" }, hold: { en: "hold", ar: "ترقّب" } };
 const grade = (kind: Quality["kind"], p: Prod): Quality | null => (p ? assess(kind, p.report, p.sources, p.lang) : null);

@@ -63,13 +63,14 @@ body { background-image: radial-gradient(1200px 600px at 70% -10%, rgba(61,220,2
 @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @keyframes ticker-rtl { from { transform: translateX(0); } to { transform: translateX(50%); } }
 @keyframes shimmer { 0% { opacity: .45 } 50% { opacity: .9 } 100% { opacity: .45 } }
+.live-ring { animation: pulse-ring 1.4s ease-out infinite; }
 .anim-slide { animation: slide-in .18s ease-out; }
 .anim-rise { animation: rise .18s ease-out; }
 .skeleton { background: var(--bg-2); border-radius: 6px; animation: shimmer 1.4s infinite; }
 .ticker-track { animation: ticker 480s linear infinite; }
 [dir="rtl"] .ticker-track { animation-name: ticker-rtl; }
 .ticker-track:hover { animation-play-state: paused; }
-@media (prefers-reduced-motion: reduce) { .anim-slide, .anim-rise, .skeleton { animation: none; } .ticker-track { animation-duration: 0s; } }
+@media (prefers-reduced-motion: reduce) { .anim-slide, .anim-rise, .skeleton, .live-ring { animation: none; } .ticker-track { animation-duration: 0s; } }
 
 .maplibregl-ctrl-attrib { background: var(--panel) !important; color: var(--t2) !important; font-size: 10px; }
 .maplibregl-ctrl-attrib a { color: var(--t1) !important; }

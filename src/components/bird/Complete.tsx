@@ -1,18 +1,19 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { CaseData } from "@/lib/case/load";
 import { AUDIT_EST_USD } from "@/lib/bird/audit";
-import { BATCH_EST, INFO, ORDER, STALE_DAYS, WAVES, estimate, plan, readHeld, runOne, statusOf, type Ev, type Pid } from "@/lib/bird/runner";
+import { BATCH_EST, DEPS, INFO, ORDER, STALE_DAYS, estimate, plan, readHeld, runDag, runOne, statusOf, type Ev, type Pid } from "@/lib/bird/runner";
 import { Block, Pill, type Lang } from "../falcon/bits";
 import { statusWord, useTr } from "../case/bits";
+import { liveEnd, liveEvent, liveStart, type Live } from "@/lib/bird/live";
+import { LiveDesk } from "./LiveDesk";
 
 type Run = "queued" | "running" | "waiting" | "done" | "failed" | "skipped";
 const sleep = (ms: number, s: AbortSignal) => new Promise<void>((res) => { const t = setTimeout(res, ms); s.addEventListener("abort", () => { clearTimeout(t); res(); }, { once: true }); });
-type Agent = { id: string; name: string; status: "wait" | "run" | "done" | "skipped" | "error" };
 /** COMPLETE THE PICTURE: runs every AI council that has no product for this country, in the order that lets each read the one before, then builds the bird's eye report. One explicit click after the list and the estimate; each run has its own US$1.00 ceiling; the hourly cap pauses it and it resumes by itself. */
 export function Complete({ L, iso, name, d, tick, onFinished }: { L: Lang; iso: string; name: string; d: CaseData | null; tick: number; onFinished: (ran: number) => void }) {
-  const t = useTr(L); const lang = L === "ar" ? "ar" : "en"; const [refreshStale, setRefreshStale] = useState(false); const [batch, setBatch] = useState(false); const [off, setOff] = useState<Set<Pid>>(new Set()); const [running, setRunning] = useState(false); const [st, setSt] = useState<Partial<Record<Pid, Run>>>({}); const [note, setNote] = useState<Partial<Record<Pid, string>>>({}); const [agents, setAgents] = useState<Agent[]>([]); const [status, setStatus] = useState(""); const [spent, setSpent] = useState(0); const [fatal, setFatal] = useState(""); const ac = useRef<AbortController | null>(null); const [now, setNow] = useState(0);
+  const t = useTr(L); const lang = L === "ar" ? "ar" : "en"; const [refreshStale, setRefreshStale] = useState(false); const [batch, setBatch] = useState(false); const [off, setOff] = useState<Set<Pid>>(new Set()); const [running, setRunning] = useState(false); const [st, setSt] = useState<Partial<Record<Pid, Run>>>({}); const [note, setNote] = useState<Partial<Record<Pid, string>>>({}); const [live, setLive] = useState<Live>({}); const [startedAt, setStartedAt] = useState(0); const [spent, setSpent] = useState(0); const [fatal, setFatal] = useState(""); const ac = useRef<AbortController | null>(null); const [now, setNow] = useState(0);
   useEffect(() => { const k = setTimeout(() => setNow(Date.now()), 0); return () => clearTimeout(k); }, [tick, iso, running]);
   useEffect(() => () => ac.current?.abort(), [iso]);
   const rows = useMemo(() => ORDER.map((id) => { const h = now ? readHeld(INFO[id].key(iso)) : null; return { id, status: now ? statusOf(h, now) : ("fresh" as const), age: h && now ? Math.round((now - Date.parse(h.at)) / 86_400_000) : null }; }), [now, iso, tick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -22,17 +23,17 @@ export function Complete({ L, iso, name, d, tick, onFinished }: { L: Lang; iso: 
   const start = async () => {
     if (!todo.length || running) return;
     if (!window.confirm(t(`Run ${todo.length} AI councils for ${name}? Estimated cost about US$${est.toFixed(2)} in total (including the three-auditor audit of the bird's eye brief), each run capped at US$1.00. Runs that were already made for this country are served free from cache. Leave this page open until it finishes${batch ? " (batch mode can take an hour or more)" : ""}.`, `تشغيل ${todo.length} مجالس بالذكاء الاصطناعي لـ ${name}؟ الكلفة التقديرية نحو ${est.toFixed(2)} دولار إجمالًا (بما فيها تدقيق المدققين الثلاثة لموجز نظرة الطائر)، وكل تشغيل بسقف 1.00 دولار. وما سبق تشغيله لهذه الدولة يُخدَّم مجانًا من الذاكرة. أبقِ هذه الصفحة مفتوحة حتى ينتهي.`))) return;
-    const a = new AbortController(); ac.current = a; setRunning(true); setFatal(""); setSpent(0); setSt(Object.fromEntries(todo.map((x) => [x.id, "queued"]))); setNote({}); let ran = 0; let total = 0;
+    const a = new AbortController(); ac.current = a; setRunning(true); setFatal(""); setSpent(0); setLive({}); setStartedAt(Date.now()); setSt(Object.fromEntries(todo.map((x) => [x.id, "queued"]))); setNote({}); let ran = 0; let total = 0;
     const runPid = async (x: { id: Pid; status: string }) => {
-      if (a.signal.aborted) return; set(x.id, "running", ""); const ev = (e: Ev) => { if (e.type === "status") setNote((n) => ({ ...n, [x.id]: String(e.text ?? "") })); }; // several councils run at once, so each shows its own status line
+      if (a.signal.aborted) return; set(x.id, "running", ""); setLive((l) => liveStart(l, x.id, Date.now())); const ev = (e: Ev) => { if (e.type === "status") setNote((n) => ({ ...n, [x.id]: String(e.text ?? "") })); else setLive((l) => liveEvent(l, x.id, e, Date.now())); }; // several councils run at once, so each shows its own status line
       let tries = 0; const go = () => runOne(x.id, iso, lang, d, { refresh: x.status === "stale", signal: a.signal, onEvent: ev, batch }); let out = await go();
       while (!out.ok && !a.signal.aborted && (out.error === "limit" || out.error === "busy") && tries < 400) { tries++; set(x.id, "waiting", out.error === "limit" ? t("Hourly limit of full sittings reached: waiting, it resumes by itself while this page stays open.", "بلغ الحد الساعي للجلسات الكاملة: انتظار، ويستأنف تلقائيًا ما دامت هذه الصفحة مفتوحة.") : t("Another briefing is being written: waiting.", "يُكتب موجز آخر: انتظار.")); await sleep(out.error === "limit" ? 60_000 : 20_000, a.signal); if (a.signal.aborted) break; set(x.id, "running", ""); out = await go(); }
-      if (a.signal.aborted) { set(x.id, "skipped", t("Stopped.", "أُوقف.")); return; }
+      setLive((l) => liveEnd(l, x.id, Date.now())); if (a.signal.aborted) { set(x.id, "skipped", t("Stopped.", "أُوقف.")); return; }
       if (out.ok) { ran++; total += out.usd ?? 0; setSpent(total); set(x.id, "done", out.cached ? t("from cache, free", "من الذاكرة بلا كلفة") : out.usd != null ? `US$${out.usd.toFixed(2)}` : ""); }
       else { set(x.id, "failed", out.message); if (["no_credits", "no_credentials", "disabled"].includes(out.error)) { setFatal(out.message); a.abort(); } }
     };
-    for (const w of WAVES) { const ws = todo.filter((x) => w.includes(x.id)); if (ws.length && !a.signal.aborted) await Promise.all(ws.map(runPid)); } // the independent councils run together in both modes; a council that reads another waits for it
-    setRunning(false); setAgents([]); setStatus(""); onFinished(ran);
+    await runDag(todo.map((x) => x.id), (id) => runPid(todo.find((x) => x.id === id)!), () => a.signal.aborted); // each council starts when the ones it reads are done; the independent ones run together
+    setRunning(false); onFinished(ran);
   };
   const stop = () => ac.current?.abort();
   return (
@@ -51,7 +52,7 @@ export function Complete({ L, iso, name, d, tick, onFinished }: { L: Lang; iso: 
         {!running ? <button type="button" onClick={start} disabled={!todo.length} className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-5 text-[13px] font-semibold text-[var(--accent-ink)] disabled:opacity-50">{todo.length ? t(`Run ${todo.length} councils (about US$${est.toFixed(2)})`, `شغّل ${todo.length} مجالس (نحو ${est.toFixed(2)} دولار)`) : t("Everything is on file", "كل شيء محفوظ")}</button> : <button type="button" onClick={stop} className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-bg3 px-5 text-[13px] font-semibold text-t0">{t("Stop after this call", "أوقف بعد هذا الاستدعاء")}</button>}
         {(running || spent > 0) && <span className="numt text-[12px] text-t1">{t("spent so far", "المصروف حتى الآن")} US${spent.toFixed(2)}</span>}</div>
       {running && <p className="mt-2 text-[11.5px] leading-snug text-warn">{t("Stay on this page while the councils run: leaving it cancels the run in progress. What is finished stays saved.", "ابقَ في هذه الصفحة أثناء عمل المجالس: مغادرتها تلغي التشغيل الجاري. وما انتهى يبقى محفوظًا.")}</p>}
-      {running && agents.length > 0 && <div className="mt-2"><p className="text-[11.5px] text-t1">{status}</p><ul className="mt-1.5 flex flex-wrap gap-1.5" aria-label={t("Agents", "الوكلاء")}>{agents.map((a) => <li key={a.id} className="rounded-full px-2.5 py-0.5 text-[11px]" style={{ background: "var(--bg3)", color: "var(--t0)", border: `1px solid ${a.status === "done" ? "var(--ok)" : a.status === "run" ? "var(--accent)" : a.status === "error" ? "var(--risk)" : a.status === "skipped" ? "var(--warn)" : "var(--line)"}` }} dir="auto">{a.name}</li>)}</ul></div>}
+      {(running || Object.keys(live).length > 0) && <LiveDesk L={L} live={live} running={running} startedAt={startedAt} queued={running ? todo.filter((x) => st[x.id] === "queued" && !live[x.id]).map((x) => ({ id: x.id, waitsFor: DEPS[x.id].filter((d) => todo.some((y) => y.id === d) && st[d] !== "done" && st[d] !== "failed" && st[d] !== "skipped") })).filter((q) => q.waitsFor.length > 0) : []} names={Object.fromEntries(ORDER.map((id) => [id, L === "ar" ? INFO[id].ar : INFO[id].en]))} />}
       {fatal && <p role="alert" className="mt-2 rounded-[10px] border border-risk/40 bg-risk/10 p-2.5 text-[12px] text-t0">{fatal}</p>}
     </Block>
   );

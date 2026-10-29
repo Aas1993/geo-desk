@@ -35,8 +35,13 @@ export function plan(iso: string, now: number, o: { refreshStale: boolean }): { 
 /** What the bundle is expected to cost. The batch transport bills tokens at half price and its hour-long cache is shared by the calls of a bundle: the councils are expected to cost about 60% of their streamed cost (to be confirmed by a measured run). */
 export const BATCH_EST = 0.6;
 export const estimate = (ids: Pid[], batch = false) => Math.round(ids.reduce((a, id) => a + INFO[id].est * (batch ? BATCH_EST : 1), 0) * 100) / 100;
-/** In batch mode the councils that do not read each other run at the same time, in these waves; otherwise they run one after another in ORDER. */
-export const WAVES: Pid[][] = [["council", "falcon", "mach", "deep", "intel"], ["architect", "mofa"], ["plan"], ["king"]];
+/** What each council reads from the others (see request() and src/lib/desk/context.ts): a council starts the moment the ones it reads have finished, and not before, so each sees exactly what the one-after-another order gave it, while the independent councils never wait for anyone. */
+export const DEPS: Record<Pid, Pid[]> = { council: [], falcon: [], mach: [], deep: [], intel: ["council"], architect: ["council"], mofa: ["council", "intel"], plan: ["council", "intel", "mofa"], king: ["council", "intel", "plan"] };
+/** Runs the ids so that each starts when the ids it reads (those that are in this run) have finished; the others start at once. */
+export async function runDag(ids: Pid[], run: (id: Pid) => Promise<void>, aborted: () => boolean = () => false): Promise<void> {
+  const p = new Map<Pid, Promise<void>>(); const go = (id: Pid): Promise<void> => { let q = p.get(id); if (!q) { q = Promise.all(DEPS[id].filter((d) => ids.includes(d)).map(go)).then(() => (aborted() ? undefined : run(id))); p.set(id, q); } return q; };
+  await Promise.all(ids.map(go));
+}
 
 type Req = { endpoint: string; body: Record<string, unknown>; extra?: Record<string, unknown> };
 const rep = (iso: string, id: Pid) => readHeld(INFO[id].key(iso))?.report ?? null;

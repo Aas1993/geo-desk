@@ -7,12 +7,15 @@ import { BATCH_FACTOR } from "./cost";
 // the store lives on globalThis: the route bundle and the library bundle of a development server can load this module twice, and the switch must be the same object in both
 const G = globalThis as unknown as { __gdBatchALS?: AsyncLocalStorage<boolean> }; const als = (G.__gdBatchALS ??= new AsyncLocalStorage<boolean>());
 export const inBatchMode = () => als.getStore() === true;
+/** Complete the picture sends the header x-geo-bundle: 1 with every council of the bundle (in either mode): the user has seen the estimate and confirmed it, so the bundle may run more briefings per hour and at once than a single page may. */
+const bundleAls = ((G as { __gdBundleALS?: AsyncLocalStorage<boolean> }).__gdBundleALS ??= new AsyncLocalStorage<boolean>());
+export const inBundle = () => bundleAls.getStore() === true;
 /** Wraps a route handler: a request that carries the header x-geo-batch: 1 runs all of its model calls through the batch transport. */
-export function withBatch(handler: (req: Request) => Promise<Response>): (req: Request) => Promise<Response> { return (req) => { if (req.headers.get("x-geo-batch") !== "1") return handler(req); console.warn("[batch] a request is running its model calls through the batch transport"); return als.run(true, () => handler(req)); }; }
+export function withBatch(handler: (req: Request) => Promise<Response>): (req: Request) => Promise<Response> { return (req) => { const batch = req.headers.get("x-geo-batch") === "1"; const bundle = batch || req.headers.get("x-geo-bundle") === "1"; if (!bundle) return handler(req); if (batch) console.warn("[batch] a request is running its model calls through the batch transport"); const inner = () => bundleAls.run(true, () => handler(req)); return batch ? als.run(true, inner) : inner(); }; }
 const BATCH_PER_HOUR = Math.max(1, +(process.env.DOSSIER_BATCH_MAX_PER_HOUR ?? 12) || 12); const BATCH_CONCURRENT = Math.max(1, +(process.env.DOSSIER_BATCH_MAX_CONCURRENT ?? 6) || 6);
 /** The hourly and concurrent limits of full sittings. A batch run mostly waits and costs about 40% less, and it is only started by the explicit "Complete the picture" click, so its limits are higher (DOSSIER_BATCH_MAX_PER_HOUR, DOSSIER_BATCH_MAX_CONCURRENT); every run still keeps its own US$1.00 ceiling. */
-export const hourlyCap = (normal: number) => (inBatchMode() ? Math.max(normal, BATCH_PER_HOUR) : normal);
-export const concurrentCap = (normal: number) => (inBatchMode() ? Math.max(normal, BATCH_CONCURRENT) : normal);
+export const hourlyCap = (normal: number) => (inBundle() ? Math.max(normal, BATCH_PER_HOUR) : normal);
+export const concurrentCap = (normal: number) => (inBundle() ? Math.max(normal, BATCH_CONCURRENT) : normal);
 export { BATCH_FACTOR }; // the token price of a batch request relative to the normal price (web searches are billed at the same price); defined beside runUsd so no stale module copy can leave it undefined
 
 type Msg = Anthropic.Beta.BetaMessage; type Params = Anthropic.Beta.Messages.BatchCreateParams["requests"][number]["params"];

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { concurrentCap, hourlyCap, withBatch, inBatchMode } from "@/lib/dossier/batch";
 import { AUDITORS, SUBJECTS, reviewTail } from "@/lib/review/pair";
 import { pairReserve, runAuditors } from "@/lib/review/run";
 import { renderFacts } from "@/lib/ask/facts";
@@ -22,7 +23,7 @@ const g = globalThis as unknown as { __gdDossier?: { cache: Map<string, unknown>
 const store = (g.__gdDossier ??= { cache: new Map(), running: new Set<string>(), runs: [] as number[] }); const cache = (g.__gdSCouncil ??= new Map());
 
 /** The Strategy Council: nineteen seats in four specialist runs, the Independent Challenger and the Evidence Verifier in parallel, then the Chair. The scope guard runs first, so a prohibited request costs nothing. */
-export async function POST(req: Request) {
+export const POST = withBatch(async function POST(req: Request) {
   if (process.env.DOSSIER_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const bad = rejectCrossSite(req); if (bad) return bad;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>; const iso3 = String(body.iso3 ?? "").toUpperCase(); if (!/^[A-Z]{3}$/.test(iso3) || iso3 === "ARE") return Response.json({ error: "bad_request" }, { status: 400 });
@@ -35,8 +36,8 @@ export async function POST(req: Request) {
       const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
       if (store.running.has(key)) { send({ type: "error", error: "busy", message: "This council is already sitting. Try again in a minute." }); return finish(); }
       store.runs = store.runs.filter((t) => Date.now() - t < 3600_000);
-      if (store.runs.length >= MAX_PER_HOUR) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
-      if (store.running.size >= MAX_CONCURRENT) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
+      if (store.runs.length >= hourlyCap(MAX_PER_HOUR)) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
+      if (store.running.size >= concurrentCap(MAX_CONCURRENT)) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
       const slot = Date.now(); store.runs.push(slot); store.running.add(key); const refund = () => { const i = store.runs.indexOf(slot); if (i >= 0) store.runs.splice(i, 1); };
       const ac = new AbortController(); req.signal.addEventListener("abort", () => ac.abort());
       try {
@@ -62,10 +63,11 @@ export async function POST(req: Request) {
         const skipped = (a: SAgent, why: string) => { results.push({ id: a.id, name: nameOf(a), text: "", usd: 0, searches: 0, failed: 0, status: "skipped", note: why }); send({ type: "agent", id: a.id, status: "skipped", message: why }); };
         const A = (id: SAgentId) => SAGENT_BY.get(id)!;
         // the first group runs alone so that the shared evidence is cached before the others read it: three parallel starts would each pay to write the same prefix
+        if (!inBatchMode()) { send({ type: "status", text: "The seat groups are reading the shared evidence together…" }); await Promise.all([A("g-perspectives"), ...SAGENTS.filter((a) => a.stage === 0 && a.id !== "g-perspectives")].map(run)); } else {
         send({ type: "status", text: "The first seat group is reading the evidence and warming the shared cache…" });
         await run(A("g-perspectives"));
         send({ type: "status", text: "The other seat groups are working in parallel…" });
-        await Promise.all(SAGENTS.filter((a) => a.stage === 0 && a.id !== "g-perspectives").map(run));
+        await Promise.all(SAGENTS.filter((a) => a.stage === 0 && a.id !== "g-perspectives").map(run)); }
         const room = CAP - spent - sWorstCase(A("chair")) - pairReserve(); const both = sWorstCase(A("challenger")) + sWorstCase(A("verifier"));
         if (room >= both) await Promise.all([run(A("challenger")), run(A("verifier"))]); else if (room >= sWorstCase(A("challenger"))) { await run(A("challenger")); skipped(A("verifier"), "would not fit under the cost ceiling"); } else { skipped(A("challenger"), "would not fit under the cost ceiling"); skipped(A("verifier"), "would not fit under the cost ceiling"); }
         if (CAP - spent >= sWorstCase(A("chair")) * 0.7) await run(A("chair")); else skipped(A("chair"), "no money left under the cost ceiling");
@@ -84,4 +86,4 @@ export async function POST(req: Request) {
     },
   });
   return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store, no-transform", Connection: "keep-alive" } });
-}
+});

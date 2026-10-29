@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { concurrentCap, hourlyCap, withBatch, inBatchMode } from "@/lib/dossier/batch";
 import { AUDITORS, SUBJECTS, reviewTail } from "@/lib/review/pair";
 import { pairReserve, runAuditors } from "@/lib/review/run";
 import { renderFacts } from "@/lib/ask/facts";
@@ -25,7 +26,7 @@ const g = globalThis as unknown as { __gdDossier?: { cache: Map<string, unknown>
 const store = (g.__gdDossier ??= { cache: new Map(), running: new Set<string>(), runs: [] as number[] }); const cache = (g.__gdDCouncil ??= new Map());
 
 /** The Deep Intelligence analyst team: the roles the routing rule selects (in at most three specialist runs), the independent challenger and the verifier in parallel, then the chair. The refusal guard runs first, so a prohibited request costs nothing. */
-export async function POST(req: Request) {
+export const POST = withBatch(async function POST(req: Request) {
   if (process.env.DOSSIER_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const bad = rejectCrossSite(req); if (bad) return bad;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>; const raw = String(body.iso3 ?? "ARE").toUpperCase(); if (!/^[A-Z]{3}$/.test(raw)) return Response.json({ error: "bad_request" }, { status: 400 });
@@ -46,8 +47,8 @@ export async function POST(req: Request) {
         const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
         if (store.running.has(key)) { send({ type: "error", error: "busy", message: "This team is already sitting. Try again in a minute." }); return finish(); }
         store.runs = store.runs.filter((t) => Date.now() - t < 3600_000);
-        if (store.runs.length >= MAX_PER_HOUR) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
-        if (store.running.size >= MAX_CONCURRENT) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
+        if (store.runs.length >= hourlyCap(MAX_PER_HOUR)) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
+        if (store.running.size >= concurrentCap(MAX_CONCURRENT)) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
         slot = Date.now(); store.runs.push(slot); store.running.add(key); refund = () => { const i = store.runs.indexOf(slot); if (i >= 0) store.runs.splice(i, 1); };
         const ac = new AbortController(); req.signal.addEventListener("abort", () => ac.abort());
         const gathered = deepFacts(snap, pubs, run); if (gathered.facts.length < 8) { refund(); send({ type: "error", error: "thin", message: "Not enough data on this yet." }); return finish(); }
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
         const skipped = (a: DAgent, why: string) => { results.push({ id: a.id, name: nameOf(a), text: "", usd: 0, searches: 0, failed: 0, status: "skipped", note: why }); send({ type: "agent", id: a.id, status: "skipped", message: why }); };
         const A = (id: DAgentId) => DAGENT_BY.get(id)!; const stage0 = team.filter((a) => a.stage === 0);
         // the first specialist run goes alone so the shared evidence is cached before the others read it: parallel starts would each pay to write the same prefix
-        if (stage0.length) { send({ type: "status", text: "The first analysts are reading the evidence and warming the shared cache…" }); await run1(stage0[0]); if (stage0.length > 1) { send({ type: "status", text: "The other analysts are working in parallel…" }); await Promise.all(stage0.slice(1).map(run1)); } }
+        if (stage0.length && !inBatchMode()) { send({ type: "status", text: "The analysts are reading the shared evidence together…" }); await Promise.all(stage0.map(run1)); } else if (stage0.length) { send({ type: "status", text: "The first analysts are reading the evidence and warming the shared cache…" }); await run1(stage0[0]); if (stage0.length > 1) { send({ type: "status", text: "The other analysts are working in parallel…" }); await Promise.all(stage0.slice(1).map(run1)); } }
         const hasCh = plan.includes("challenger"); const hasChair = plan.includes("chair"); const room = CAP - spent - (hasChair ? dWorstCase(A("chair")) : 0) - pairReserve(); const both = (hasCh ? dWorstCase(A("challenger")) : 0) + dWorstCase(A("verifier"));
         if (room >= both) await Promise.all([...(hasCh ? [run1(A("challenger"))] : []), run1(A("verifier"))]);
         else { if (hasCh && room >= dWorstCase(A("challenger"))) { await run1(A("challenger")); skipped(A("verifier"), "would not fit under the cost ceiling"); } else { if (hasCh) skipped(A("challenger"), "would not fit under the cost ceiling"); if (room >= dWorstCase(A("verifier"))) await run1(A("verifier")); else skipped(A("verifier"), "would not fit under the cost ceiling"); } }
@@ -90,4 +91,4 @@ export async function POST(req: Request) {
     },
   });
   return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store, no-transform", Connection: "keep-alive" } });
-}
+});

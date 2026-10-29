@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { concurrentCap, hourlyCap, withBatch } from "@/lib/dossier/batch";
 import { AUDITORS, SUBJECTS, reviewTail } from "@/lib/review/pair";
 import { pairReserve, runAuditors } from "@/lib/review/run";
 import { foresightDossierFacts } from "@/lib/dossier/facts";
@@ -21,7 +22,7 @@ type Done = { report: string; agents: AgentOut[]; sources: Source[]; tiles: unkn
 const g = globalThis as unknown as { __gdDossier?: { cache: Map<string, unknown>; running: Set<string>; runs: number[] }; __gdCouncil?: Map<string, Done> };
 const store = (g.__gdDossier ??= { cache: new Map(), running: new Set<string>(), runs: [] as number[] }); const cache = (g.__gdCouncil ??= new Map());
 
-export async function POST(req: Request) {
+export const POST = withBatch(async function POST(req: Request) {
   if (process.env.DOSSIER_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const bad = rejectCrossSite(req); if (bad) return bad;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>; const iso3 = String(body.iso3 ?? "").toUpperCase(); if (!/^[A-Z]{3}$/.test(iso3) || iso3 === "ARE") return Response.json({ error: "bad_request" }, { status: 400 });
@@ -32,8 +33,8 @@ export async function POST(req: Request) {
       const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
       if (store.running.has(key)) { send({ type: "error", error: "busy", message: "This council is already sitting. Try again in a minute." }); return finish(); }
       store.runs = store.runs.filter((t) => Date.now() - t < 3600_000);
-      if (store.runs.length >= MAX_PER_HOUR) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
-      if (store.running.size >= MAX_CONCURRENT) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
+      if (store.runs.length >= hourlyCap(MAX_PER_HOUR)) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
+      if (store.running.size >= concurrentCap(MAX_CONCURRENT)) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
       const slot = Date.now(); store.runs.push(slot); store.running.add(key); const refund = () => { const i = store.runs.indexOf(slot); if (i >= 0) store.runs.splice(i, 1); };
       const ac = new AbortController(); req.signal.addEventListener("abort", () => ac.abort());
       try {
@@ -86,4 +87,4 @@ export async function POST(req: Request) {
     },
   });
   return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store, no-transform", Connection: "keep-alive" } });
-}
+});

@@ -32,7 +32,11 @@ export const STALE_DAYS = 30;
 export function statusOf(h: Held, now: number): Status { if (!h) return "missing"; return (now - Date.parse(h.at)) / 86_400_000 > STALE_DAYS ? "stale" : "fresh"; }
 /** What to run: everything with no product, plus (when asked) everything older than 30 days, in dependency order. */
 export function plan(iso: string, now: number, o: { refreshStale: boolean }): { id: Pid; status: Status }[] { return ORDER.map((id) => ({ id, status: statusOf(readHeld(INFO[id].key(iso)), now) })).filter((x) => x.status === "missing" || (o.refreshStale && x.status === "stale")); }
-export const estimate = (ids: Pid[]) => Math.round(ids.reduce((a, id) => a + INFO[id].est, 0) * 100) / 100;
+/** What the bundle is expected to cost. The batch transport bills tokens at half price and its hour-long cache is shared by the calls of a bundle: the councils are expected to cost about 60% of their streamed cost (to be confirmed by a measured run). */
+export const BATCH_EST = 0.6;
+export const estimate = (ids: Pid[], batch = false) => Math.round(ids.reduce((a, id) => a + INFO[id].est * (batch ? BATCH_EST : 1), 0) * 100) / 100;
+/** In batch mode the councils that do not read each other run at the same time, in these waves; otherwise they run one after another in ORDER. */
+export const WAVES: Pid[][] = [["council", "falcon", "mach", "deep", "intel"], ["architect", "mofa"], ["plan"], ["king"]];
 
 type Req = { endpoint: string; body: Record<string, unknown>; extra?: Record<string, unknown> };
 const rep = (iso: string, id: Pid) => readHeld(INFO[id].key(iso))?.report ?? null;
@@ -54,9 +58,9 @@ export function request(id: Pid, iso: string, lang: "en" | "ar", d: CaseData | n
 export type Ev = Record<string, unknown> & { type: string };
 export type Outcome = { ok: true; usd: number | null; cached: boolean } | { ok: false; error: string; message: string };
 /** Runs one product: posts the request, follows the stream, saves the finished product where its own page keeps it. */
-export async function runOne(id: Pid, iso: string, lang: "en" | "ar", d: CaseData | null, o: { refresh: boolean; signal: AbortSignal; onEvent: (e: Ev) => void }): Promise<Outcome> {
+export async function runOne(id: Pid, iso: string, lang: "en" | "ar", d: CaseData | null, o: { refresh: boolean; signal: AbortSignal; onEvent: (e: Ev) => void; batch?: boolean }): Promise<Outcome> {
   const r0 = request(id, iso, lang, d, o.refresh); let r: Response;
-  try { r = await fetch(r0.endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(r0.body), signal: o.signal }); } catch (e) { return { ok: false, error: (e as Error).name === "AbortError" ? "aborted" : "network", message: (e as Error).message }; }
+  try { r = await fetch(r0.endpoint, { method: "POST", headers: { "Content-Type": "application/json", ...(o.batch ? { "x-geo-batch": "1" } : {}) }, body: JSON.stringify(r0.body), signal: o.signal }); } catch (e) { return { ok: false, error: (e as Error).name === "AbortError" ? "aborted" : "network", message: (e as Error).message }; }
   if (!r.ok || !r.body) { const j = (await r.json().catch(() => ({}))) as { error?: string; message?: string }; return { ok: false, error: j.error ?? "upstream", message: j.message ?? j.error ?? "The request was refused." }; }
   const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
   try {

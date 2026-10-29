@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { concurrentCap, hourlyCap, withBatch, inBatchMode } from "@/lib/dossier/batch";
 import { renderFacts } from "@/lib/ask/facts";
 import { rejectCrossSite, safeMessage } from "@/lib/guard";
 import { maxRunUsd } from "@/lib/dossier/cost";
@@ -23,7 +24,7 @@ const g = globalThis as unknown as { __gdDossier?: { cache: Map<string, unknown>
 const store = (g.__gdDossier ??= { cache: new Map(), running: new Set<string>(), runs: [] as number[] }); const cache = (g.__gdArchitect ??= new Map());
 
 /** The Statecraft Architect: five analyst agents (the first alone to warm the shared cache, three in parallel, then implementation and measurement) and an editor who writes the deliverables and the structured decision dashboard. The refusal guard runs first, so a prohibited request costs nothing. */
-export async function POST(req: Request) {
+export const POST = withBatch(async function POST(req: Request) {
   if (process.env.DOSSIER_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const bad = rejectCrossSite(req); if (bad) return bad;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>; const iso3 = String(body.iso3 ?? "").toUpperCase(); if (!/^[A-Z]{3}$/.test(iso3) || iso3 === "ARE") return Response.json({ error: "bad_request" }, { status: 400 });
@@ -40,8 +41,8 @@ export async function POST(req: Request) {
         const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
         if (store.running.has(key)) { send({ type: "error", error: "busy", message: "This strategy is already being written. Try again in a minute." }); return finish(); }
         store.runs = store.runs.filter((t) => Date.now() - t < 3600_000);
-        if (store.runs.length >= MAX_PER_HOUR) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
-        if (store.running.size >= MAX_CONCURRENT) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
+        if (store.runs.length >= hourlyCap(MAX_PER_HOUR)) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
+        if (store.running.size >= concurrentCap(MAX_CONCURRENT)) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
         slot = Date.now(); store.runs.push(slot); store.running.add(key); refund = () => { const i = store.runs.indexOf(slot); if (i >= 0) store.runs.splice(i, 1); };
         const ac = new AbortController(); req.signal.addEventListener("abort", () => ac.abort());
         const gathered = await caseFacts(iso3, c, snap, res?.pubs ?? []); if (!gathered || gathered.facts.length < 8) { refund(); send({ type: "error", error: "thin", message: "Not enough data on this yet." }); return finish(); }
@@ -64,8 +65,9 @@ export async function POST(req: Request) {
         const skipped = (a: ArchAgent, why: string) => { results.push({ id: a.id, name: nameOf(a), text: "", usd: 0, searches: 0, failed: 0, status: "skipped", note: why }); send({ type: "agent", id: a.id, status: "skipped", message: why }); };
         const stage0 = ARCH_AGENTS.filter((a) => a.stage === 0); const EDIT = ARCH_BY.get("EDIT")!; const AR5 = ARCH_BY.get("AR5")!; const REVS = ARCH_AGENTS.filter((a) => a.stage === 3); const revWorst = REVS.reduce((s, a) => s + archWorst(a), 0);
         // the first analyst goes alone so the shared evidence is cached before the others read it
+        if (!inBatchMode()) { send({ type: "status", text: "The analysts are working together: pillars, the three horizons, and options with the stress test…" }); await Promise.all(stage0.map((a) => run1(a))); } else {
         send({ type: "status", text: "The first analyst is reading the evidence and warming the shared cache…" }); await run1(stage0[0]);
-        send({ type: "status", text: "Three analysts are working in parallel: pillars, the three horizons, and options with the stress test…" }); await Promise.all(stage0.slice(1).map((a) => run1(a)));
+        send({ type: "status", text: "Three analysts are working in parallel: pillars, the three horizons, and options with the stress test…" }); await Promise.all(stage0.slice(1).map((a) => run1(a))); }
         // implementation and measurement start only if their worst case still leaves the editor's
         if (CAP - spent - archWorst(EDIT) - revWorst * 0.55 >= archWorst(AR5)) { send({ type: "status", text: "Implementation, governance and measurement…" }); await run1(AR5); } else skipped(AR5, "would not fit under the cost ceiling");
         if (CAP - spent - revWorst * 0.5 >= archWorst(EDIT) * 0.7) { send({ type: "status", text: "The Architect is writing the deliverables and the decision dashboard…" }); await run1(EDIT); } else skipped(EDIT, "no money left under the cost ceiling");
@@ -84,4 +86,4 @@ export async function POST(req: Request) {
     },
   });
   return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store, no-transform", Connection: "keep-alive" } });
-}
+});

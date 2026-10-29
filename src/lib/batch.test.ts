@@ -1,0 +1,31 @@
+// Tests for the batch transport: the header switch, the half-price accounting, the limits, the scheduler and the bundle's waves.
+import assert from "node:assert/strict";
+import { BATCH_FACTOR, batchTiming, concurrentCap, hourlyCap, inBatchMode, submitBatch, withBatch } from "./dossier/batch";
+import { runUsd } from "./dossier/cost";
+import { runModelTask } from "./dossier/run";
+import { BATCH_EST, INFO, ORDER, WAVES, estimate } from "./bird/runner";
+
+(async () => {
+  // ---- the header switches the transport on for the whole request, and only for it
+  assert.equal(inBatchMode(), false); let inside: boolean | null = null; const h = withBatch(async () => { await Promise.resolve(); inside = inBatchMode(); return new Response("x"); });
+  await h(new Request("http://x/", { method: "POST", headers: { "x-geo-batch": "1" } })); assert.equal(inside, true, "a request with the header runs its calls in batch mode, across awaits"); await h(new Request("http://x/", { method: "POST" })); assert.equal(inside, false, "a request without it does not"); assert.equal(inBatchMode(), false);
+  // ---- limits: higher in batch mode, unchanged otherwise
+  assert.equal(hourlyCap(4), 4); assert.equal(concurrentCap(2), 2); let hc = 0, cc = 0; await withBatch(async () => { hc = hourlyCap(4); cc = concurrentCap(2); return new Response(""); })(new Request("http://x/", { headers: { "x-geo-batch": "1" } })); assert.ok(hc >= 12 && cc >= 6, "the explicit bundle may run more, and more at once");
+  // ---- half-price tokens, full-price searches
+  const tally = { input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000, searches: 10 }; const full = runUsd(tally, "claude-sonnet-5-5"); const half = runUsd(tally, "claude-sonnet-5-5", BATCH_FACTOR); assert.ok(Math.abs(full - (2 + 10 + 0.2 + 2.5 + 0.1)) < 1e-9 && Math.abs(half - ((2 + 10 + 0.2 + 2.5) / 2 + 0.1)) < 1e-9, "tokens halve, the search fee does not");
+  // ---- the scheduler: requests made together travel in one batch, results go to the right caller, an error reaches only its own caller
+  batchTiming.poll = 5; batchTiming.gather = 20; const created: { custom_id: string }[][] = []; let polls = 0;
+  const msg = (text: string) => ({ content: [{ type: "text", text }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } });
+  const fake = { beta: { messages: { batches: { create: async (b: { requests: { custom_id: string }[] }) => { created.push(b.requests); return { id: "b1" }; }, retrieve: async () => ({ processing_status: ++polls >= 2 ? "ended" : "in_progress", request_counts: { succeeded: 0, errored: 0 } }), cancel: async () => ({}), results: async () => (async function* () { const ids = created[0].map((r) => r.custom_id); yield { custom_id: ids[1], result: { type: "succeeded", message: msg("second") } }; yield { custom_id: ids[0], result: { type: "succeeded", message: msg("first") } }; yield { custom_id: ids[2], result: { type: "errored", error: { type: "overloaded" } } }; })() } } } } as never;
+  const ac = new AbortController(); const p0 = submitBatch(fake, { model: "m", max_tokens: 1, messages: [] } as never, ac.signal); const p1 = submitBatch(fake, { model: "m", max_tokens: 1, messages: [] } as never, ac.signal); const p2 = submitBatch(fake, { model: "m", max_tokens: 1, messages: [] } as never, ac.signal);
+  const [r0, r1, r2] = await Promise.allSettled([p0, p1, p2]); assert.equal(created.length, 1, "three calls made together are one batch"); assert.equal(created[0].length, 3); assert.equal(r0.status, "fulfilled"); assert.equal((r0 as PromiseFulfilledResult<{ content: { text: string }[] }>).value.content[0].text, "first", "each result goes to its own caller, whatever order they come back in"); assert.equal((r1 as PromiseFulfilledResult<{ content: { text: string }[] }>).value.content[0].text, "second"); assert.equal(r2.status, "rejected", "a failed request fails only its own caller");
+  // ---- the bundle: every council once, each wave after what it reads
+  assert.deepEqual(WAVES.flat().sort(), [...ORDER].sort(), "every council is in exactly one wave"); const wave = (id: string) => WAVES.findIndex((w) => (w as string[]).includes(id)); assert.ok(wave("council") < wave("architect") && wave("intel") < wave("mofa") && wave("mofa") < wave("plan") && wave("intel") < wave("plan") && wave("plan") < wave("king") && ORDER.every((id) => wave(id) <= wave("king")), "no council starts before the ones it reads"); assert.ok(WAVES[0].length >= 4, "the independent councils run together");
+  const all = estimate(ORDER); const bat = estimate(ORDER, true); assert.ok(bat < all * 0.65 && bat > all * 0.5 && BATCH_EST === 0.6 && INFO.king.est > 0, "the batch estimate is the measured streamed cost times 0.6");
+  // ---- a whole run through the batch transport is priced at half the token price (a stale module copy once left the factor out and the run was billed in the log at full price)
+  { batchTiming.poll = 1; batchTiming.gather = 1; let ids: string[] = []; const msg = { content: [{ type: "text", text: "hi" }], stop_reason: "end_turn", usage: { input_tokens: 1_000_000, output_tokens: 100_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, server_tool_use: { web_search_requests: 0 } } };
+    const stub = { beta: { messages: { batches: { create: async (b: { requests: { custom_id: string }[] }) => { ids = b.requests.map((r) => r.custom_id); return { id: "b" }; }, retrieve: async () => ({ processing_status: "ended", request_counts: {} }), cancel: async () => ({}), results: async () => (async function* () { yield { custom_id: ids[0], result: { type: "succeeded", message: msg } }; })() } } } } as never;
+    let usd: number | null = null; await withBatch(async () => { const r = await runModelTask({ client: stub, model: "claude-sonnet-5-5", system: "s", firstText: "f", budget: { maxTokens: 1000, searches: 0, fetches: 0, fetchTokens: 1000 }, effort: "low", maxUsd: 5, signal: new AbortController().signal, send: () => {} }); usd = r.usage.usd; return new Response(""); })(new Request("http://x/", { headers: { "x-geo-batch": "1" } }));
+    assert.ok(usd !== null && Math.abs((usd as number) - 1.5) < 1e-9, "1M in and 100k out cost 3.00 at full price and 1.50 in batch"); }
+  console.log("batch: all checks passed");
+})().catch((e) => { console.error(e); process.exit(1); });

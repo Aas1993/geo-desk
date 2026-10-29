@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { concurrentCap, hourlyCap, withBatch, inBatchMode } from "@/lib/dossier/batch";
 import { AUDITORS, SUBJECTS, reviewTail } from "@/lib/review/pair";
 import { pairReserve, runAuditors } from "@/lib/review/run";
 import { renderFacts } from "@/lib/ask/facts";
@@ -26,7 +27,7 @@ const g = globalThis as unknown as { __gdDossier?: { cache: Map<string, unknown>
 const store = (g.__gdDossier ??= { cache: new Map(), running: new Set<string>(), runs: [] as number[] }); const cache = (g.__gdCCouncil ??= new Map());
 
 /** THE FALCON EYE Strategic Council: up to twenty seats in four independent group calls, then the debate, the evidence audit and red team and the execution roadmap in parallel, then the Chair. The refusal guard runs first, so a prohibited request costs nothing. */
-export async function POST(req: Request) {
+export const POST = withBatch(async function POST(req: Request) {
   if (process.env.DOSSIER_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const bad = rejectCrossSite(req); if (bad) return bad;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>; const iso3 = String(body.iso3 ?? "").toUpperCase(); if (!/^[A-Z]{3}$/.test(iso3) || iso3 === "ARE") return Response.json({ error: "bad_request" }, { status: 400 });
@@ -43,8 +44,8 @@ export async function POST(req: Request) {
         const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
         if (store.running.has(key)) { send({ type: "error", error: "busy", message: "This council is already sitting. Try again in a minute." }); return finish(); }
         store.runs = store.runs.filter((t) => Date.now() - t < 3600_000);
-        if (store.runs.length >= MAX_PER_HOUR) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
-        if (store.running.size >= MAX_CONCURRENT) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
+        if (store.runs.length >= hourlyCap(MAX_PER_HOUR)) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
+        if (store.running.size >= concurrentCap(MAX_CONCURRENT)) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
         slot = Date.now(); store.runs.push(slot); store.running.add(key); refund = () => { const i = store.runs.indexOf(slot); if (i >= 0) store.runs.splice(i, 1); };
         const ac = new AbortController(); req.signal.addEventListener("abort", () => ac.abort());
         const gathered = await caseFacts(iso3, c, snap, res?.pubs ?? []); if (!gathered || gathered.facts.length < 8) { refund(); send({ type: "error", error: "thin", message: "Not enough data on this yet." }); return finish(); }
@@ -67,9 +68,9 @@ export async function POST(req: Request) {
         const skipped = (a: Agent, why2: string) => { results.push({ id: a.id, name: nameOf(a), text: "", usd: 0, searches: 0, failed: 0, status: "skipped", note: why2 }); send({ type: "agent", id: a.id, status: "skipped", message: why2 }); };
         const stage0 = plan.filter((a) => a.stage === 0); const stage1 = plan.filter((a) => a.stage === 1);
         // the first independent group goes alone so the shared evidence is cached before the others read it
-        if (stage0.length) { send({ type: "status", text: "Stage 3: the first seats are reading the evidence and warming the shared cache…" }); await run1(stage0[0]); if (stage0.length > 1) { send({ type: "status", text: "Stage 3: the other seat groups are working independently in parallel…" }); await Promise.all(stage0.slice(1).map(run1)); } }
+        if (stage0.length && !inBatchMode()) { send({ type: "status", text: "Stage 3: the seat groups are reading the shared evidence together…" }); await Promise.all(stage0.map(run1)); } else if (stage0.length) { send({ type: "status", text: "Stage 3: the first seats are reading the evidence and warming the shared cache…" }); await run1(stage0[0]); if (stage0.length > 1) { send({ type: "status", text: "Stage 3: the other seat groups are working independently in parallel…" }); await Promise.all(stage0.slice(1).map(run1)); } }
         // stages 4 to 6: audit and red team first, then roadmap, then debate; each starts only if its worst case still leaves the Chair's
-        let room = CAP - spent - worstCase(CHAIR) - pairReserve(); const go: Agent[] = []; for (const id of ["review", "execution", "debate"] as const) { const a = stage1.find((x) => x.id === id); if (!a) continue; if (room >= worstCase(a)) { go.push(a); room -= worstCase(a); } else skipped(a, "would not fit under the cost ceiling"); }
+        const wc = (a: Agent) => worstCase(a) * (inBatchMode() ? 0.55 : 1); /* half-price tokens: a stage that would not fit at the full price can still run, so the saving buys back the debate */ let room = CAP - spent - wc(CHAIR) - pairReserve() * (inBatchMode() ? 0.55 : 1); const go: Agent[] = []; for (const id of ["review", "execution", "debate"] as const) { const a = stage1.find((x) => x.id === id); if (!a) continue; if (room >= wc(a)) { go.push(a); room -= wc(a); } else skipped(a, "would not fit under the cost ceiling"); }
         if (go.length) { send({ type: "status", text: "Stages 4 to 6: debate, adversarial review and the execution roadmap…" }); await Promise.all(go.map(run1)); }
         if (CAP - spent >= worstCase(CHAIR) * 0.7) { send({ type: "status", text: "Stage 7: the Chair is writing the decision and the strategy…" }); await run1(CHAIR); } else skipped(CHAIR, "no money left under the cost ceiling");
         const ordered0 = plan.map((a) => results.find((r) => r.id === a.id)).filter((x): x is AgentOut => !!x);
@@ -87,4 +88,4 @@ export async function POST(req: Request) {
     },
   });
   return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store, no-transform", Connection: "keep-alive" } });
-}
+});

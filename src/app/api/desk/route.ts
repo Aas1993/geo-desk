@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { concurrentCap, hourlyCap, inBatchMode, withBatch } from "@/lib/dossier/batch";
 import { renderFacts } from "@/lib/ask/facts";
 import { noteText, rejectCrossSite, safeMessage } from "@/lib/guard";
 import { maxRunUsd, outputRoom, runUsd } from "@/lib/dossier/cost";
@@ -28,7 +29,7 @@ const g = globalThis as unknown as { __gdDossier?: { cache: Map<string, unknown>
 const store = (g.__gdDossier ??= { cache: new Map(), running: new Set<string>(), runs: [] as number[] }); const dir = (g.__gdDeskDir ??= { running: new Set<string>(), runs: [] as number[] }); const cache = (g.__gdDesk ??= new Map());
 
 /** THE KING's council and the Embassy council: a click-started run of ten (or thirteen) specialists in sittings and a final writer, or a directive routed to the specialists whose field it touches. The refusal guard runs first, so a prohibited request costs nothing. */
-export async function POST(req: Request) {
+export const POST = withBatch(async function POST(req: Request) {
   if (process.env.DOSSIER_ENABLED === "0") return Response.json({ error: "disabled" }, { status: 403 });
   const bad = rejectCrossSite(req); if (bad) return bad;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>; const iso3 = String(body.iso3 ?? "").toUpperCase(); const product = String(body.product ?? "") as Product;
@@ -47,9 +48,9 @@ export async function POST(req: Request) {
         const manifest = manifestHash(snap, null, iso3); key = deskKey(product, iso3, o, manifest, context);
         const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit, agents: hit.agents.map((a: CallOut) => ({ ...a, text: "" })) }); return finish(); }
         if (pool.running.has(key)) { send({ type: "error", error: "busy", message: "This is already being written. Try again in a minute." }); return finish(); }
-        pool.runs = pool.runs.filter((t) => Date.now() - t < 3600_000); const lim = directive ? MAX_DIRECTIVES_PER_HOUR : MAX_PER_HOUR;
+        pool.runs = pool.runs.filter((t) => Date.now() - t < 3600_000); const lim = directive ? MAX_DIRECTIVES_PER_HOUR : hourlyCap(MAX_PER_HOUR);
         if (pool.runs.length >= lim) { send({ type: "error", error: "limit", message: `Limit of ${lim} new ${directive ? "directives" : "detailed briefings"} per hour reached (${directive ? "DESK_MAX_DIRECTIVES_PER_HOUR" : "DOSSIER_MAX_PER_HOUR"}). Cached results are still free.` }); return finish(); }
-        if (!directive && store.running.size >= MAX_CONCURRENT) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
+        if (!directive && store.running.size >= concurrentCap(MAX_CONCURRENT)) { send({ type: "error", error: "busy", message: "Other detailed briefings are being written. Try again in a few minutes." }); return finish(); }
         if (directive && dir.running.size >= 3) { send({ type: "error", error: "busy", message: "Other directives are being worked. Try again in a minute." }); return finish(); }
         slot = Date.now(); pool.runs.push(slot); pool.running.add(key); owned = true; refund = () => { const i = pool.runs.indexOf(slot); if (i >= 0) pool.runs.splice(i, 1); };
         const ac = new AbortController(); req.signal.addEventListener("abort", () => ac.abort()); if (req.signal.aborted) ac.abort();
@@ -62,24 +63,26 @@ export async function POST(req: Request) {
         const total: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0, fetches: 0, usd: 0 }; let spent = 0; const nameOf = (x: Call) => (o.lang === "ar" ? x.name.ar : x.name.en);
         const effort = (x: Call): Effort => ENV_EFFORT ?? (x.stage === 1 ? "medium" : "low");
         send({ type: "roster", agents: plan.calls.map((x) => ({ id: x.id, name: nameOf(x), stage: x.stage, searches: x.searches })) });
+        const inflight = new Map<string, number>(); let ledger = false; const siblings = (id: string) => { if (!ledger) return 0; let t = 0; for (const [k, v] of inflight) if (k !== id) t += v; return t; }; // sittings that run together count each other's live spend, so they share the ceiling without each being cut to an equal slice
         const run1 = async (x: Call, cap?: number, spentAt?: number) => {
           send({ type: "agent", id: x.id, status: "start" });
           try {
-            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 2 ? CAP : x.stage === 1 ? CAP - revReserve : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0) - revReserve), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => spentAt ?? spent, reserveUsd: x.stage === 0 ? 0.03 : x.stage === 1 ? 0.05 : 0.01 }); // each tier keeps back only what its own input and searches still need, so a share smaller than the default 0.15 does not shrink to the 1,500-token floor
-            const usd = r.usage.usd ?? runUsd(r.usage, MODEL); r.usage.usd = usd; spent += usd; for (const k of ["input", "output", "cacheRead", "cacheWrite", "searches", "fetches"] as const) total[k] += r.usage[k]; total.usd = spent;
+            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 2 ? CAP : x.stage === 1 ? CAP - revReserve : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0) - revReserve), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => (spentAt !== undefined ? spentAt : spent + siblings(x.id)), onSpend: spentAt === undefined ? (v) => inflight.set(x.id, v) : undefined, reserveUsd: x.stage === 0 ? 0.03 : x.stage === 1 ? 0.05 : 0.01 }); // each tier keeps back only what its own input and searches still need, so a share smaller than the default 0.15 does not shrink to the 1,500-token floor
+            const usd = r.usage.usd ?? runUsd(r.usage, MODEL); r.usage.usd = usd; inflight.delete(x.id); spent += usd; for (const k of ["input", "output", "cacheRead", "cacheWrite", "searches", "fetches"] as const) total[k] += r.usage[k]; total.usd = spent;
             for (const s of r.sources) if (!seen.has(s.url)) { seen.add(s.url); sources.push(s); }
             const start = r.report.search(/^#{1,3} /m); const text = (start > 0 && x.stage === 0 ? r.report.slice(start) : r.report).trim(); out[x.id] = text;
             results.push({ id: x.id, name: nameOf(x), text, usd, searches: r.usage.searches, failed: r.failedSteps, status: "done", note: r.costStopped ? "stopped at the cost ceiling" : undefined }); send({ type: "agent", id: x.id, status: "done", usd, searches: r.usage.searches, failed: r.failedSteps });
-          } catch (e) { if (ac.signal.aborted) throw e; const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[desk] ${product} ${x.id} failed:`, msg); results.push({ id: x.id, name: nameOf(x), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); send({ type: "agent", id: x.id, status: "error", message: msg }); }
+          } catch (e) { inflight.delete(x.id); if (ac.signal.aborted) throw e; const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[desk] ${product} ${x.id} failed:`, msg); results.push({ id: x.id, name: nameOf(x), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); send({ type: "agent", id: x.id, status: "error", message: msg }); }
         };
         const skipped = (x: Call, why: string) => { results.push({ id: x.id, name: nameOf(x), text: "", usd: 0, searches: 0, failed: 0, status: "skipped", note: why }); send({ type: "agent", id: x.id, status: "skipped", message: why }); };
         const stage0 = plan.calls.filter((x) => x.stage === 0); const fin = plan.calls.find((x) => x.stage === 1);
         // the first call goes alone so the shared evidence is cached before the others read it
-        if (stage0.length) { send({ type: "status", text: stage0.length > 1 ? "The first sitting is reading the evidence and warming the shared cache…" : "Working…" }); await run1(stage0[0]); }
+        const par = stage0.length > 1 && !inBatchMode(); ledger = par; // the sittings start together: each waits only until the first has begun answering (the shared evidence is then cached); the batch transport still sends the first alone
+        if (stage0.length && !par) { send({ type: "status", text: stage0.length > 1 ? "The first sitting is reading the evidence and warming the shared cache…" : "Working…" }); await run1(stage0[0]); }
         if (stage0.length > 1) {
-          const room = CAP - spent - (fin ? worstOf(fin.maxTokens, fin.searches) * LIKELY : 0) - revLikely; let used = 0; const go: Call[] = [];
+          const room = CAP - spent - (fin ? worstOf(fin.maxTokens, fin.searches) * LIKELY : 0) - revLikely - (par ? worstOf(stage0[0].maxTokens, stage0[0].searches) * LIKELY : 0); let used = 0; const go: Call[] = [];
           for (const x of stage0.slice(1)) { const w = worstOf(x.maxTokens, x.searches) * LIKELY; if (used + w <= room) { used += w; go.push(x); } else skipped(x, "no money left under the cost ceiling"); }
-          if (go.length) { send({ type: "status", text: `${go.length} more sitting${go.length === 1 ? " is" : "s are"} working in parallel…` }); const reserve = (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0) + revReserve; const at = spent; const share = (CAP - at - reserve) / go.length; await Promise.all(go.map((x) => run1(x, at + share, at))); }
+          const all = par ? [stage0[0], ...go] : go; if (all.length) { send({ type: "status", text: `${all.length} sitting${all.length === 1 ? " is" : "s are"} working in parallel…` }); const reserve = (fin ? worstOf(fin.maxTokens, fin.searches) * FINAL_RESERVE : 0) + revReserve; const at = spent; const share = (CAP - at - reserve) / all.length; await Promise.all(all.map((x) => (par ? run1(x) : run1(x, at + share, at)))); }
         }
         if (fin) { if (CAP - spent >= worstOf(fin.maxTokens, fin.searches) * LIKELY && outputRoom(spent, CAP - revReserve, MODEL, 0.05) >= Math.min(fin.maxTokens * 0.6, 6000)) { send({ type: "status", text: "Writing the final product…" }); await run1(fin); } else skipped(fin, "no money left under the cost ceiling"); }
         if (revs.length) {
@@ -101,4 +104,4 @@ export async function POST(req: Request) {
     },
   });
   return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store, no-transform", Connection: "keep-alive" } });
-}
+});

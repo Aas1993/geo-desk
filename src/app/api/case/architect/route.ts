@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { isAuthError, isNoCredit, resolveModel, upstreamMessage } from "@/lib/llm";
 import { concurrentCap, hourlyCap, withBatch, inBatchMode } from "@/lib/dossier/batch";
 import { renderFacts } from "@/lib/ask/facts";
 import { rejectCrossSite, safeMessage } from "@/lib/guard";
@@ -13,7 +14,7 @@ import { caseFacts } from "@/lib/case/facts";
 import { loadCase } from "@/lib/case/load";
 
 export const maxDuration = 800;
-const MODEL = process.env.DOSSIER_MODEL || "claude-sonnet-5-5";
+const MODEL = resolveModel(process.env.DOSSIER_MODEL || "claude-sonnet-5-5");
 const ENV_EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as Effort) : null;
 const CAP = maxRunUsd(process.env.DOSSIER_MAX_RUN_USD); // the whole Architect run, every agent together, never spends more than this
 const MAX_PER_HOUR = Math.max(1, +(process.env.DOSSIER_MAX_PER_HOUR ?? 4) || 4); const TTL = 6 * 3600_000; const MAX_CONCURRENT = 2;
@@ -60,7 +61,7 @@ export const POST = withBatch(async function POST(req: Request) {
             for (const s of r.sources) if (!seen.has(s.url)) { seen.add(s.url); sources.push(s); }
             const start = r.report.search(/^#{1,3} /m); const text = (start > 0 && a.id !== "EDIT" && a.stage !== 3 ? r.report.slice(start) : r.report).trim(); out[a.id] = text;
             results.push({ id: a.id, name: nameOf(a), text, usd, searches: r.usage.searches, failed: r.failedSteps, status: "done", note: r.costStopped ? "stopped at the cost ceiling" : undefined }); send({ type: "agent", id: a.id, status: "done", usd, searches: r.usage.searches, failed: r.failedSteps });
-          } catch (e) { if (ac.signal.aborted) throw e; const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[case-architect] ${a.id} failed:`, msg); results.push({ id: a.id, name: nameOf(a), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); send({ type: "agent", id: a.id, status: "error", message: msg }); }
+          } catch (e) { if (ac.signal.aborted || isNoCredit(e) || isAuthError(e)) throw e; /* no money or no key stops every agent: say so once */ const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[case-architect] ${a.id} failed:`, msg); results.push({ id: a.id, name: nameOf(a), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); send({ type: "agent", id: a.id, status: "error", message: msg }); }
         };
         const skipped = (a: ArchAgent, why: string) => { results.push({ id: a.id, name: nameOf(a), text: "", usd: 0, searches: 0, failed: 0, status: "skipped", note: why }); send({ type: "agent", id: a.id, status: "skipped", message: why }); };
         const stage0 = ARCH_AGENTS.filter((a) => a.stage === 0); const EDIT = ARCH_BY.get("EDIT")!; const AR5 = ARCH_BY.get("AR5")!; const REVS = ARCH_AGENTS.filter((a) => a.stage === 3); const revWorst = REVS.reduce((s, a) => s + archWorst(a), 0);
@@ -80,8 +81,8 @@ export const POST = withBatch(async function POST(req: Request) {
       } catch (e) {
         if (req.signal.aborted) return finish();
         console.error("[case-architect] run failed:", e instanceof Error ? e.message : e);
-        const nocredit = e instanceof Error && /credit balance/i.test(e.message); const authish = e instanceof Error && /authentication|api key|credential|x-api-key|oauth|refresh token|invalid_grant|expired/i.test(e.message);
-        send({ type: "error", error: nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError || authish ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : "upstream", message: safeMessage(e) });
+        const nocredit = isNoCredit(e); const authish = e instanceof Error && /authentication|api key|credential|x-api-key|oauth|refresh token|invalid_grant|expired/i.test(e.message);
+        send({ type: "error", error: nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError || isAuthError(e) || authish ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : "upstream", message: upstreamMessage(e, safeMessage) });
       } finally { if (key) store.running.delete(key); finish(); }
     },
   });

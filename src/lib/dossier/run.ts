@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
-import { BATCH_FACTOR, PRICE, outputRoom, runUsd } from "./cost";
+import { BATCH_FACTOR, outputRoom, priceOf, runUsd } from "./cost";
+import { provider } from "../llm";
+import { runHfTask } from "./run-hf";
 import { inBatchMode, submitBatch } from "./batch";
 
 // The model-run core shared by the dossier route (one analyst, streamed to the browser) and the Falcon council (several analysts, run in parallel and in sequence).
@@ -40,6 +42,7 @@ const WARM = ((globalThis as { __gdWarm?: Map<string, Promise<void>> }).__gdWarm
 const WARM_WAIT_MS = 60_000; const WARM_KEEP_MS = 4 * 60_000;
 
 export async function runModelTask(o: RunOptions): Promise<RunResult> {
+  if (provider() === "hf") return runHfTask(o); // an open model with our own search tools: see run-hf.ts (no batch transport, no cache sharing)
   const hold = { release: () => {} }; // a call that fails before it answers must still let its waiting siblings go
   try { return await runTask(o, hold); } finally { hold.release(); }
 }
@@ -134,6 +137,6 @@ async function runTask(o: RunOptions, hold: { release: () => void }): Promise<Ru
     break;
   }
   console.warn(`[${tag}] searches counted from the stream: ${u.searches}; billed by the API: ${apiSearches}; failed research steps: ${research.failed}; tokens in/out/read/write: ${u.input}/${u.output}/${u.cacheRead}/${Math.round(u.cacheWrite)}; priced at ${batch ? "batch" : "standard"}: $${cost().toFixed(4)}`);
-  u.usd = PRICE[model] ? cost() : null;
+  u.usd = priceOf(model) ? cost() : null;
   return { report, sources, usage: u, stop, costStopped, failedSteps: research.failed, apiSearches };
 }

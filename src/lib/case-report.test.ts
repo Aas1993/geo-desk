@@ -45,9 +45,9 @@ async function main() {
   const ans = ar.parts.find((x) => x.id === "answer")!.md; assert.ok(!/\b(Stance|Biggest risk|Confidence)\b/.test(ans) && /الموقف/.test(ans), "no English labels in the Arabic answer");
   assert.ok(ar.parts.find((x) => x.id === "numbers")!.md.includes("نمو الناتج المحلي الحقيقي"), "metric names are Arabic"); assert.ok(ar.parts.find((x) => x.id === "judgment")!.md.includes("كُتب بالإنجليزية"), "an English council text in an Arabic report is marked");
   assert.equal(langOf("مرحبا بالعالم"), "ar"); assert.equal(langOf("hello world"), "en"); assert.ok(classification("ar").includes("غير مُراجَع") && classification("en").includes("NOT REVIEWED"));
-  // ---- the desk brief in Arabic: 24 sections, Arabic titles, the Arabic 'not yet written' ----
-  const dk = composeDesk(egy, null, null, "ar"); assert.equal(dk.length, 24); assert.ok(dk.every((s) => /[؀-ۿ]/.test(s.title)), "every title is Arabic"); assert.ok(dk.find((s) => s.n === 15)!.body.includes("لم يُكتب بعد") && !dk.find((s) => s.n === 15)!.body.includes("Not yet written"));
-  assert.ok(dk.find((s) => s.n === 14)!.body.includes("الفئة") && !/\| Category \|/.test(dk.find((s) => s.n === 14)!.body), "table headers are Arabic"); assert.equal(composeDesk(egy, null).length, 24);
+  // ---- the desk brief in Arabic: 25 sections, Arabic titles, the Arabic 'not yet written' ----
+  const dk = composeDesk(egy, null, null, "ar"); assert.equal(dk.length, 25); assert.ok(dk.every((s) => /[؀-ۿ]/.test(s.title)), "every title is Arabic"); assert.ok(dk.find((s) => s.n === 15)!.body.includes("لم يُكتب بعد") && !dk.find((s) => s.n === 15)!.body.includes("Not yet written"));
+  assert.ok(dk.find((s) => s.n === 14)!.body.includes("الفئة") && !/\| Category \|/.test(dk.find((s) => s.n === 14)!.body), "table headers are Arabic"); assert.equal(composeDesk(egy, null).length, 25);
   // ---- the dossier carries other saved products as annexes, once ----
   const other: SavedItem = { key: "gd-strat:EGY:dossier", iso3: "EGY", kind: "strategy", at: "2026-10-20T00:00:00Z", usd: 0.3, words: 10, report: "# Strategy\n\nBody", model: "m" };
   assert.deepEqual(annexBlocks([other]).map((b) => b.id), ["annex:gd-strat:EGY:dossier"]); const dossier = TP("dossier"); const ids = [...dossier.blocks.slice(0, -1), "annex:gd-strat:EGY:dossier", dossier.blocks[dossier.blocks.length - 1]];

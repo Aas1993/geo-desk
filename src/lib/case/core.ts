@@ -88,7 +88,7 @@ export const POSTURE: Record<Posture, { name: B; sub: B }> = {
   hold: { name: b("Hold and watch", "الإمساك والمراقبة"), sub: b("Maintain, monitor and buy information first: value is modest or risk is high.", "الإبقاء والرصد وشراء المعلومات أولًا: القيمة متواضعة أو المخاطر مرتفعة.") },
 };
 export const THRESHOLDS = { deepenValue: 65, deepenAbility: 60, deepenRisk: 40, stagedValue: 50, stagedAbility: 50, holdRisk: 60 };
-const rule = (v: number, a: number, r: number): Posture => (v >= THRESHOLDS.deepenValue && a >= THRESHOLDS.deepenAbility && r <= THRESHOLDS.deepenRisk ? "deepen" : v >= THRESHOLDS.stagedValue && a >= THRESHOLDS.stagedAbility ? "staged" : v >= THRESHOLDS.stagedValue ? "hedge" : "hold");
+export const rule = (v: number, a: number, r: number): Posture => (v >= THRESHOLDS.deepenValue && a >= THRESHOLDS.deepenAbility && r <= THRESHOLDS.deepenRisk ? "deepen" : v >= THRESHOLDS.stagedValue && a >= THRESHOLDS.stagedAbility ? "staged" : v >= THRESHOLDS.stagedValue ? "hedge" : "hold");
 export type PostureResult = { posture: Posture | null; value: number | null; ability: number | null; risk: number | null; stable: boolean; alternatives: Posture[]; reasons: B[]; thresholds: typeof THRESHOLDS };
 export function posture(i: Inputs, ps: Pillar[]): PostureResult {
   const s = (id: string) => ps.find((p) => p.id === id)?.score ?? null; const value = mean([s("political"), s("economic"), s("geography"), s("soft")]); const d = i.score?.dims ?? {};
@@ -101,6 +101,13 @@ export function posture(i: Inputs, ps: Pillar[]): PostureResult {
 
 // ---- instruments: footprint, headroom and a stated intensity ----
 export type InstrRow = { id: string; kind: "soft" | "hard" | "mixed"; name: B; footprint: number | null; headroom: number | null; basis: B; intensity: B };
+/** The stated intensity of one instrument for a posture, from its footprint (0-5): the rule the Case File and the Scenario sandbox share. */
+export function instrIntensity(fp: number | null, post: Posture | null): B {
+  const head = fp == null ? null : Math.round((5 - fp) * 10) / 10;
+  if (fp == null) return b("Measure first", "قِس أولًا");
+  if (post === "staged" && head != null && head >= 2) return b("Add one staged step with a gate", "أضف خطوة متدرجة بنقطة قرار");
+  return post === "hold" ? b("Maintain", "أبقِ") : head != null && head >= 2 ? b(post === "deepen" ? "Raise" : "Add one staged step", "ارفع") : head != null && head < 1 ? b("Saturated: sustain, do not add", "مشبع: حافظ ولا تضف") : b("Maintain and test", "أبقِ واختبر");
+}
 const aidScore = (v: number | null) => (v == null || v <= 0 ? (v === 0 ? 0 : null) : v < 5e6 ? 1 : v < 25e6 ? 2 : v < 100e6 ? 3 : v < 500e6 ? 4 : 5);
 export function instruments(i: Inputs, post: Posture | null): InstrRow[] {
   const c = i.part?.c; const f = (id: string): { fp: number | null; basis: B } => {
@@ -113,8 +120,8 @@ export function instruments(i: Inputs, post: Posture | null): InstrRow[] {
       default: return { fp: null, basis: b("Not measured: no dataset", "غير مقيس: لا مجموعة بيانات") };
     }
   };
-  return INSTRUMENTS.map((x) => { const { fp, basis } = f(x.id); const head = fp == null ? null : Math.round((5 - fp) * 10) / 10; const intensity = fp == null ? b("Measure first", "قِس أولًا") : post === "hold" ? b("Maintain", "أبقِ") : head != null && head >= 2 ? b(post === "deepen" ? "Raise" : "Add one staged step", "ارفع") : head != null && head < 1 ? b("Saturated: sustain, do not add", "مشبع: حافظ ولا تضف") : b("Maintain and test", "أبقِ واختبر");
-    return { id: x.id, kind: x.kind, name: typeof x.name === "string" ? b(x.name, x.name) : x.name, footprint: fp != null ? Math.round(fp * 10) / 10 : null, headroom: head, basis, intensity: post === "staged" && head != null && head >= 2 ? b("Add one staged step with a gate", "أضف خطوة متدرجة بنقطة قرار") : intensity }; });
+  return INSTRUMENTS.map((x) => { const { fp, basis } = f(x.id); const head = fp == null ? null : Math.round((5 - fp) * 10) / 10;
+    return { id: x.id, kind: x.kind, name: typeof x.name === "string" ? b(x.name, x.name) : x.name, footprint: fp != null ? Math.round(fp * 10) / 10 : null, headroom: head, basis, intensity: instrIntensity(fp, post) }; });
 }
 
 // ---- measured position toward UAE policy ----

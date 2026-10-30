@@ -16,13 +16,15 @@ import { IntelTab } from "./IntelTab";
 import { AgreementsTab } from "./AgreementsTab";
 import { MediaTab } from "./MediaTab";
 import { DiplomacyTab } from "./DiplomacyTab";
+import { HubApp } from "./hub/HubApp";
+import { CountryCouncils } from "./roundtable/CountryCouncils";
 import { IconBtn } from "./ui";
 import { useDashboard } from "@/lib/dashboard-store";
 import { printOnePager } from "@/lib/one-pager";
 import { regionLabel } from "@/lib/regions";
 import type { Country, CountryDetail, TabId } from "@/lib/types";
 
-const TABS: TabId[] = ["overview", "brief", "intel", "investments", "foresight", "minister", "counterpart", "desk", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
+const TABS: TabId[] = ["overview", "hub", "councils", "brief", "intel", "investments", "foresight", "minister", "counterpart", "desk", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
 const cache = new Map<string, CountryDetail>(); const stamp = new Map<string, number>(); // weather and air quality are part of the detail, so it is refreshed when older than 15 minutes
 const fresh = (iso: string) => (stamp.get(iso) ?? 0) > Date.now() - 900_000;
 
@@ -97,6 +99,8 @@ export function CountryPanel() {
       </div>
       <div ref={body} role="tabpanel" className="scroll-thin flex-1 space-y-3 overflow-y-auto p-4" style={{ overscrollBehavior: "contain" }}>
         {tab === "overview" && <OverviewTab c={c} detail={detail} />}
+        {tab === "hub" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "مركز المستجدات يخص الدول الأخرى." : "The updates hub covers other countries."}</p> : <HubApp iso={c.iso3} compact />)}
+        {tab === "councils" && <CountryCouncils iso={c.iso3} name={displayName(c, lang)} L={lang === "ar" ? "ar" : "en"} />}
         {tab === "brief" && <BriefTab c={c} />}
         {tab === "intel" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "الرؤى تخص الدول الأخرى." : "Intel covers other countries."}</p> : <IntelTab c={c} />)}
         {tab === "desk" && (c.iso3 === "ARE" ? <p className="text-[13px] text-t1">{lang === "ar" ? "موجز المكتب يخص الدول الأخرى." : "The desk brief covers other countries."}</p> : <DeskTab c={c} />)}

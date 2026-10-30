@@ -5,6 +5,7 @@ import { AlertTriangle, CalendarClock, Eye, Flag, Lightbulb, Shield, TrendingUp,
 import type { Bird, From } from "@/lib/bird/consolidate";
 import { Block, Pill, type Lang } from "../falcon/bits";
 import { useTr } from "../case/bits";
+import { PlaybookView } from "../case/PlaybookView";
 import { Bar, Freshness, Gauge, POS_COLOR, PostureScale, SCORE_C, srcColor } from "./visuals";
 
 const WORDS: Record<"en" | "ar", Record<string, string>> = { en: { deepen: "deepen", staged: "staged", hedge: "hedge", hold: "hold" }, ar: { deepen: "تعميق", staged: "على مراحل", hedge: "تحوّط", hold: "ترقّب" } };
@@ -13,7 +14,7 @@ const SHORT: Record<string, string> = { "Case File posture (free, from the data)
 const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, t.lastIndexOf(" ", n) > n * 0.6 ? t.lastIndexOf(" ", n) : n)}…` : t);
 const verdictColor = (v: string) => { const w = v.split(":").pop() ?? v; return /reject|fail|not/i.test(w) ? "var(--risk)" : /revise|partial|caution/i.test(w) ? "var(--warn)" : "var(--ok)"; };
 const SourceChip = ({ f }: { f: From }) => <Link href={f.href} className="inline-flex items-center gap-1 rounded-full bg-bg3 px-2 py-0.5 text-[10.5px] text-t1 hover:text-accent"><span aria-hidden className="inline-block size-1.5 rounded-full" style={{ background: srcColor(f.tab) }} />{f.tab}</Link>;
-const SECTIONS = [["course", "The course", "المسار"], ["flags", "Red flags", "الأعلام الحمراء"], ["councils", "Council by council", "مجلس بمجلس"], ["insights", "Insights", "الرؤى"], ["interests", "Interests", "المصالح"], ["moves", "Next moves", "الخطوات"], ["opps", "Opportunities", "الفرص"], ["risks", "Risks", "المخاطر"], ["security", "Security", "الأمن"], ["evidence", "Readiness", "الجاهزية"], ["profile", "Country brief", "موجز الدولة"], ["ask", "Ask a question", "اسأل"]] as const;
+const SECTIONS = [["course", "The course", "المسار"], ["flags", "Red flags", "الأعلام الحمراء"], ["councils", "Council by council", "مجلس بمجلس"], ["insights", "Insights", "الرؤى"], ["interests", "Interests", "المصالح"], ["playbook", "Playbook", "دليل فن الحكم"], ["moves", "Next moves", "الخطوات"], ["opps", "Opportunities", "الفرص"], ["risks", "Risks", "المخاطر"], ["security", "Security", "الأمن"], ["evidence", "Readiness", "الجاهزية"], ["profile", "Country brief", "موجز الدولة"], ["ask", "Ask a question", "اسأل"], ["score", "Country score", "درجة الدولة"]] as const;
 
 const Stat = ({ n, label, c, icon }: { n: string | number; label: string; c: string; icon: React.ReactNode }) => <li className="flex items-center gap-2.5 rounded-[12px] border border-line bg-bg2 p-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-[9px]" style={{ background: `color-mix(in srgb, ${c} 16%, transparent)`, color: c }}>{icon}</span><span><b className="numt block text-[18px] leading-none text-t0">{n}</b><span className="text-[11px] text-t2">{label}</span></span></li>;
 /** THE REPORT of the bird's eye view, drawn: a dashboard first (readiness, the course on its scale, the counts that matter), then each section as something to look at rather than a list to read. Every figure and every line comes from the consolidated brief, and every line still names its tab. */
@@ -86,6 +87,8 @@ export function BirdReport({ bird, L, missing }: { bird: Bird; L: Lang; missing:
       </div>
 
       {/* ---- opportunities and risks */}
+      {bird.playbook && <div id="bird-playbook" className="scroll-mt-20"><PlaybookView pb={bird.playbook[lg]} L={L} enrichment={bird.playbook.enrichment[lg]} /></div>}
+
       <div id="bird-opps" className="scroll-mt-20"><Block title={t("Opportunities", "الفرص")} hint={t("Grouped by kind: trade and investment gaps, UAE companies, sectors to support, and the recommended course.", "مجمّعة بحسب النوع: فجوات التجارة والاستثمار وشركات إماراتية وقطاعات تُدعم والمسار الموصى به.")}>
         {kinds.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{kinds.map((g) => <div key={g.kind} className="rounded-[12px] border border-line bg-bg2 p-3" style={{ borderTop: "3px solid var(--ok)" }}><p className="flex items-center gap-1.5 text-[12px] font-semibold text-ok"><TrendingUp size={14} aria-hidden />{g.kind}<span className="numt ms-auto text-t2">{g.items.length}</span></p><ul className="mt-1.5 space-y-2">{g.items.map((x, i) => <li key={i} className="text-[12.5px] leading-snug"><span className="text-t0" dir="auto">{x.text}</span>{x.sub && <span className="mt-0.5 block text-[11.5px] text-t1" dir="auto">{x.sub}</span>}<span className="mt-1 block"><SourceChip f={x.from} /></span></li>)}</ul></div>)}</div>
           : <p className="text-[12.5px] text-t1">{t("Run the embassy intelligence sitting to list the gaps, the companies and the sectors.", "شغّل جلسة استخبارات السفارة لتُدرج الفجوات والشركات والقطاعات.")}</p>}</Block></div>

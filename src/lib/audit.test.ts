@@ -58,4 +58,7 @@ assert.ok(!/food/i.test(KING_AGENTS.find((a) => a.id === "resources")!.mandate.r
 assert.ok(EMB_AGENTS.some((a) => a.id === "sme" && /small and medium/i.test(a.mandate)), "the embassy has an SME promotion attaché");
 // every desk and specialist has a mandate, questions and sources, not just a name
 for (const a of [...KING_AGENTS, ...EMB_AGENTS]) assert.ok(a.mandate.length > 80 && a.questions.length >= 4 && a.sources.length >= 2, `${a.id} has a mandate, questions and starting sources`);
+// the UAE statecraft playbook is in every embassy and Ministry prompt, with the boundary it must respect, and the writers and auditors carry the search tool so they read the cached evidence
+for (const [n, sys] of [["embassy", EMB_SYSTEM], ["Ministry", MOFA_SYSTEM]] as const) assert.ok(/UAE STATECRAFT PLAYBOOK/.test(sys) && /no covert action/i.test(sys) && /uae-playbook/.test(sys) && /Playbook input/.test(sys), `the ${n} prompt carries the playbook and the boundary`);
+for (const k of ["emb-intel", "emb-plan", "mofa-council"] as const) { const pl = planFor(k, { focus: "", topic: "", mode: "question", urgency: "routine", agents: [], lang: "en", useContext: true }, ""); assert.ok(pl.calls.filter((c) => c.stage >= 1).every((c) => c.searches >= 1), `${k}: the writer and the auditors keep the search tool`); }
 console.log("audit: all checks passed");

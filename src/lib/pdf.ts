@@ -20,6 +20,8 @@ function quietRow(cv: HTMLCanvasElement, target: number, window: number, forbid:
 /** `html` is a complete HTML document (with its own styles). It is shown in a hidden A4-width frame, so its CSS cannot touch the app. */
 export async function buildPdf(html: string, o: Pick<PdfOptions, "onProgress">): Promise<Blob> {
   const [{ jsPDF }, { default: html2canvas }] = await Promise.all([import("jspdf"), import("html2canvas")]);
+  // html2canvas measures where a font's baseline sits with a hidden <img> in THIS document, and the app's stylesheet makes every img a block, which puts the measured baseline a line too low: every line of text in the PDF was drawn about a third of its size below where it belongs (invisible in running text, plain in pills and table cells). Make that probe image inline while the PDF is built; the rule matches only html2canvas's own hidden probe.
+  const probe = document.createElement("style"); probe.textContent = 'body>div[style*="visibility: hidden"]>img{display:inline!important}'; document.head.appendChild(probe);
   const frame = document.createElement("iframe"); frame.setAttribute("aria-hidden", "true"); frame.style.cssText = `position:fixed;left:-${PX * 3}px;top:0;width:${PX}px;height:1200px;border:0;pointer-events:none;`; frame.srcdoc = html.replace("</head>", `<style>${BOOST}</style></head>`);
   const loaded = new Promise<void>((res) => { frame.onload = () => res(); }); document.body.appendChild(frame);
   try {
@@ -55,7 +57,7 @@ export async function buildPdf(html: string, o: Pick<PdfOptions, "onProgress">):
     }
     for (let p = 1; p <= pages; p++) { pdf.setPage(p); pdf.setFontSize(8); pdf.setTextColor(120); pdf.text(`${p} / ${pages}`, PW / 2, PH - 6, { align: "center" }); }
     return pdf.output("blob");
-  } finally { document.body.removeChild(frame); }
+  } finally { document.body.removeChild(frame); probe.remove(); }
 }
 /** Saves a finished PDF to the user's disk. The link is revoked a minute later. */
 export function saveBlobAs(blob: Blob, filename: string) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60_000); }

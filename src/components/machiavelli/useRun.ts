@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Profile } from "@/lib/machiavelli/profile-core";
+import { keepPrevious } from "@/lib/report/diff";
 import type { Portfolio, Roll } from "@/lib/machiavelli/profile";
 
 export type Src = { url: string; title: string; kind?: string };
@@ -30,7 +31,7 @@ export function useRun(iso: string | null, storeKey: string | null, onSaved?: (d
           else if (ev.type === "status") setStatus(String(ev.text ?? "")); else if (ev.type === "tool" && ev.name === "search") setSearches((n) => n + 1); else if (ev.type === "source") setSources((n) => n + 1);
           else if (ev.type === "text") setTail((x) => (x + String(ev.delta)).slice(-320));
           else if (ev.type === "error") { ended = true; setErr(String(ev.message ?? ev.error)); setPhase("error"); }
-          else if (ev.type === "done") { ended = true; const d = { ...(ev as unknown as Saved), ...(extra as object) } as Saved; setSaved(d); setPhase("done"); if (storeKey) { try { localStorage.setItem(storeKey, JSON.stringify({ ...d, type: undefined })); window.dispatchEvent(new Event("storage")); } catch { /* storage full */ } } onSaved?.(d); }
+          else if (ev.type === "done") { ended = true; const d = { ...(ev as unknown as Saved), ...(extra as object) } as Saved; setSaved(d); setPhase("done"); if (storeKey) { keepPrevious(storeKey); try { localStorage.setItem(storeKey, JSON.stringify({ ...d, type: undefined })); window.dispatchEvent(new Event("storage")); } catch { /* storage full */ } } onSaved?.(d); }
         }
       }
       if (!ended) { setErr("The connection ended before the product finished."); setPhase("error"); }

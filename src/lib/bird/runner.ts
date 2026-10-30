@@ -5,6 +5,7 @@ import { activate } from "../case/seats";
 import { DEFAULT_QUESTION as DEEP_Q } from "../deep/council";
 import { DEFAULT_COUNTRY_FOCUS, DEFAULT_EMB_FOCUS, DEFAULT_KING_FOCUS, DEFAULT_MOFA_FOCUS, PRODUCT_USD } from "../desk/core";
 import { countryContext, embContext, kingContext, mofaContext } from "../desk/context";
+import { clipsFactFor } from "../clips";
 import { COUNCIL_PRESETS } from "../falcon/council";
 import { SCOUNCIL_DEFAULT_QUESTION } from "../machiavelli/council";
 
@@ -57,7 +58,7 @@ export function request(id: Pid, iso: string, lang: "en" | "ar", d: CaseData | n
     case "deep": return { endpoint: "/api/deep/council", body: { iso3: iso, lang, question: DEEP_Q, mode: "full", consequential: true, horizonYears: 3, audience: "analyst", roles: [], refresh } };
     case "intel": return { endpoint: "/api/desk", body: { product: "emb-intel", iso3: iso, lang, focus: DEFAULT_EMB_FOCUS, topic: "", useContext: true, context: embContext({ council: filed.council, kingBrief: filed.kingBrief, mofa: filed.mofa }, "emb-intel"), refresh } };
     case "mofa": return { endpoint: "/api/desk", body: { product: "mofa-council", iso3: iso, lang, focus: DEFAULT_MOFA_FOCUS, topic: "", useContext: true, context: mofaContext(filed), refresh } };
-    case "country": return { endpoint: "/api/desk", body: { product: "country-full", iso3: iso, lang, focus: DEFAULT_COUNTRY_FOCUS, topic: "", useContext: true, context: countryContext({ council: filed.council, embIntel: filed.embIntel, embPlan: filed.embPlan, mofa: filed.mofa }), refresh } };
+    case "country": return { endpoint: "/api/desk", body: { product: "country-full", iso3: iso, lang, focus: DEFAULT_COUNTRY_FOCUS, topic: "", useContext: true, context: countryContext({ council: filed.council, embIntel: filed.embIntel, embPlan: filed.embPlan, mofa: filed.mofa, clips: clipsFactFor(iso) }), refresh } };
     case "plan": return { endpoint: "/api/desk", body: { product: "emb-plan", iso3: iso, lang, focus: DEFAULT_EMB_FOCUS, topic: "", useContext: true, context: embContext({ council: filed.council, kingBrief: filed.kingBrief, embIntel: filed.embIntel, mofa: filed.mofa }, "emb-plan"), refresh } };
     case "king": return { endpoint: "/api/desk", body: { product: "king-council", iso3: iso, lang, focus: DEFAULT_KING_FOCUS, topic: "", useContext: true, context: kingContext({ council: filed.council, architect: filed.architect, embIntel: filed.embIntel, embPlan: filed.embPlan }), refresh } };
   }

@@ -1,6 +1,6 @@
 "use client";
 import { useState, type ReactNode } from "react";
-import { Copy, Printer, Trash2 } from "lucide-react";
+import { Copy, Printer } from "lucide-react";
 import { PdfButton } from "../PdfButton";
 import { headlineOf, type Agent } from "@/lib/desk/core";
 import { briefingHtml, printBriefing } from "@/lib/dossier/export";
@@ -12,6 +12,7 @@ import { usd } from "../machiavelli/parts";
 import { useRun, type AgentLive, type Saved } from "../machiavelli/useRun";
 import { Hatch, statusWord, useTr } from "../case/bits";
 import { Drill, Row, Bullets } from "./shared";
+import { ConfirmButton } from "../report/kit";
 
 /** The click-started run of one council product: its focus, what it reads, the cost, and live progress by sitting. */
 export function RunPanel({ L, title, hint, focus, setFocus, placeholder, run, start, label, cost, refusal, useContext, setUseContext, ctxFound, disabled, extra }: { L: Lang; title: string; hint: string; focus: string; setFocus: (v: string) => void; placeholder: string; run: ReturnType<typeof useRun>; start: () => void; label: string; cost: string; refusal: string; useContext: boolean; setUseContext: (v: boolean) => void; ctxFound: string[]; disabled?: boolean; extra?: ReactNode }) {
@@ -40,7 +41,7 @@ export function SavedBar({ L, s, name, title, strip, onClear, partial, pdfKey }:
       <span className="ms-auto flex gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(clean()); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Copy size={13} />{copied ? "✓" : t("Copy", "نسخ")}</button>
         {pdfKey && <PdfButton L={L} storeKey={pdfKey} />}
         <button type="button" onClick={() => printBriefing(briefingHtml(clean(), { title: `${title}: ${name}`, rtl: runLang === "ar", foot: `${s.model} · ${s.at}`, classification: classification(runLang) }))} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Printer size={13} />{t("Print", "طباعة")}</button>
-        <button type="button" onClick={() => { if (window.confirm(t("Remove this saved result from this browser?", "إزالة هذه النتيجة المحفوظة من هذا المتصفح؟"))) onClear(); }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] text-t2 hover:text-risk"><Trash2 size={13} />{t("Remove", "إزالة")}</button></span></div>
+        <ConfirmButton L={L} label={t("Remove", "إزالة")} ask={t("Remove this saved result from this browser?", "إزالة هذه النتيجة المحفوظة من هذا المتصفح؟")} onConfirm={onClear} /></span></div>
       {partial && <PartialNote L={L} />}
       <p className="rounded-[10px] border border-warn/40 bg-warn/10 p-2.5 text-[12px] text-t0" role="note">{t("Working analysis of proposals, not reviewed and not adopted UAE policy. Owners are proposed; funding is \"not estimated\" unless evidenced; people are public roles and organisations only; the specialists are archetypes of expertise, not real persons.", "تحليل عمل لمقترحات، غير مُراجَع وليس سياسة إماراتية معتمدة. المسؤولون مقترحون؛ والتمويل «غير مقدّر» ما لم يثبت؛ والأشخاص أدوار عامة وجهات فقط؛ والمختصون نماذج خبرة لا أشخاص حقيقيون.")}</p>
     </div>

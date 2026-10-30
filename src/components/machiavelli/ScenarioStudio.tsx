@@ -12,10 +12,14 @@ import { briefingHtml, printBriefing, saveBlob } from "@/lib/dossier/export";
 import type { Country } from "@/lib/types";
 import { Markdown } from "../Markdown";
 import { GatesPanel } from "../falcon/GatesPanel";
-import { Block, Pill, ScopePicker, type Lang } from "../falcon/bits";
+import { Block as Plain, Pill, ScopePicker, type Lang } from "../falcon/bits";
+import { FoldGroup } from "../report/kit";
+import { FBlock as Block, FTbl } from "../report/kit-fm";
+import { BranchBar, MachHead, MachStandard, NodeList, stat } from "./MachParts";
+import { Route, ShieldAlert, Sparkles, Zap } from "lucide-react";
 import { InstrumentChips, Progress, Question, Refusal, RunBar, refusalText } from "./forms";
 import { filterBody, type Filters } from "./filters";
-import { Inline, Tabs, Tbl, TreeSvg, usd } from "./parts";
+import { Inline, Tabs, TreeSvg, usd } from "./parts";
 import { useRun, type ProfileSet } from "./useRun";
 
 const T = {
@@ -33,7 +37,7 @@ export function ScenarioStudio({ L, f, setF, list, by, set }: { L: Lang; f: Filt
     <div className="space-y-4">
       <Tabs<Tab> tabs={[{ id: "build", label: u.build }, { id: "illus", label: u.illus }]} value={tab} onChange={setTab} />
       {tab === "build" && (<>
-        <Block title={u.title} hint={u.sub}>
+        <Plain title={u.title} hint={u.sub}>
           <div className="grid gap-4 md:grid-cols-2"><div><span className="label mb-1 block">{u.subject}</span><ScopePicker list={list} value={iso} onPick={(i) => setF({ iso: i })} L={L} /></div>
             <div className="space-y-3"><div><span className="label mb-1 block">{u.hor}</span><select value={hor} onChange={(e) => setHor(e.target.value)} className="h-10 w-full rounded-[10px] border border-line bg-bg2 px-2.5 text-[13px] text-t0">{SCEN_HORIZONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div></div></div>
           <div className="mt-3"><span className="label mb-1 block">{u.ins}</span><InstrumentChips value={ins} onChange={setIns} L={L} /></div>
@@ -41,20 +45,24 @@ export function ScenarioStudio({ L, f, setF, list, by, set }: { L: Lang; f: Filt
           {ins.length === 0 && <p className="mt-2 text-[11.5px] text-warn">{u.missing}</p>}
           <RunBar phase={run.phase} onRun={start} onCancel={run.cancel} disabled={!iso || !!refusal || ins.length === 0} L={L} label={s ? u.again : u.go} cost={u.cost} />
           <Progress phase={run.phase} status={run.status} tail={run.tail} searches={run.searches} sources={run.sources} err={run.err} L={L} />
-        </Block>
+        </Plain>
         {s && p && run.phase !== "running" && (<>
           <div className="flex flex-wrap items-center gap-2"><span className="numt text-[11.5px] text-t1">{c?.flag} {name} · {u.saved} {s.at.slice(0, 16).replace("T", " ")} UTC · {u.spent} {usd(s.usage.usd)}{s.cached ? " · cached" : ""}</span><span className="ms-auto flex flex-wrap gap-1.5"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(s.report); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Copy size={13} />{copied ? u.copied : u.copy}</button><button type="button" onClick={() => saveBlob(`${iso}-scenario.md`, "text/markdown", s.report)} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Download size={13} />.md</button><PdfButton L={L} storeKey={iso ? `gd-scen:${iso}` : undefined} /><button type="button" onClick={() => printBriefing(html())} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Printer size={13} />{u.pdf}</button><button type="button" onClick={() => setView(view === "vis" ? "text" : "vis")} className="h-8 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-accent">{view === "vis" ? u.text : u.title}</button></span></div>
-          {view === "text" ? <div className="space-y-4"><Block title={u.text}><article><Markdown source={s.report} /></article></Block><GatesPanel md={s.report} kind="other" L={L} iso3={iso!} /></div> : (<div className="space-y-4">
+          {view === "text" ? <div className="space-y-4"><Block title={u.text}><article><Markdown source={s.report} /></article></Block><GatesPanel md={s.report} kind="other" L={L} iso3={iso!} /></div> : (<FoldGroup L={L}><div className="space-y-4">
+            <MachHead L={L} kind="mach-scenario" report={s.report} at={s.at} kicker={u.title}
+              nav={[p.tree.length > 0 && { id: "sc-tree", label: u.tree }, p.shifts.length > 0 && { id: "sc-shifts", label: u.shifts }, p.sequence.length > 0 && { id: "sc-seq", label: u.seq }, p.redteam.length > 0 && { id: "sc-red", label: u.red }].filter(Boolean) as { id: string; label: string }[]}
+              stats={[stat(p.tree.length, L === "ar" ? "عقد النتائج" : "outcome nodes", "var(--accent)", <Route size={16} />, "sc-tree", !p.tree.length), stat(p.tree.filter((n) => n.branch === "favourable").length, L === "ar" ? "مؤاتٍ" : "favourable", "var(--ok)", <Sparkles size={16} />, "sc-tree", !p.tree.some((n) => n.branch === "favourable")), stat(p.tree.filter((n) => n.branch === "adverse").length, L === "ar" ? "سلبي" : "adverse", "var(--risk)", <ShieldAlert size={16} />, "sc-tree", !p.tree.some((n) => n.branch === "adverse")), stat(p.tree.filter((n) => n.branch === "shock").length, L === "ar" ? "بفعل صدمة" : "shock-triggered", "var(--warn)", <Zap size={16} />, "sc-tree", !p.tree.some((n) => n.branch === "shock"))]} />
+            <MachStandard L={L} report={s.report} skip={["scenarios"]} />
             <h3 className="display text-[16px] font-semibold text-t0">{p.title}</h3><p className="-mt-2 text-[11.5px] text-t2">{p.line}</p>
-            {p.recap.length > 0 && <Block title={u.recap}><Tbl head={["Input", "Value"]} rows={p.recap.map((r) => [`**${r.input}**`, r.value])} w={["26%", "74%"]} /></Block>}
-            {p.developments.length > 0 && <Block title={u.latest}><Tbl head={["Date", "Development", "Source", "Effect on the scenario"]} rows={p.developments.map((d) => [d.date, d.text, d.source, d.effect])} w={["10%", "38%", "24%", "28%"]} /></Block>}
-            {p.tree.length > 0 && <Block title={u.tree} hint={u.treeH}><TreeSvg nodes={p.tree} L={L} title={u.tree} /></Block>}
-            {p.io.length > 0 && <Block title={u.io}><Tbl head={L === "ar" ? ["المدخل الملتزم به", "الآلية", "المخرج الوسيط", "النتيجة المواتية", "النتيجة السلبية", "المؤشر الدال"] : ["Input committed", "Mechanism", "Intermediate output", "Favourable outcome", "Adverse outcome", "Signpost"]} rows={p.io.map((r) => [`**${r.input}**`, r.mechanism, r.intermediate, r.favourable, r.adverse, r.signpost])} /></Block>}
-            {p.shifts.length > 0 && <Block title={u.shifts}><Tbl head={["Indicator", "Baseline", "Favourable branch", "Adverse branch", "Evidence"]} rows={p.shifts.map((r) => [`**${r.indicator}**`, r.baseline, r.favourable, r.adverse, r.evidence])} /></Block>}
-            {p.sequence.length > 0 && <Block title={u.seq}><Tbl head={["Step", "Period", "Instrument", "Decision gate", "Exit condition"]} rows={p.sequence.map((r) => [`**${r.step}**`, r.period, r.instrument, r.gate, r.exit])} /></Block>}
-            {p.redteam.length > 0 && <Block title={u.red}><Tbl head={["Check", "Finding", "Effect on the recommendation"]} rows={p.redteam.map((r) => [`**${r.check}**`, r.finding, r.effect])} w={["22%", "50%", "28%"]} /></Block>}
+            {p.recap.length > 0 && <Block title={u.recap}><FTbl L={L} head={["Input", "Value"]} rows={p.recap.map((r) => [`**${r.input}**`, r.value])} w={["26%", "74%"]} /></Block>}
+            {p.developments.length > 0 && <Block title={u.latest}><FTbl L={L} head={["Date", "Development", "Source", "Effect on the scenario"]} rows={p.developments.map((d) => [d.date, d.text, d.source, d.effect])} w={["10%", "38%", "24%", "28%"]} /></Block>}
+            {p.tree.length > 0 && <Block id="sc-tree" title={u.tree} hint={u.treeH} count={p.tree.length}><div className="mb-3 rounded-[12px] bg-bg2 p-3"><BranchBar L={L} nodes={p.tree} /></div><TreeSvg nodes={p.tree} L={L} title={u.tree} /><div className="mt-4"><NodeList L={L} nodes={p.tree} /></div></Block>}
+            {p.io.length > 0 && <Block title={u.io}><FTbl L={L} head={L === "ar" ? ["المدخل الملتزم به", "الآلية", "المخرج الوسيط", "النتيجة المواتية", "النتيجة السلبية", "المؤشر الدال"] : ["Input committed", "Mechanism", "Intermediate output", "Favourable outcome", "Adverse outcome", "Signpost"]} rows={p.io.map((r) => [`**${r.input}**`, r.mechanism, r.intermediate, r.favourable, r.adverse, r.signpost])} /></Block>}
+            {p.shifts.length > 0 && <Block id="sc-shifts" title={u.shifts} count={p.shifts.length}><FTbl L={L} head={["Indicator", "Baseline", "Favourable branch", "Adverse branch", "Evidence"]} rows={p.shifts.map((r) => [`**${r.indicator}**`, r.baseline, r.favourable, r.adverse, r.evidence])} /></Block>}
+            {p.sequence.length > 0 && <Block id="sc-seq" title={u.seq} count={p.sequence.length}><FTbl L={L} head={["Step", "Period", "Instrument", "Decision gate", "Exit condition"]} rows={p.sequence.map((r) => [`**${r.step}**`, r.period, r.instrument, r.gate, r.exit])} /></Block>}
+            {p.redteam.length > 0 && <Block id="sc-red" title={u.red} count={p.redteam.length}><FTbl L={L} head={["Check", "Finding", "Effect on the recommendation"]} rows={p.redteam.map((r) => [`**${r.check}**`, r.finding, r.effect])} w={["22%", "50%", "28%"]} /></Block>}
             {p.gaps.length > 0 && <Block title={u.gaps}><ul className="space-y-1 text-[12px] leading-snug text-t1">{p.gaps.map((x, i) => <li key={i} className="flex gap-2"><span aria-hidden className="text-warn">▲</span><span><Inline text={x} /></span></li>)}</ul></Block>}
-          </div>)}
+          </div></FoldGroup>)}
         </>)}
       </>)}
       {tab === "illus" && (<div className="space-y-4">
@@ -62,9 +70,9 @@ export function ScenarioStudio({ L, f, setF, list, by, set }: { L: Lang; f: Filt
         <Block title={u.fig2} hint={u.fig2h}><TreeSvg nodes={FIG_PARTNERSHIP} L={L} title={u.fig2} /></Block>
         <Block title={u.fig3}><ol className="flex flex-wrap items-center gap-2 text-[12px]">{FIG_GATES.map((g, i) => <li key={g} className="flex items-center gap-2"><span className="rounded-[10px] bg-bg2 px-3 py-2 text-t0"><span className="num me-1.5 text-accent">{i + 1}</span>{g}</span>{i < FIG_GATES.length - 1 && <span aria-hidden className="text-t2 rtl:rotate-180">→</span>}</li>)}</ol></Block>
         <Block title={u.fig4}><div className="grid gap-px overflow-hidden rounded-[12px] bg-line sm:grid-cols-[150px_1fr_1fr]"><div className="bg-bg1" />{SCEN_AXES.cols.map((c2) => <div key={c2} className="bg-bg1 p-2 text-[11px] font-semibold text-t1">{c2}</div>)}{SCEN_AXES.rows.map((r, i) => <><div key={r} className="bg-bg1 p-2 text-[11px] font-semibold text-t1">{r}</div>{SCEN_AXES.cells[i].map((c2, j) => <div key={j} className="bg-bg2 p-2.5 text-[12px] leading-snug text-t0">{c2}</div>)}</>)}</div></Block>
-        <Block title={u.tmpl}><Tbl head={[...u.tmplT]} rows={SCEN_TEMPLATES.map((t) => [`**${tx(t.name, L)}**`, t.conditions, t.implication, t.response])} /></Block>
+        <Block title={u.tmpl}><FTbl L={L} head={[...u.tmplT]} rows={SCEN_TEMPLATES.map((t) => [`**${tx(t.name, L)}**`, t.conditions, t.implication, t.response])} /></Block>
         <Block title={u.flow}><ol className="grid gap-1.5 sm:grid-cols-2">{SCENARIO_FLOW.map((x, i) => <li key={i} className="flex gap-2 rounded-[10px] bg-bg2 p-2.5 text-[12px] text-t0"><span className="num text-accent">{i + 1}</span>{x}</li>)}</ol></Block>
-        <Block title={u.ex}><p className="mb-2 rounded-[10px] bg-bg2 p-2.5 text-[12px] italic text-t1">{FIG_EXAMPLE_TABLE.request}</p><TreeSvg nodes={FIG_EXAMPLE} L={L} title={u.ex} /><div className="mt-3"><Tbl head={L === "ar" ? ["المدخل الملتزم به", "الآلية", "المخرج الوسيط", "النتيجة المواتية", "النتيجة السلبية", "المؤشر الدال"] : ["Input committed", "Mechanism", "Intermediate output", "Favourable outcome", "Adverse outcome", "Signpost"]} rows={[[FIG_EXAMPLE_TABLE.row.input, FIG_EXAMPLE_TABLE.row.mechanism, FIG_EXAMPLE_TABLE.row.intermediate, FIG_EXAMPLE_TABLE.row.favourable, FIG_EXAMPLE_TABLE.row.adverse, FIG_EXAMPLE_TABLE.row.signpost]]} /></div><p className="mt-2"><Pill c="var(--warn)">{L === "ar" ? "الشكل فقط" : "Format only"}</Pill></p></Block>
+        <Block title={u.ex}><p className="mb-2 rounded-[10px] bg-bg2 p-2.5 text-[12px] italic text-t1">{FIG_EXAMPLE_TABLE.request}</p><TreeSvg nodes={FIG_EXAMPLE} L={L} title={u.ex} /><div className="mt-3"><FTbl L={L} head={L === "ar" ? ["المدخل الملتزم به", "الآلية", "المخرج الوسيط", "النتيجة المواتية", "النتيجة السلبية", "المؤشر الدال"] : ["Input committed", "Mechanism", "Intermediate output", "Favourable outcome", "Adverse outcome", "Signpost"]} rows={[[FIG_EXAMPLE_TABLE.row.input, FIG_EXAMPLE_TABLE.row.mechanism, FIG_EXAMPLE_TABLE.row.intermediate, FIG_EXAMPLE_TABLE.row.favourable, FIG_EXAMPLE_TABLE.row.adverse, FIG_EXAMPLE_TABLE.row.signpost]]} /></div><p className="mt-2"><Pill c="var(--warn)">{L === "ar" ? "الشكل فقط" : "Format only"}</Pill></p></Block>
       </div>)}
     </div>
   );

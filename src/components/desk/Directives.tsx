@@ -1,7 +1,7 @@
 "use client";
 import { PdfButton } from "../PdfButton";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Clock, Copy, Printer, Send, Trash2, Zap } from "lucide-react";
+import { Clock, Copy, Printer, Send, Zap } from "lucide-react";
 import { PRODUCT_USD, parseDirective, type Agent, type Directive } from "@/lib/desk/core";
 import { routed } from "@/lib/desk/plan";
 import { briefingHtml, printBriefing } from "@/lib/dossier/export";
@@ -14,7 +14,9 @@ import { usd } from "../machiavelli/parts";
 import { useRun, type Saved } from "../machiavelli/useRun";
 import { statusWord, useTr } from "../case/bits";
 import { useAnswers, type Answer } from "./filed";
-import { CONF_C, Bullets, Drill, FactsProvider, Row, word } from "./shared";
+import { CONF_C, Drill, FactsProvider, word } from "./shared";
+import { DirectiveView } from "./DirectiveParts";
+import { ConfirmButton } from "../report/kit";
 
 export type Preset = { n: number; topic: string; agents?: string[]; mode?: "question" | "directive" | "update" };
 const MODES: { id: "question" | "directive" | "update"; en: string; ar: string; help: { en: string; ar: string } }[] = [
@@ -58,7 +60,7 @@ export function Directives({ L, iso, name, product, roster, context, storeKey, p
 }
 
 function AnswerCard({ L, a, iso, desk, name, roster, chief, onFollow, onDelete, onRecord, done }: { L: Lang; a: Answer; iso: string; desk: "king" | "embassy" | "mofa"; name: string; roster: Agent[]; chief: string; onFollow: (t: string) => void; onDelete: () => void; onRecord?: () => void; done: boolean }) {
-  const t = useTr(L); const d: Directive | null = a.directive; const [copied, setCopied] = useState(false); const body = a.report.replace(/<directive>[\s\S]*?(?:<\/directive>|$)/g, "").trim();
+  const t = useTr(L); const d: Directive | null = a.directive ?? parseDirective(a.report); const [copied, setCopied] = useState(false); const body = a.report.replace(/<directive>[\s\S]*?(?:<\/directive>|$)/g, "").trim();
   const nameOf = (id: string) => { const x = roster.find((r) => r.id === id); return x ? (L === "ar" ? x.ar : x.en) : id; };
   const kind = a.mode === "update" ? t("Update", "مستجدات") : a.mode === "directive" ? t("Directive", "توجيه") : t("Question", "سؤال");
   return (
@@ -68,15 +70,7 @@ function AnswerCard({ L, a, iso, desk, name, roster, chief, onFollow, onDelete, 
         <h3 className="display mt-2 text-[17px] font-semibold leading-snug text-t0" dir="auto">{a.topic || (a.mode === "update" ? t("What has changed in the last 30 days", "ما تغيّر خلال آخر 30 يومًا") : "")}</h3>
         {a.agents.length > 0 && <p className="mt-1 flex flex-wrap gap-1 text-[11px] text-t2">{t("Consulted", "استُشير")}: {a.agents.map((id) => <span key={id} className="rounded-full border border-line px-2 py-0.5 text-t1">{nameOf(id)}</span>)}</p>}
         {d ? (
-          <div className="mt-3 space-y-3">
-            <div className="rounded-[12px] border border-accent/40 bg-accent/5 p-3.5"><div className="label">{t("The answer", "الإجابة")} · {chief}</div><p className="mt-1 text-[14px] leading-snug text-t0" dir="auto">{d.answer}</p></div>
-            {d.recommendation && <div className="rounded-[12px] bg-bg2 p-3.5"><div className="label">{t("Recommendation", "التوصية")}</div><p className="mt-1 text-[13px] leading-snug text-t0" dir="auto">{d.recommendation}</p></div>}
-            {d.options.length > 0 && <section><h4 className="mb-1.5 text-[13px] font-semibold text-t0">{t("Options", "الخيارات")}</h4><div className="space-y-2">{d.options.map((o) => <Drill key={o.name} L={L} head={o.name} sub={o.risk}><Bullets label={t("For", "مع")} items={o.pros} tone="ok" /><Bullets label={t("Against", "ضد")} items={o.cons} tone="warn" /><Row label={t("Cost", "الكلفة")}>{o.cost}</Row><Row label={t("Risk", "الخطر")} tone="risk">{o.risk}</Row></Drill>)}</div></section>}
-            {d.steps.length > 0 && <section><h4 className="mb-1.5 text-[13px] font-semibold text-t0">{t("The way forward", "سبيل المضي")}</h4><ol className="space-y-2">{d.steps.map((s, i) => <li key={i}><Drill L={L} head={<><span className="num me-1.5 text-t2">{i + 1}.</span>{s.action}</>} tags={s.when ? <Pill c="var(--c2)">{s.when}</Pill> : undefined}><Row label={t("Owner (proposed)", "المسؤول (مقترح)")}>{s.owner}</Row><Row label={t("Detail", "التفصيل")}>{s.detail}</Row></Drill></li>)}</ol></section>}
-            {d.risks.length > 0 && <section><h4 className="mb-1.5 text-[13px] font-semibold text-t0">{t("Risks", "المخاطر")}</h4><div className="space-y-2">{d.risks.map((r) => <Drill key={r.name} L={L} head={r.name} accent="var(--warn)"><Row label={t("Mitigation", "المعالجة")}>{r.mitigation}</Row></Drill>)}</div></section>}
-            {d.needs.length > 0 && <Bullets label={t("Only the desk or the ministry can supply", "لا يوفره إلا المكتب أو الوزارة")} items={d.needs} tone="warn" />}
-            {d.follow.length > 0 && <div><div className="label mb-1">{t("Ask next", "اسأل بعد ذلك")}</div><div className="flex flex-wrap gap-1.5">{d.follow.map((f) => <button key={f} type="button" onClick={() => onFollow(f)} className="rounded-full border border-line bg-bg2 px-3 py-1 text-start text-[12px] text-t0 hover:border-accent">{f}</button>)}</div></div>}
-          </div>
+          <DirectiveView L={L} id={a.id} report={a.report} at={a.at} d={d} kind={kind} chief={chief} onFollow={onFollow} />
         ) : <p className="mt-2 rounded-[10px] border border-warn/40 bg-warn/10 p-2.5 text-[12px] text-t0">{t("The structured part of this answer could not be read; the full text is below.", "تعذّرت قراءة الجزء المنظم من هذه الإجابة؛ والنص الكامل أدناه.")}</p>}
         <div className="mt-3"><Drill L={L} head={t("The full written answer and the specialists' findings", "الإجابة المكتوبة كاملة ونتائج المختصين")}><article><Markdown source={body} /></article></Drill></div>
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -84,7 +78,7 @@ function AnswerCard({ L, a, iso, desk, name, roster, chief, onFollow, onDelete, 
           <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(body); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } }} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Copy size={13} />{copied ? "✓" : t("Copy", "نسخ")}</button>
           <PdfButton L={L} source={{ kind: "directive", iso, country: name, report: a.report, at: a.at, usd: a.usd, lang: a.lang, idPart: `${desk}-${a.id}`, title: `${desk === "king" ? "THE KING" : desk === "mofa" ? "Ministry" : "Embassy"} · ${a.mode}: ${(a.topic || "").slice(0, 90)}` }} />
           <button type="button" onClick={() => printBriefing(briefingHtml(body, { title: `${a.topic || kind}: ${name}`, rtl: a.lang === "ar", foot: a.at, classification: classification(a.lang) }))} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t1"><Printer size={13} />{t("Print", "طباعة")}</button>
-          <button type="button" onClick={onDelete} className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] text-t2 hover:text-risk"><Trash2 size={13} />{t("Delete", "حذف")}</button></div>
+          <span className="ms-auto"><ConfirmButton L={L} label={t("Delete", "حذف")} ask={t("Delete this answer from this page? The PDF in the Archive is not affected.", "حذف هذه الإجابة من هذه الصفحة؟ لا يتأثر ملف PDF في الأرشيف.")} onConfirm={onDelete} /></span></div>
         <p className="mt-2 text-[11px] leading-snug text-t2">{t("Working analysis of proposals, not reviewed and not adopted policy. Owners are proposed; costs are \"not estimated\" unless evidenced.", "تحليل عمل لمقترحات، غير مُراجَع وليس سياسة معتمدة. المسؤولون مقترحون؛ والتكاليف «غير مقدّرة» ما لم يثبت.")}</p>
       </article>
     </FactsProvider>

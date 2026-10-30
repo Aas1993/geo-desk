@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Briefcase, ClipboardList, Compass, Crown, FileText, Flag, Gauge, Landmark, LayoutList, ListChecks, ScrollText, Users, X } from "lucide-react";
+import { Briefcase, ClipboardList, Scale, Compass, Crown, FileText, Flag, Gauge, Landmark, LayoutList, ListChecks, ScrollText, Users, X } from "lucide-react";
 import { useT } from "@/lib/store";
 import type { CaseData } from "@/lib/case/load";
 import { POSTURE } from "@/lib/case/core";
@@ -28,15 +28,16 @@ import { Reports } from "./Reports";
 import { Statecraft } from "./Statecraft";
 import { StrategyTab } from "./StrategyTab";
 import { bt, useTr } from "./bits";
+import { CouncilRoundTable } from "../roundtable/CouncilRoundTable";
 
-type View = "priorities" | "president" | "minister" | "detailed" | "reports"; type Sub = "trends" | "value" | "council" | "architect" | "strategy" | "log" | "desk" | "ready";
+type View = "priorities" | "president" | "minister" | "detailed" | "reports"; type Sub = "trends" | "value" | "council" | "architect" | "strategy" | "log" | "desk" | "ready" | "roundtable";
 const VIEWS: { id: View; icon: typeof Gauge; en: string; ar: string; sub: { en: string; ar: string } }[] = [
   { id: "priorities", icon: Flag, en: "Priorities", ar: "الأولويات", sub: { en: "All countries", ar: "كل الدول" } }, { id: "president", icon: Crown, en: "President", ar: "الرئيس", sub: { en: "One page", ar: "صفحة واحدة" } }, { id: "minister", icon: Briefcase, en: "Minister", ar: "الوزير", sub: { en: "The reasons", ar: "الأسباب" } },
   { id: "detailed", icon: ListChecks, en: "Detailed", ar: "التفصيلي", sub: { en: "The evidence", ar: "الأدلة" } }, { id: "reports", icon: FileText, en: "Reports", ar: "التقارير", sub: { en: "Print and share", ar: "اطبع وشارك" } },
 ];
 const SUBS: { id: Sub; icon: typeof Gauge; en: string; ar: string }[] = [
   { id: "trends", icon: LayoutList, en: "Ten-year trends", ar: "اتجاهات عشر سنوات" }, { id: "value", icon: Compass, en: "UAE value and position", ar: "القيمة والموقف" }, { id: "council", icon: Users, en: "Strategic Council", ar: "المجلس الاستراتيجي" }, { id: "architect", icon: Landmark, en: "Statecraft Architect", ar: "مهندس فن الحكم" },
-  { id: "strategy", icon: Briefcase, en: "Strategy", ar: "الاستراتيجية" }, { id: "log", icon: ClipboardList, en: "Decision log", ar: "سجل القرارات" }, { id: "desk", icon: ScrollText, en: "Desk brief", ar: "موجز المكتب" }, { id: "ready", icon: Gauge, en: "Readiness", ar: "الجاهزية" },
+  { id: "strategy", icon: Briefcase, en: "Strategy", ar: "الاستراتيجية" }, { id: "log", icon: ClipboardList, en: "Decision log", ar: "سجل القرارات" }, { id: "desk", icon: ScrollText, en: "Desk brief", ar: "موجز المكتب" }, { id: "roundtable", icon: Scale, en: "Council opinions and challenge", ar: "آراء المجالس والتحدي" }, { id: "ready", icon: Gauge, en: "Readiness", ar: "الجاهزية" },
 ];
 /** Links written before the four-view layout still open the right place. */
 const LEGACY: Record<string, [View, Sub?]> = { log: ["detailed", "log"], exec: ["minister"], detail: ["detailed", "trends"], statecraft: ["detailed", "value"], council: ["detailed", "council"], architect: ["detailed", "architect"], strategy: ["detailed", "strategy"], desk: ["detailed", "desk"], ready: ["detailed", "ready"] };
@@ -80,6 +81,7 @@ export function CaseApp() {
         {iso && d && body("detailed", "log") && <DecisionLog L={L} d={d} iso={iso} arch={arch?.report ?? null} />}
         {iso && d && body("detailed", "desk") && <DeskBrief L={L} d={d} report={council?.report ?? null} arch={arch?.report ?? null} />}
         {iso && d && body("reports") && <Reports L={L} d={d} iso={iso} council={council} arch={arch} intel={intel} plan={plan} preset={preset} onGo={open} />}
+        {iso && d && body("detailed", "roundtable") && <CouncilRoundTable L={L} iso={iso} name={nm ?? iso} d={d} lens="country" />}
         {body("detailed", "ready") && <Readiness L={L} d={d} />}
       </main>
     </div>

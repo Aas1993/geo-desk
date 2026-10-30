@@ -5,7 +5,7 @@ import type { Ev } from "../bird/runner";
 import { INFO, readHeld, runOne, STALE_DAYS } from "../bird/runner";
 import { stripReviewJson } from "../review/pair";
 import { DEPT_BY } from "./catalog";
-import type { AgentPlan, PlanStep } from "./plan";
+import { fanAsk, fanRuns, MAX_FAN_RUNS, type AgentPlan, type PlanStep } from "./plan";
 
 // THE DESK AGENT'S HANDS: runs a plan from the browser through the same routes the departments' own tabs use (so the same ceilings, caches, limits and quality steps apply), in parallel, then hands their texts to the writer. Nothing here talks to a model directly.
 export type StepOut = { dept: string; name: string; ok: boolean; text: string; usd: number | null; error?: string; cached?: boolean };
@@ -54,4 +54,25 @@ export type Answer = { text: string; usd: number | null; truncated: boolean };
 export async function composeAnswer(o: { message: string; plan: AgentPlan; country: string; outs: StepOut[]; lang: "en" | "ar"; signal: AbortSignal }): Promise<{ ok: true; a: Answer } | { ok: false; message: string }> {
   const good = o.outs.filter((x) => x.ok); if (!good.length) return { ok: false, message: o.outs.map((x) => `${x.name}: ${x.error ?? "no output"}`).join(" · ") || "No department produced anything." };
   try { const r = await fetch("/api/agent/compose", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: o.message, iso3: o.plan.iso3, country: o.country, lang: o.lang, format: o.plan.format, length: o.plan.length, notes: o.plan.notes, sources: good.map((x) => ({ name: x.name, text: x.text })) }), signal: o.signal }); const j = (await r.json().catch(() => ({}))) as { text?: string; usd?: number; truncated?: boolean; message?: string }; return r.ok && j.text ? { ok: true, a: { text: j.text, usd: j.usd ?? null, truncated: !!j.truncated } } : { ok: false, message: j.message ?? "The writer could not finish." }; } catch (e) { return { ok: false, message: (e as Error).message }; }
+}
+
+// ---- COMPARE: the fan-out. The same departments' routes, once per country, a couple at a time (the desk route lets two detailed briefings run at once), at most MAX_FAN_RUNS in all; the comparative writer then reads the free held-data table and what each run wrote.
+export type FanOut = StepOut & { iso: string; country: string };
+export const fanKey = (dept: string, iso: string) => `${dept}:${iso}`;
+export type FanCtx = { lang: "en" | "ar"; signal: AbortSignal; name: (iso: string) => string; data: (iso: string) => Promise<string>; onEvent: (key: string, e: Ev) => void; onStart?: (key: string) => void; onEnd?: (key: string, o: FanOut) => void };
+export async function runFan(p: AgentPlan, c: FanCtx, pool = 2): Promise<FanOut[]> {
+  const runs = fanRuns(p); const n = p.countries?.length ?? 1; const out: FanOut[] = new Array(runs.length); let next = 0;
+  if ((p.countries?.length ?? 0) * p.steps.length > MAX_FAN_RUNS) return runs.map((r) => ({ dept: r.dept, name: r.dept, ok: false, text: "", usd: null, error: `A comparison runs at most ${MAX_FAN_RUNS} departments in all.`, iso: r.iso, country: c.name(r.iso) }));
+  const one = async (i: number) => {
+    const r = runs[i]; const step = p.steps.find((s) => s.dept === r.dept)!; const country = c.name(r.iso); const key = fanKey(r.dept, r.iso); c.onStart?.(key);
+    const o = c.signal.aborted ? ({ dept: r.dept, name: r.dept, ok: false, text: "", usd: null, error: "stopped" } as StepOut) : await runStep({ ...step, ask: fanAsk(step, country, n) }, { iso: r.iso, lang: c.lang, data: () => c.data(r.iso), signal: c.signal, onEvent: (_d, e) => c.onEvent(key, e) });
+    const f: FanOut = { ...o, iso: r.iso, country }; out[i] = f; c.onEnd?.(key, f);
+  };
+  await Promise.all(Array.from({ length: Math.min(pool, runs.length) }, async () => { for (;;) { const i = next++; if (i >= runs.length) return; await one(i); } }));
+  return out;
+}
+/** The comparative writer: the held-data table first, then what each run wrote for each country. It works with no run at all (the table alone). */
+export async function composeCompare(o: { message: string; plan: AgentPlan; countries: string[]; evidence: { name: string; text: string }[]; outs: FanOut[]; lang: "en" | "ar"; signal: AbortSignal }): Promise<{ ok: true; a: Answer } | { ok: false; message: string }> {
+  const sources = [...o.evidence, ...o.outs.filter((x) => x.ok).map((x) => ({ name: `${x.name}: ${x.country}`, text: x.text }))];
+  try { const r = await fetch("/api/agent/compose", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ compare: true, message: o.message, countries: o.countries, lang: o.lang, format: o.plan.format, length: o.plan.length, notes: o.plan.notes, sources }), signal: o.signal }); const j = (await r.json().catch(() => ({}))) as { text?: string; usd?: number; truncated?: boolean; message?: string }; return r.ok && j.text ? { ok: true, a: { text: j.text, usd: j.usd ?? null, truncated: !!j.truncated } } : { ok: false, message: j.message ?? "The writer could not finish." }; } catch (e) { return { ok: false, message: (e as Error).message }; }
 }

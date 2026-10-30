@@ -1,19 +1,16 @@
 "use client";
 import { PdfButton } from "../PdfButton";
-import { RedFlags, ReviewPair, reviewsOf } from "../desk/Quality";
 import { classification } from "@/lib/case/report";
 import { CouncilGuide } from "../case/CouncilGuide";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, Download, Play, Printer } from "lucide-react";
 import { AGENTS, COUNCIL_PRESETS } from "@/lib/falcon/council";
-import { parseCouncil, type RtStatus } from "@/lib/falcon/council-parse";
+import { parseCouncil } from "@/lib/falcon/council-parse";
 import { briefingHtml, printBriefing, saveBlob } from "@/lib/dossier/export";
 import type { Country } from "@/lib/types";
-import { Markdown } from "../Markdown";
-import { Meter } from "../VisualBrief";
-import { safeHttp } from "@/lib/url";
-import { Block, Pill, ScopePicker, mixc, type Lang } from "./bits";
-import { GatesPanel } from "./GatesPanel";
+import { jumpTo } from "../report/kit";
+import { Block, Pill, ScopePicker, type Lang } from "./bits";
+import { AgentsTab, AssessTab, SourcesTab, VerifyTab } from "./CouncilTabs";
 
 type Source = { url: string; title: string };
 type AgentRes = { id: string; name: string; text: string; usd: number; searches: number; failed: number; status: "done" | "skipped" | "error"; note?: string };
@@ -25,11 +22,11 @@ const T = {
   ar: { title: "مجلس الصقر", sub: "وكلاء متخصصون مقيَّدون يعملون على مراحل من قاعدة أدلة واحدة: منسق يخطط، وأربعة متخصصين يبحثون بالتوازي، ومحلل للمصلحة الإماراتية ومحلل استشراف يقرآنهم، وفريق أحمر ومدقق يتحديان ويتحققان، ومحرر يكتب التقييم ويحفظ مواضع الخلاف بينهم.", subject: "الموضوع", question: "سؤال المجلس", presets: "أمثلة", go: "اعقد المجلس", cost: "يجري كل مجلس عشر خطوات وكلاء ونحو ست عمليات بحث ويُحتسب على حساب Anthropic (قيس بنحو 0.75 دولار و95 ثانية؛ وسقف المجلس كله 1.00 دولار ويتخطى الخطوات الاختيارية بدل تجاوزه). النتائج مخزّنة 6 ساعات.", running: "المجلس منعقد…", stages: ["التخطيط", "المتخصصون", "الإمارات والاستشراف", "التحدي والتحقق", "المحرر"], wait: "ينتظر", run: "يعمل", done: "انتهى", skipped: "تُخطّي", error: "فشل",
     assess: "التقييم", agentsT: "تقارير الوكلاء", verifyT: "التحقق والتحدي", sourcesT: "المصادر", bluf: "الخلاصة", judg: "الأحكام الرئيسية", status: { survived: "صمد أمام الفريق الأحمر", softened: "خُفِّف", reversed: "عُكس", untested: "لم يُختبر" }, agrees: "حيث يتفق المجلس", agreesH: "السبب أدلة مشتركة ونموذج واحد، فليس هذا تثبّتًا مستقلًا.", dis: "خلافات محفوظة", dA: "الموقف أ", dB: "الموقف ب", dE: "الدليل", dR: "ما يحسمه", impact: "الأثر والفرص للإمارات", options: "خيارات للقرار", aud: "تدقيق الادعاءات", chal: "تحديات الفريق الأحمر", verd: { confirmed: "مؤكَّد", disputed: "متنازَع", unverifiable: "تعذّر التحقق", stale: "قديم" }, spent: "المنفَق", copy: "نسخ", copied: "تم النسخ", pdf: "طباعة / PDF", fail: "فشل المجلس:", none: "—", again: "مجلس جديد", usage: "عمليات بحث", noCred: "بيانات اعتماد Anthropic مفقودة أو منتهية." },
 } as const;
-const VC = { confirmed: "var(--ok)", disputed: "var(--risk)", unverifiable: "var(--warn)", stale: "var(--c2)" } as const; const SC: Record<RtStatus, string> = { survived: "var(--ok)", softened: "var(--warn)", reversed: "var(--risk)", untested: "var(--t2)" };
 
 /** The Falcon Council: convene it on a country or scope and a question, watch the agents work stage by stage, then read the editor's assessment with the disagreements preserved, the red-team challenges and the claim audit. */
 export function CouncilView({ list, by, iso, setIso, L, seed }: { list: Country[]; by: Map<string, Country>; iso: string | null; setIso: (i: string) => void; L: Lang; seed?: string }) {
   const u = T[L]; const [q, setQ] = useState(seed && seed.length >= 8 ? seed.slice(0, 600) : COUNCIL_PRESETS[0]); const [phase, setPhase] = useState<"form" | "running" | "done" | "error">("form"); const [live, setLive] = useState<Live>({}); const [tail, setTail] = useState(""); const [err, setErr] = useState(""); const [saved, setSaved] = useState<Saved | null>(null); const [tab, setTab] = useState<"assess" | "agents" | "verify" | "sources">("assess"); const [copied, setCopied] = useState(false);
+  const jump = (id: string) => { const to = id === "fc-audit" || id === "fc-chal" ? "verify" : "assess"; if (to !== tab) { setTab(to); setTimeout(() => jumpTo(id), 120); } else jumpTo(id); };
   const abort = useRef<AbortController | null>(null); const c = iso ? by.get(iso) : undefined; const key = iso ? `gd-council:${iso}` : "";
   useEffect(() => { const t = setTimeout(() => { setSaved(null); setPhase("form"); setErr(""); if (!key) return; try { const s = localStorage.getItem(key); if (s) { setSaved(JSON.parse(s) as Saved); setPhase("done"); } } catch { /* none saved */ } }, 0); return () => clearTimeout(t); }, [key]);
   useEffect(() => () => abort.current?.abort(), []);
@@ -78,25 +75,10 @@ export function CouncilView({ list, by, iso, setIso, L, seed }: { list: Country[
       </Block>
       {phase === "done" && saved && p && (<>
         <div role="tablist" className="flex flex-wrap gap-1">{(["assess", "agents", "verify", "sources"] as const).map((t) => <button key={t} role="tab" type="button" aria-selected={tab === t} onClick={() => setTab(t)} className={`h-8 rounded-full px-3 text-[12.5px] ${tab === t ? "bg-accent font-semibold text-[var(--accent-ink)]" : "bg-bg2 text-t1 hover:text-t0"}`}>{t === "assess" ? u.assess : t === "agents" ? `${u.agentsT} · ${saved.agents.filter((a) => a.status === "done").length}` : t === "verify" ? u.verifyT : `${u.sourcesT} · ${saved.sources.length}`}</button>)}</div>
-        {tab === "assess" && (<div className="space-y-4" dir={L === "ar" ? "rtl" : "ltr"}>
-          <RedFlags L={L} reviews={reviewsOf(saved.report)} />
-          {p.bluf && <section className="rounded-[14px] border border-accent/40 bg-accent/5 p-4"><h4 className="label mb-1.5 text-accent">{u.bluf}</h4><p className="text-[14px] leading-relaxed text-t0">{p.bluf}</p></section>}
-          {p.judgments.length > 0 && <Block title={u.judg}><ul className="grid gap-2.5 md:grid-cols-2">{p.judgments.map((j, i) => <div key={i}><Meter j={{ text: j.text, band: j.band, confidence: j.confidence, so: j.so }} lang={L} /><div className="mt-1 flex flex-wrap items-center gap-1.5 px-1 text-[10.5px] text-t2">{j.status && <Pill c={SC[j.status]}>{u.status[j.status]}</Pill>}{j.agents && <span>{j.agents}</span>}</div></div>)}</ul></Block>}
-          {p.disagreements.length > 0 && <Block title={u.dis}><ul className="space-y-2.5">{p.disagreements.map((d, i) => <li key={i} className="rounded-[12px] bg-bg2 p-3"><b className="text-[13px] text-t0">{d.issue}</b><div className="mt-2 grid gap-2 md:grid-cols-2"><p className="rounded-[8px] p-2 text-[12px] leading-snug text-t0" style={{ background: mixc("var(--accent)", 12) }}><b className="label block">{u.dA}</b>{d.a}</p><p className="rounded-[8px] p-2 text-[12px] leading-snug text-t0" style={{ background: mixc("var(--warn)", 12) }}><b className="label block">{u.dB}</b>{d.b}</p></div>{(d.evidence || d.resolve) && <p className="mt-1.5 text-[11px] leading-snug text-t1">{d.evidence && <><b className="text-t0">{u.dE}: </b>{d.evidence} </>}{d.resolve && <><b className="text-t0">{u.dR}: </b>{d.resolve}</>}</p>}</li>)}</ul></Block>}
-          {p.agrees.length > 0 && <Block title={u.agrees} hint={u.agreesH}><ul className="space-y-1.5">{p.agrees.map((a, i) => <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-t0"><span aria-hidden className="text-ok">✓</span>{a}</li>)}</ul></Block>}
-          {p.items.length > 0 && <Block title={u.impact}><ul className="space-y-1.5">{p.items.map((x, i) => <li key={i} className="flex flex-wrap items-center gap-2 rounded-[10px] bg-bg2 p-2 text-[12px]"><Pill c={/opportun/i.test(x.type) ? "var(--ok)" : "var(--risk)"}>{x.type}</Pill><span className="min-w-0 flex-1 text-t0">{x.item}</span><span className="numt text-[10.5px] text-t2">{[x.size, x.feas, x.horizon].filter(Boolean).join(" · ")}</span>{x.step && <span className="basis-full text-[11px] text-t1">→ {x.step}</span>}</li>)}</ul></Block>}
-          {p.options.length > 0 && <Block title={u.options}><ul className="space-y-1.5">{p.options.map((x, i) => <li key={i} className="rounded-[10px] bg-bg2 p-2.5 text-[12px] leading-snug"><div className="flex flex-wrap items-baseline justify-between gap-2"><b className="text-[12.5px] text-t0">{x.option}</b><span className="numt text-[10.5px] text-t2">{x.window}{x.owner ? ` · ${x.owner}` : ""}</span></div><p className="text-t1">{x.benefit}</p>{x.risk && <p className="text-t2">⚠ {x.risk}</p>}</li>)}</ul></Block>}
-          <Block title={u.assess}><article><Markdown source={p.editorMd} /></article></Block>
-          <GatesPanel md={saved.report} kind="council" L={L} iso3={iso ?? ""} />
-        </div>)}
-        {tab === "agents" && <div className="space-y-2.5">{saved.agents.map((a) => <details key={a.id} className="rounded-[12px] border border-line bg-bg1 p-3" open={a.id === "orchestrator"}><summary className="flex cursor-pointer flex-wrap items-center gap-2 text-[13px] font-semibold text-t0">{a.name}<Pill c={a.status === "done" ? "var(--ok)" : a.status === "error" ? "var(--risk)" : "var(--t2)"}>{a.status}</Pill><span className="num ms-auto text-[10.5px] font-normal text-t2">{a.searches ? `${a.searches} 🔎 · ` : ""}${a.usd.toFixed(2)}</span></summary>{a.text ? <article className="mt-2" dir={L === "ar" ? "rtl" : "ltr"}><Markdown source={a.text} /></article> : <p className="mt-2 text-[12px] text-t2">{a.note ?? u.none}</p>}</details>)}</div>}
-        {tab === "verify" && <div className="space-y-4">
-          <ReviewPair L={L} reviews={reviewsOf(saved.report)} />
-          {p.audit.length > 0 && <Block title={u.aud}><div className="mb-2 flex flex-wrap gap-2">{(["confirmed", "disputed", "unverifiable", "stale"] as const).map((k) => { const n = p.audit.filter((x) => x.verdict === k).length; return n > 0 && <Pill key={k} c={VC[k]}>{n} {u.verd[k]}</Pill>; })}</div><ul className="space-y-1.5">{p.audit.map((x, i) => <li key={i} className="flex items-start gap-2.5 rounded-[10px] bg-bg2 p-2 text-[12px] leading-snug"><span className="mt-0.5 shrink-0">{x.verdict ? <Pill c={VC[x.verdict]}>{u.verd[x.verdict]}</Pill> : "?"}</span><span className="min-w-0 flex-1 text-t0">{x.claim}<span className="block text-[10.5px] text-t2">{[x.agent, x.evidence, x.note].filter(Boolean).join(" · ")}</span></span></li>)}</ul></Block>}
-          {p.challenges.length > 0 && <Block title={u.chal}><ul className="space-y-1.5">{p.challenges.map((x, i) => <li key={i} className="rounded-[10px] bg-bg2 p-2.5 text-[12px] leading-snug"><div className="flex items-start justify-between gap-2"><b className="text-t0">{x.judgment}</b>{x.change && <Pill c={/revers/i.test(x.change) ? "var(--risk)" : /soften|caveat/i.test(x.change) ? "var(--warn)" : "var(--ok)"}>{x.change}</Pill>}</div><p className="mt-1 text-t1">{x.challenge}</p>{(x.agent || x.evidence) && <p className="text-[10.5px] text-t2">{[x.agent, x.evidence].filter(Boolean).join(" · ")}</p>}</li>)}</ul></Block>}
-          {!p.audit.length && !p.challenges.length && <p className="text-[12.5px] text-t2">{u.none}</p>}
-        </div>}
-        {tab === "sources" && <Block title={u.sourcesT}><ol className="space-y-1.5 text-[12.5px]">{saved.sources.map((s, i) => <li key={s.url} className="flex gap-2"><span className="num w-6 shrink-0 text-end text-t2">{i + 1}</span><a href={safeHttp(s.url)} target="_blank" rel="noreferrer noopener" className="min-w-0 break-words text-t1 hover:text-accent">{s.title}<span className="block text-[10.5px] text-t2">{(() => { try { return new URL(s.url).hostname; } catch { return s.url; } })()}</span></a></li>)}</ol></Block>}
+        {tab === "assess" && <AssessTab L={L} saved={saved} p={p} iso={iso ?? ""} onJump={jump} />}
+        {tab === "agents" && <AgentsTab L={L} saved={saved} />}
+        {tab === "verify" && <VerifyTab L={L} saved={saved} p={p} />}
+        {tab === "sources" && <Block title={u.sourcesT}><SourcesTab L={L} saved={saved} /></Block>}
       </>)}
     </div>
   );

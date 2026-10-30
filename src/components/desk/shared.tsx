@@ -34,10 +34,10 @@ export function Rich({ text }: { text: string }) {
 }
 
 /** A card that opens in place to its detail. Every item a desk states is one of these. */
-export function Drill({ head, sub, tags, children, defaultOpen, onAsk, askText, L, accent }: { head: ReactNode; sub?: ReactNode; tags?: ReactNode; children: ReactNode; defaultOpen?: boolean; onAsk?: (text: string) => void; askText?: string; L: Lang; accent?: string }) {
+export function Drill({ head, sub, tags, children, defaultOpen, onAsk, askText, L, accent, id }: { id?: string; head: ReactNode; sub?: ReactNode; tags?: ReactNode; children: ReactNode; defaultOpen?: boolean; onAsk?: (text: string) => void; askText?: string; L: Lang; accent?: string }) {
   const t = useTr(L);
   return (
-    <details open={defaultOpen} className="group rounded-[12px] border border-line bg-bg1 open:border-accent/50" style={accent ? { borderInlineStart: `3px solid ${accent}` } : undefined}>
+    <details id={id} open={defaultOpen} className="group scroll-mt-20 rounded-[12px] border border-line bg-bg1 open:border-accent/50" style={accent ? { borderInlineStart: `3px solid ${accent}` } : undefined}>
       <summary className="flex cursor-pointer list-none items-start gap-2.5 p-3 [&::-webkit-details-marker]:hidden"><ChevronDown size={15} className="mt-0.5 shrink-0 text-t2 transition-transform group-open:rotate-180" />
         <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="min-w-0 text-[13.5px] font-semibold leading-snug text-t0">{head}</span>{tags}</span>{sub && <span className="mt-0.5 block text-[12px] leading-snug text-t1">{sub}</span>}</span></summary>
       <div className="space-y-2 border-t border-line px-3 pb-3 pt-2.5 text-[12.5px] leading-snug">{children}{onAsk && askText && <button type="button" onClick={() => onAsk(askText)} className="mt-1 inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-2.5 text-[12px] text-t0 hover:bg-bg2"><MessageSquarePlus size={13} />{t("Ask the council about this", "اسأل المجلس عن هذا")}</button>}</div>
@@ -55,3 +55,5 @@ export function Bullets({ label, items, tone }: { label: string; items: string[]
 export const BAND_C: Record<string, string> = { high: "var(--risk)", medium: "var(--warn)", low: "var(--ok)" };
 export const CONF_C: Record<string, string> = { high: "var(--ok)", moderate: "var(--warn)", low: "var(--risk)" };
 export const word = (L: Lang, s: string) => (L === "ar" ? ({ high: "مرتفع", medium: "متوسط", moderate: "معتدل", low: "منخفض", easy: "سهل", hard: "صعب", decisive: "حاسم", influential: "مؤثر", useful: "مفيد", enter: "دخول", expand: "توسّع", protect: "حماية", ally: "حليف", partner: "شريك", neutral: "محايد", tension: "توتر", rival: "منافس", deepen: "التعميق", staged: "انتقائي ومتدرج", hedge: "التحوط", hold: "الإمساك والمراقبة", government: "الحكومة", security: "الأمن", economy: "الاقتصاد", private: "القطاع الخاص", community: "المجتمع", research: "الأبحاث", media: "الإعلام", "state-linked": "مرتبطة بالدولة", association: "جمعية" } as Record<string, string>)[s] ?? s : s);
+/** Opens the Drill with this id (a card that folds) and scrolls to it: how a dot on a matrix or a bar on a chart leads to its detail. */
+export const openDrill = (id: string) => { const el = document.getElementById(id) as HTMLDetailsElement | null; if (!el) return; el.open = true; el.scrollIntoView({ behavior: "smooth", block: "center" }); };

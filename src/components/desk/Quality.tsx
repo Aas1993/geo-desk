@@ -12,10 +12,10 @@ const GRADE_C: Record<string, string> = { A: "var(--ok)", B: "var(--ok)", C: "va
 export function useQuality(kind: Quality["kind"], s: Saved | null): Quality | null {
   return useMemo(() => (s ? assess(kind, s.report, s.sources, (s.options as { lang?: string } | undefined)?.lang === "ar" ? "ar" : (s.options as { lang?: string } | undefined)?.lang === "en" ? "en" : null) : null), [kind, s]);
 }
-export function QualityPanel({ L, q }: { L: Lang; q: Quality }) {
+export function QualityPanel({ L, q, noFlags }: { L: Lang; q: Quality; noFlags?: boolean }) {
   const t = useTr(L); const G: Record<string, [string, string]> = { evidence: ["Evidence", "الأدلة"], structure: ["Structure", "البنية"], plan: ["Plan integrity", "سلامة الخطة"], boundary: ["Boundary", "الحدود"], review: ["Independent review", "المراجعة المستقلة"], language: ["Language", "اللغة"] };
   return (
-    <div className="space-y-4"><RedFlags L={L} reviews={q.reviews} />
+    <div className="space-y-4">{!noFlags && <RedFlags L={L} reviews={q.reviews} />}
     <Block title={t("Quality check", "فحص الجودة")} hint={t("Free checks run on the product itself: completeness, evidence, source mix, plan integrity, boundary, language and the independent reviewer's verdict. It proves the product is traceable and consistent, not that the analysis is right; read the failures first.", "فحوص مجانية على المنتج نفسه: الاكتمال والأدلة وتنوّع المصادر وسلامة الخطة والحدود واللغة وحكم المراجع المستقل. تثبت أن المنتج قابل للتتبع ومتسق لا أن التحليل صحيح؛ فاقرأ الإخفاقات أولًا.")} right={<span className="flex items-center gap-2"><Pill c={GRADE_C[q.grade]}>{t("grade", "التقدير")} {q.grade}</Pill><b className="num display text-[20px]" style={{ color: GRADE_C[q.grade] }}>{q.score}</b></span>}>
       {q.failed.length > 0 && <div className="mb-3 rounded-[10px] border border-warn/40 bg-warn/10 p-2.5 text-[12px] leading-snug text-t0"><b>{t("To fix or read with care", "للإصلاح أو القراءة بحذر")}:</b> {q.failed.map((c) => (L === "ar" ? c.ar : c.en)).join(" · ")}</div>}
       <ul className="grid gap-1.5 md:grid-cols-2">{[...q.checks].sort((a, z) => Number(a.ok) - Number(z.ok)).map((c) => <li key={c.id}><Drill L={L} accent={c.ok ? "var(--ok)" : "var(--risk)"} head={<><span className={c.ok ? "text-ok" : "text-risk"}>{c.ok ? "✓" : "✗"}</span> {L === "ar" ? c.ar : c.en}</>} tags={<Pill c="var(--t2)">{L === "ar" ? G[c.group][1] : G[c.group][0]}</Pill>}><Row label={t("Reading", "القراءة")}>{c.detail}</Row><Row label={t("Weight", "الوزن")}>{String(c.weight)}</Row></Drill></li>)}</ul>
@@ -45,7 +45,7 @@ export function RedFlags({ L, reviews }: { L: Lang; reviews: Review[] }) {
   const t = useTr(L); const flags = reviews.flatMap((r) => r.redFlags.map((f) => ({ ...f, lens: r.lens }))).sort((a, z) => Number(z.severity === "critical") - Number(a.severity === "critical"));
   if (!flags.length) return null;
   return (
-    <div role="alert" className="rounded-[14px] border border-risk/50 bg-risk/10 p-3.5">
+    <div id="report-flags" role="alert" className="scroll-mt-20 rounded-[14px] border border-risk/50 bg-risk/10 p-3.5">
       <p className="flex items-center gap-2 text-[13px] font-semibold text-risk"><span aria-hidden>⚑</span> {t(`${flags.length} red flag${flags.length === 1 ? "" : "s"} raised by the independent auditors: read before relying on this product`, `${flags.length} علم أحمر رفعه المدققون المستقلون: اقرأها قبل الاعتماد على هذا المنتج`)}</p>
       <ul className="mt-2 space-y-2">{flags.map((f, i) => <li key={i}><Drill L={L} defaultOpen={f.severity === "critical"} accent={SEV[f.severity]} head={f.flag} tags={<><Pill c={SEV[f.severity]}>{f.severity === "critical" ? t("critical", "حرج") : t("serious", "جاد")}</Pill><Pill c="var(--c2)">{L === "ar" ? WHO[f.lens][1] : WHO[f.lens][0]}</Pill>{f.where && <Pill c="var(--t2)">{f.where}</Pill>}</>}><Row label={t("Why it matters to the UAE", "لماذا يهم الإمارات")} tone="risk">{f.why}</Row><Row label={t("Before relying on it", "قبل الاعتماد عليه")} tone="ok">{f.ask}</Row></Drill></li>)}</ul>
     </div>

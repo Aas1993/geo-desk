@@ -8,6 +8,9 @@ import { STATE_LABEL, type SeatState } from "@/lib/room/seats";
 import { Block, Pill, type Lang } from "../falcon/bits";
 import { useTr } from "../case/bits";
 import { Bullets, Cites, Drill, Row } from "../desk/shared";
+import { ListBar, NoMatch, SegBar, useListView, type Facet, type SortSpec } from "../report/kit";
+import { useMemo } from "react";
+import { INTEREST_W } from "@/lib/report/mission-model";
 
 const bar = (p: number | null, c = "var(--ok)") => p == null ? null : <span className="inline-flex w-24 items-center gap-1.5 align-middle" aria-label={`${Math.round(p * 100)}%`}><span className="block h-1.5 flex-1 overflow-hidden rounded-full bg-bg3"><span className="block h-full rounded-full" style={{ width: `${Math.round(p * 100)}%`, background: c }} /></span><span className="numt text-[10.5px] text-t2">{Math.round(p * 100)}%</span></span>;
 const INTEREST_AR: Record<string, string> = { security: "الأمن", economic: "الاقتصاد", "energy and food": "الطاقة والغذاء", "diplomatic standing": "المكانة الدبلوماسية", alliances: "التحالفات", citizens: "المواطنون", reputation: "السمعة" };
@@ -16,27 +19,35 @@ export const POSTURE_AR: Record<string, string> = { deepen: "تعميق", staged
 /** The ranked priorities, each with its goals and the tasks set for the mission under it. */
 export function PrioritiesView({ L, m, track, onAsk }: { L: Lang; m: Mofa; track: Track; onAsk: (text: string) => void }) {
   const t = useTr(L);
+  const facets = useMemo<Facet<Mofa["priorities"][number]>[]>(() => [{ id: "interest", label: t("Interest", "المصلحة"), get: (x) => x.interest, options: [...new Set(m.priorities.map((p) => p.interest))].map((v) => ({ v, label: INTEREST_W[v]?.[L] ?? v })) }, { id: "horizon", label: t("Horizon", "الأفق"), get: (x) => x.horizon, options: [...new Set(m.priorities.map((p) => p.horizon).filter(Boolean))].map((v) => ({ v, label: v })) }], [L, m.priorities]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sorts = useMemo<SortSpec<Mofa["priorities"][number]>[]>(() => [{ id: "rank", label: t("Rank", "الترتيب"), cmp: (a, z) => a.rank - z.rank }, { id: "behind", label: t("Furthest behind first", "الأكثر تأخرًا أولًا"), cmp: (a, z) => (progressOf(m, track, a.id) ?? 2) - (progressOf(m, track, z.id) ?? 2) }, { id: "goals", label: t("Most goals first", "الأكثر أهدافًا أولًا"), cmp: (a, z) => m.goals.filter((g) => g.priority === z.id).length - m.goals.filter((g) => g.priority === a.id).length }], [L, m, track]); // eslint-disable-line react-hooks/exhaustive-deps
+  const view = useListView(m.priorities, { text: (p) => `${p.id} ${p.title} ${p.interest} ${p.why} ${p.horizon} ${p.owner} ${m.goals.filter((g) => g.priority === p.id).map((g) => `${g.goal} ${g.measure} ${g.owner}`).join(" ")} ${m.mission.filter((x) => x.priority === p.id).map((x) => `${x.task} ${x.who}`).join(" ")}`, facets, sorts });
   return (
     <div className="space-y-2.5">
-      {m.priorities.map((p) => { const goals = m.goals.filter((g) => g.priority === p.id); const tasks = m.mission.filter((x) => x.priority === p.id); const pr = progressOf(m, track, p.id);
+      <ListBar L={L} view={view} placeholder={t("Search priorities, goals and tasks", "ابحث في الأولويات والأهداف والمهام")} />
+      {view.shown.map((p) => { const goals = m.goals.filter((g) => g.priority === p.id); const tasks = m.mission.filter((x) => x.priority === p.id); const pr = progressOf(m, track, p.id);
         return (
           <Drill key={p.id} L={L} defaultOpen={p.rank <= 2} accent="var(--accent)" onAsk={onAsk} askText={`Priority ${p.id} (${p.title}): what would it take to advance it faster, and what could derail it?`} head={<><span className="numt me-1.5 text-t2">#{p.rank}</span>{p.title}</>} sub={bar(pr)} tags={<><Pill c="var(--c2)">{L === "ar" ? INTEREST_AR[p.interest] ?? p.interest : p.interest}</Pill>{p.horizon && <Pill c="var(--t2)">{p.horizon}</Pill>}<Pill c="var(--t2)">{p.id}</Pill></>}>
             <Row label={t("Why it ranks here", "لماذا يحتل هذه المرتبة")}>{p.why}<Cites ids={p.evidence} /></Row>
             {p.owner && <Row label={t("Ministry owner (proposed)", "مسؤول الوزارة (مقترح)")}>{p.owner}</Row>}
             {goals.length > 0 && <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[640px] text-[11.5px]"><thead><tr className="text-start text-t2">{[t("Goal", "الهدف"), t("Measure", "المقياس"), t("Baseline", "خط الأساس"), t("Target", "المستهدف"), t("By", "بحلول"), t("Owner", "المسؤول")].map((h) => <th key={h} className="py-1 pe-2 text-start font-medium">{h}</th>)}</tr></thead><tbody>{goals.map((g) => <tr key={g.id} className="border-t border-line align-top"><td className="py-1 pe-2 text-t0" dir="auto"><span className="numt text-t2">{g.id}</span> {g.goal}</td><td className="py-1 pe-2" dir="auto">{g.measure}</td><td className="py-1 pe-2" dir="auto">{g.baseline}</td><td className="py-1 pe-2" dir="auto">{g.target}</td><td className="py-1 pe-2" dir="auto">{g.by}</td><td className="py-1 pe-2" dir="auto">{g.owner}</td></tr>)}</tbody></table></div>}
-            {tasks.length > 0 && <div className="mt-2"><Bullets label={t("Tasks set for the mission", "المهام المكلّفة للبعثة")} items={tasks.map((x) => `${x.id}: ${x.task} (${x.who}${x.when ? `, ${x.when}` : ""}${x.measure ? `; ${x.measure}` : ""})`)} /></div>}
+            {tasks.length > 0 && <div className="mt-2"><Bullets label={t("Tasks set for the mission", "المهام المكلّفة للبعثة")} items={tasks.map((x) => `${x.id}: ${x.task} (${x.who}${x.when ? `, ${x.when}` : ""}${x.measure ? `; ${x.measure}` : ""}${x.deliverable ? `; ${t("deliverable", "المخرج")}: ${x.deliverable}` : ""})`)} /></div>}
           </Drill>
         ); })}
+      {!view.shown.length && <NoMatch L={L} />}
     </div>
   );
 }
 /** The embassy's plans in the seven domains, then the reporting lines and the triggers for an updated brief. */
 export function PlansView({ L, m }: { L: Lang; m: Mofa }) {
-  const t = useTr(L); const by = new Map(m.plans.map((p) => [p.domain, p]));
+  const t = useTr(L); const by = useMemo(() => new Map(m.plans.map((p) => [p.domain, p])), [m.plans]); const DL = useMemo(() => MOFA_DOMAINS.map((d) => ({ d, p: by.get(d) })), [by]);
+  const facets = useMemo<Facet<(typeof DL)[number]>[]>(() => [{ id: "domain", label: t("Domain", "المجال"), get: (x) => x.d, options: MOFA_DOMAINS.map((v) => ({ v, label: DOMAIN_LABEL[v][L] })) }], [L]); // eslint-disable-line react-hooks/exhaustive-deps
+  const view = useListView(DL, { text: (x) => `${DOMAIN_LABEL[x.d].en} ${DOMAIN_LABEL[x.d].ar} ${x.p ? `${x.p.aim} ${x.p.actions.map((a) => `${a.action} ${a.owner} ${a.when} ${a.measure}`).join(" ")} ${x.p.risks.join(" ")} ${x.p.dependsOn.join(" ")}` : ""}`, facets });
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 lg:grid-cols-2">{MOFA_DOMAINS.map((d) => { const p = by.get(d); const lab = DOMAIN_LABEL[d]; return (
-        <section key={d} className="rounded-[14px] border border-line bg-bg1 p-3.5"><h4 className="display text-[15px] font-semibold text-t0">{L === "ar" ? lab.ar : lab.en}</h4>
+      <ListBar L={L} view={view} placeholder={t("Search the domain plans", "ابحث في خطط المجالات")} />
+      <div className="grid gap-3 lg:grid-cols-2">{view.shown.map(({ d, p }) => { const lab = DOMAIN_LABEL[d]; return (
+        <section key={d} id={`mofa-plan-${d}`} className="scroll-mt-20 rounded-[14px] border border-line bg-bg1 p-3.5"><h4 className="display text-[15px] font-semibold text-t0">{L === "ar" ? lab.ar : lab.en}</h4>
           {p ? <><p className="mt-1 text-[12.5px] leading-snug text-t1" dir="auto">{p.aim}</p>
             <ul className="mt-2 space-y-1.5">{p.actions.map((a, i) => <li key={i} className="rounded-[10px] bg-bg2 p-2 text-[12px] leading-snug"><span className="text-t0" dir="auto">{a.action}</span><span className="mt-0.5 block text-[10.5px] text-t2">{[a.owner, a.when, a.measure && `${t("measure", "المقياس")}: ${a.measure}`].filter(Boolean).join(" · ")}</span></li>)}</ul>
             {p.risks.length > 0 && <div className="mt-2"><Bullets label={t("Risks", "المخاطر")} items={p.risks} tone="warn" /></div>}{p.dependsOn.length > 0 && <p className="mt-1.5 text-[11px] text-t2">{t("Depends on", "يعتمد على")}: {p.dependsOn.join(", ")}</p>}</>
@@ -50,6 +61,9 @@ export function PlansView({ L, m }: { L: Lang; m: Mofa }) {
 /** The tracker: set each goal and task, add a note, and send the progress to the Ministry for an updated brief. */
 export function TrackerView({ L, m, track, set, onUpdate, busy }: { L: Lang; m: Mofa; track: Track; set: (id: string, s: TrackStatus, note?: string) => void; onUpdate: () => void; busy: boolean }) {
   const t = useTr(L); const c = counts(m, track); const all = progressOf(m, track);
+  const rows = useMemo(() => [...m.goals.map((g) => ({ id: g.id, kind: "goal", priority: g.priority, text: `${g.id} ${g.goal} ${g.measure} ${g.target} ${g.owner} ${track[g.id]?.note ?? ""}` })), ...m.mission.map((x) => ({ id: x.id, kind: "task", priority: x.priority, text: `${x.id} ${x.task} ${x.who} ${x.when} ${x.deliverable} ${track[x.id]?.note ?? ""}` }))], [m, track]);
+  const facets = useMemo<Facet<(typeof rows)[number]>[]>(() => [{ id: "status", label: t("Status", "الحالة"), get: (x) => track[x.id]?.status ?? "todo", options: STATUSES.map((s) => ({ v: s.id, label: L === "ar" ? s.ar : s.en, color: s.color })) }, { id: "kind", label: t("Kind", "النوع"), get: (x) => x.kind, options: [{ v: "goal", label: t("Goals", "الأهداف") }, { v: "task", label: t("Mission tasks", "مهام البعثة") }] }, { id: "priority", label: t("Priority", "الأولوية"), get: (x) => x.priority, options: m.priorities.map((p) => ({ v: p.id, label: `#${p.rank} ${p.id}` })) }], [L, m, track]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rv = useListView(rows, { text: (x) => x.text, facets }); const ok = new Set(rv.shown.map((x) => x.id));
   const row = (id: string, kind: string, text: string, sub: string) => { const e = track[id]; const st = e?.status ?? "todo"; return (
     <li key={id} className="rounded-[10px] bg-bg2 p-2.5"><div className="flex flex-wrap items-start gap-2"><div className="min-w-0 flex-1"><p className="text-[12.5px] leading-snug text-t0" dir="auto"><span className="numt me-1 text-t2">{id}</span>{text}</p><p className="text-[10.5px] text-t2" dir="auto">{kind} · {sub}</p></div>
       <div role="radiogroup" aria-label={`${id} ${t("status", "الحالة")}`} className="flex flex-wrap gap-1">{STATUSES.map((s) => <button key={s.id} type="button" role="radio" aria-checked={st === s.id} onClick={() => set(id, s.id, e?.note)} className={`h-7 rounded-full border px-2.5 text-[11px] ${st === s.id ? "font-semibold text-t0" : "text-t2 hover:text-t0"}`} style={{ borderColor: st === s.id ? s.color : "var(--line)", background: st === s.id ? `color-mix(in srgb, ${s.color} 18%, transparent)` : "transparent" }}>{L === "ar" ? s.ar : s.en}</button>)}</div></div>
@@ -60,9 +74,11 @@ export function TrackerView({ L, m, track, set, onUpdate, busy }: { L: Lang; m: 
       <Block title={t("Progress", "التقدم")} hint={`${L === "ar" ? PROGRESS_RULE.ar : PROGRESS_RULE.en} ${t("Statuses are kept in this browser: the Ministry's own systems are the record.", "تُحفظ الحالات في هذا المتصفح: وأنظمة الوزارة هي السجل.")}`} right={bar(all)}>
         <div className="flex flex-wrap items-center gap-2">{STATUSES.map((s) => <Pill key={s.id} c={s.color}>{L === "ar" ? s.ar : s.en}: {c[s.id]}</Pill>)}<span className="text-[11.5px] text-t2">{t("of", "من")} {c.total}</span>
           <button type="button" disabled={busy || c.total === 0} onClick={onUpdate} className="ms-auto h-9 rounded-[10px] bg-accent px-3 text-[12.5px] font-semibold text-[var(--accent-ink)] disabled:opacity-50">{t("Send this progress for an updated brief", "أرسل هذا التقدم لموجز محدّث")}</button></div>
+        <div className="mt-3"><SegBar segs={STATUSES.map((s) => ({ label: L === "ar" ? s.ar : s.en, n: c[s.id], color: s.color }))} /></div>
         <p className="mt-2 text-[11px] text-t2">{t("The updated brief searches the last 30 days, reads your statuses and notes, and says which goals to keep, change or drop. It is a paid run (about US$0.20) and opens under Ask or direct.", "يبحث الموجز المحدّث في آخر 30 يومًا ويقرأ حالاتك وملاحظاتك ويقول أي الأهداف تُبقي أو تُغيّر أو تُسقط. هو تشغيل مدفوع (نحو 0.20 دولار) ويُفتح تحت «اسأل أو وجّه».")}</p>
       </Block>
-      {m.priorities.map((p) => { const goals = m.goals.filter((g) => g.priority === p.id); const tasks = m.mission.filter((x) => x.priority === p.id); return (
+      <ListBar L={L} view={rv} placeholder={t("Search goals, tasks and notes", "ابحث في الأهداف والمهام والملاحظات")} />
+      {m.priorities.map((p) => { const goals = m.goals.filter((g) => g.priority === p.id && ok.has(g.id)); const tasks = m.mission.filter((x) => x.priority === p.id && ok.has(x.id)); if (rv.active && goals.length + tasks.length === 0) return null; return (
         <Block key={p.id} title={`#${p.rank} ${p.title}`} right={bar(progressOf(m, track, p.id))}><ul className="space-y-1.5">{goals.map((g) => row(g.id, t("Goal", "هدف"), g.goal, `${g.target} · ${g.by} · ${g.owner}`))}{tasks.map((x) => row(x.id, t("Mission task", "مهمة البعثة"), x.task, `${x.who} · ${x.when}`))}{goals.length + tasks.length === 0 && <li className="text-[12px] text-t2">{t("No goal or task under this priority.", "لا هدف ولا مهمة تحت هذه الأولوية.")}</li>}</ul></Block>); })}
     </div>
   );

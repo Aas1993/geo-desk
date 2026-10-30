@@ -16,8 +16,8 @@ import { outputRoom } from "./dossier/cost";
 
 const unique = (a: string[]) => new Set(a).size === a.length;
 // ---- the roster: thirteen role-agents, four sittings, each role once, a chief
-assert.equal(MOFA_AGENTS.length, 16); assert.ok(unique(MOFA_AGENTS.map((a) => a.id)) && unique(MOFA_AGENTS.map((a) => a.en)) && unique(MOFA_AGENTS.map((a) => a.ar)), "ids and names are unique in both languages");
-assert.deepEqual(MOFA_AGENTS.map((a) => a.n), Array.from({ length: 16 }, (_, k) => k + 1)); assert.ok(MOFA_AGENTS.every((a) => a.desk === "mofa" && a.mandate.length > 120 && a.questions.length >= 4 && a.sources.length >= 2 && /role-lens|منظور دور/.test(a.title.en + a.title.ar)), "every role has a mandate, questions, sources and is marked as a role-lens, not a person");
+assert.equal(MOFA_AGENTS.length, 17); assert.ok(unique(MOFA_AGENTS.map((a) => a.id)) && unique(MOFA_AGENTS.map((a) => a.en)) && unique(MOFA_AGENTS.map((a) => a.ar)), "ids and names are unique in both languages");
+assert.deepEqual(MOFA_AGENTS.map((a) => a.n), Array.from({ length: 17 }, (_, k) => k + 1)); assert.ok(MOFA_AGENTS.every((a) => a.desk === "mofa" && a.mandate.length > 120 && a.questions.length >= 4 && a.sources.length >= 2 && /role-lens|منظور دور/.test(a.title.en + a.title.ar)), "every role has a mandate, questions, sources and is marked as a role-lens, not a person");
 assert.deepEqual(MOFA_GROUPS.flatMap((g) => g.agents).sort(), MOFA_AGENTS.map((a) => a.id).sort(), "each role sits exactly once");
 assert.equal(MOFA_GROUPS.length, 5); assert.ok(MOFA_CHIEF.maxTokens >= 12_000 && /Under-Secretary/.test(MOFA_CHIEF.en));
 for (const g of MOFA_GROUPS) { const r = mofaGroupRole(g); assert.ok(r.includes("Ministry's point of view") && g.agents.every((id) => r.includes(MOFA_BY.get(id)!.en)), g.id); }
@@ -26,9 +26,9 @@ for (const d of ["Political", "Security", "Social and cultural", "Economic", "Tr
 assert.ok(/no real person|never a named person|not a claim about a named person/i.test(MOFA_SYSTEM) && !MOFA_SYSTEM.includes("`") && !mofaChiefRole({}, {}).includes("`"), "roles are functions; no backticks in prompts");
 assert.ok(mofaUpdateRole("PROGRESS TEXT").includes("PROGRESS TEXT") && mofaDirectiveChiefRole({}, { topic: "T", mode: "directive", urgency: "routine" }).includes("DIRECTIVE from the Minister"));
 // ---- the routing and the plans
-assert.ok(PRODUCTS.includes("mofa-council") && PRODUCTS.includes("mofa-directive") && PRODUCT_USD["mofa-council"] > 0 && WORST["mofa-council"] < 1.25 && WORST["mofa-directive"] < WORST["mofa-council"]);
+assert.ok(PRODUCTS.includes("mofa-council") && PRODUCTS.includes("mofa-directive") && PRODUCT_USD["mofa-council"] > 0 && WORST["mofa-council"] < 1.4 && WORST["mofa-directive"] < WORST["mofa-council"]);
 const O = (x: object = {}) => ({ focus: "", topic: "", mode: "question" as const, urgency: "routine" as const, agents: [], lang: "en" as const, useContext: true, ...x });
-const mp = planFor("mofa-council", O(), ""); assert.deepEqual(mp.calls.map((c) => c.id), ["M1", "M2", "M3", "M4", "M5", "chief", "revs", "revr"], "five sittings, the Under-Secretary, then both auditors"); assert.equal(mp.calls[6].stage, 2); assert.ok(mp.calls[5].searches === 0 && mp.calls.slice(0, 5).every((c) => c.searches >= 1));
+const mp = planFor("mofa-council", O(), ""); assert.deepEqual(mp.calls.map((c) => c.id), ["M1", "M2", "M3", "M4", "M5", "chief", "revs", "revr"], "five sittings, the Under-Secretary, then both auditors"); assert.equal(mp.calls[6].stage, 2); assert.ok(mp.calls[5].searches === 1 && mp.calls.slice(0, 5).every((c) => c.searches >= 1));
 assert.ok(mp.calls[5].role({ M1: "THE M1 TEXT" }).includes("THE M1 TEXT") && mp.calls[6].role({ chief: "THE CHIEF TEXT" }).includes("THE CHIEF TEXT") && /Ministry of Foreign Affairs council/.test(mp.calls[7].role({ chief: "x" })), "the auditors read the Under-Secretary's product and know it is the Ministry's");
 assert.equal(planFor("mofa-council", O({ lang: "ar" }), "").calls[0].maxTokens, Math.round(MOFA_GROUPS[0].maxTokens * 1.3), "Arabic gets a third more output room");
 const rd = routed("mofa-directive", O({ topic: "Should we sign the investment treaty and extend a port loan?" })); assert.ok(rd.length >= 1 && rd.every((r) => MOFA_BY.has(r.id)), "a directive routes to Ministry roles"); assert.ok(rd.some((r) => ["econ", "logfin", "legal"].includes(r.id)), "an economic question reaches the economic roles");

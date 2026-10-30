@@ -10,7 +10,7 @@ import { loadResearch } from "@/lib/deep/research";
 import { loadSnapshot } from "@/lib/deep/snapshot";
 import { caseFacts } from "@/lib/case/facts";
 import { loadCase } from "@/lib/case/load";
-import { DEFAULT_COUNTRY_FOCUS, DEFAULT_EMB_FOCUS, DEFAULT_PRESIDENT_FOCUS, DEFAULT_KING_FOCUS, DEFAULT_MOFA_FOCUS, PRODUCTS, checkRefs, citedIds, cleanDeskOptions, deskBase, deskKey, worstOf, type Product } from "@/lib/desk/core";
+import { DEFAULT_CHALLENGE_FOCUS, DEFAULT_COUNTRY_FOCUS, DEFAULT_EMB_FOCUS, DEFAULT_PRESIDENT_FOCUS, DEFAULT_KING_FOCUS, DEFAULT_MOFA_FOCUS, PRODUCTS, checkRefs, citedIds, cleanDeskOptions, deskBase, deskKey, worstOf, type Product } from "@/lib/desk/core";
 import { deskExtraFacts } from "@/lib/desk/context";
 import { planFor, type Call } from "@/lib/desk/plan";
 
@@ -34,7 +34,7 @@ export const POST = withBatch(async function POST(req: Request) {
   const bad = rejectCrossSite(req); if (bad) return bad;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>; const iso3 = String(body.iso3 ?? "").toUpperCase(); const product = String(body.product ?? "") as Product;
   if (!/^[A-Z]{3}$/.test(iso3) || iso3 === "ARE" || !(PRODUCTS as string[]).includes(product)) return Response.json({ error: "bad_request" }, { status: 400 });
-  const king = product.startsWith("king"); const directive = product.endsWith("directive"); const o = cleanDeskOptions(body, king ? DEFAULT_KING_FOCUS : product.startsWith("mofa") ? DEFAULT_MOFA_FOCUS : product === "country-full" ? DEFAULT_COUNTRY_FOCUS : product === "president-brief" ? DEFAULT_PRESIDENT_FOCUS : DEFAULT_EMB_FOCUS);
+  const king = product.startsWith("king"); const directive = product.endsWith("directive"); const o = cleanDeskOptions(body, king ? DEFAULT_KING_FOCUS : product.startsWith("mofa") ? DEFAULT_MOFA_FOCUS : product === "country-full" ? DEFAULT_COUNTRY_FOCUS : product === "president-brief" ? DEFAULT_PRESIDENT_FOCUS : product === "council-challenge" ? DEFAULT_CHALLENGE_FOCUS : DEFAULT_EMB_FOCUS);
   if (directive && o.mode !== "update" && o.topic.length < 4) return Response.json({ error: "bad_request", message: o.lang === "ar" ? "اكتب السؤال أو التوجيه." : "Write the question or the directive." }, { status: 400 });
   const refusal = refusalFor(`${o.focus} ${o.topic}`); if (refusal) return Response.json({ error: "bad_request", message: REFUSAL_TEXT[o.lang](refusal) }, { status: 400 });
   const refresh = body.refresh === true; const enc = new TextEncoder(); const context = o.useContext && typeof body.context === "string" ? noteText(body.context).slice(0, 24_000) : "";
@@ -67,7 +67,7 @@ export const POST = withBatch(async function POST(req: Request) {
         const run1 = async (x: Call, cap?: number, spentAt?: number) => {
           send({ type: "agent", id: x.id, status: "start" });
           try {
-            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 2 ? CAP : x.stage === 1 ? CAP - revReserve : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * (plan.finalReserve ?? FINAL_RESERVE) : 0) - revReserve), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => (spentAt !== undefined ? spentAt : spent + siblings(x.id)), onSpend: spentAt === undefined ? (v) => inflight.set(x.id, v) : undefined, reserveUsd: x.stage === 0 ? 0.03 : x.stage === 1 ? 0.05 : 0.01 }); // each tier keeps back only what its own input and searches still need, so a share smaller than the default 0.15 does not shrink to the 1,500-token floor
+            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: x.fetches ?? 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 2 ? CAP : x.stage === 1 ? CAP - revReserve : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * (plan.finalReserve ?? FINAL_RESERVE) : 0) - revReserve), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => (spentAt !== undefined ? spentAt : spent + siblings(x.id)), onSpend: spentAt === undefined ? (v) => inflight.set(x.id, v) : undefined, reserveUsd: x.stage === 0 ? 0.03 : x.stage === 1 ? 0.05 : 0.01 }); // each tier keeps back only what its own input and searches still need, so a share smaller than the default 0.15 does not shrink to the 1,500-token floor
             const usd = r.usage.usd ?? runUsd(r.usage, MODEL); r.usage.usd = usd; inflight.delete(x.id); spent += usd; for (const k of ["input", "output", "cacheRead", "cacheWrite", "searches", "fetches"] as const) total[k] += r.usage[k]; total.usd = spent;
             for (const s of r.sources) if (!seen.has(s.url)) { seen.add(s.url); sources.push(s); }
             const start = r.report.search(/^#{1,3} /m); const text = (start > 0 && x.stage === 0 ? r.report.slice(start) : r.report).trim(); out[x.id] = text;

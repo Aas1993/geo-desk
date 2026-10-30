@@ -2,11 +2,21 @@ import { parseReviews } from "./desk/core";
 import { parseMission1, parseMission2 } from "./desk/embassy";
 import { parseKing } from "./desk/king";
 import { classification } from "./case/report";
-import { briefingHtml } from "./dossier/export";
+import { extendedStructured, withPlaybook } from "./playbookPdf";
+import { BRIEF_CSS, mdToHtml } from "./dossier/export";
+import { stripReviewJson } from "./review/pair";
+import { stripMachine } from "./report/strip";
+import { genericIllustrate } from "./report/generic";
+import { ILLUSTRATORS } from "./report/registry";
+import { prepareRoundtable, roundtableForProduct } from "./roundtable/pdf";
+import { headOf } from "./report/model";
+import { standardBlocks, whatChangedHtml, STANDARD_CSS } from "./report/standardHtml";
+import { diffBlocks, readPrev } from "./report/diff";
+import { REPORT_CSS, chipRow, esc, flagBlocks, gauge, hero, metaRow } from "./report/html";
 import { buildPdf, saveBlobAs } from "./pdf";
 import { getFile, getMeta, putReport, type ArchiveMeta } from "./archive";
 /** The layout version of the PDFs: a stored PDF made by an older layout is made again. */
-export const PDF_FORMAT = "v2-annex";
+export const PDF_FORMAT = "v5-roundtable";
 
 // EVERY AI PRODUCT AS A PDF REPORT: a finished product (a council's brief, a strategy, a directive's answer, a dossier) becomes a PDF with a cover block, the independent auditors' red flags first, the consolidated brief (the long role-by-role annex is left out of the PDF and stays on the platform) and the sources, and is kept in the Archive.
 // The conversion is free (no model): it reads what is already saved in this browser.
@@ -14,8 +24,16 @@ export type Group = "desk" | "case" | "influence" | "deep" | "falcon" | "dossier
 export const KINDS: Record<string, { en: string; ar: string; group: Group }> = {
   "mofa-council": { en: "The Ministry's Council: foreign policy brief", ar: "مجلس الوزارة: موجز السياسة الخارجية", group: "desk" },
   "king-council": { en: "THE KING's Council: decision brief", ar: "مجلس القرار النهائي: موجز القرار", group: "desk" },
+  compare: { en: "Country comparison", ar: "مقارنة بين الدول", group: "other" },
   "agent-answer": { en: "Desk agent answer", ar: "إجابة وكيل المكتب", group: "other" },
+  roundtable: { en: "Council round table", ar: "الطاولة المستديرة للمجالس", group: "desk" },
+  "council-challenge": { en: "Council challenge: the councils cross-examined", ar: "تحدّي المجالس: استجواب متبادل", group: "desk" },
   "president-brief": { en: "The President's brief", ar: "موجز الرئيس", group: "desk" },
+  "lab-scenario": { en: "Scenario sandbox (illustrative rule outputs)", ar: "مختبر السيناريوهات (مخرجات قواعد توضيحية)", group: "other" },
+  "lab-coalition": { en: "Coalition and vote map", ar: "خريطة التحالفات والتصويت", group: "other" },
+  "lab-ledger": { en: "Influence ledger over time", ar: "سجل النفوذ عبر الزمن", group: "other" },
+  "lab-decisions": { en: "Decision log", ar: "سجل القرارات", group: "other" },
+  "lab-pack": { en: "Briefing pack", ar: "حزمة إحاطة", group: "other" },
   "country-full": { en: "Country brief (full)", ar: "موجز الدولة الكامل", group: "desk" },
   "emb-intel": { en: "Embassy intelligence brief", ar: "موجز استخبارات السفارة", group: "desk" },
   "emb-plan": { en: "Mission strategy and plans", ar: "استراتيجية البعثة وخططها", group: "desk" },
@@ -47,13 +65,13 @@ export const KINDS: Record<string, { en: string; ar: string; group: Group }> = {
 export const GROUP_LABEL: Record<Group, { en: string; ar: string }> = { desk: { en: "The desks", ar: "المكاتب" }, case: { en: "Case File", ar: "ملف الحالة" }, influence: { en: "Influence", ar: "النفوذ" }, deep: { en: "Deep Intelligence", ar: "الاستخبارات المعمّقة" }, falcon: { en: "Falcon Eye", ar: "عين الصقر" }, dossier: { en: "Dossiers", ar: "الملفات" }, other: { en: "Other briefs", ar: "موجزات أخرى" } };
 
 /** What is needed to make one report. */
-export type Source = { kind: string; iso: string; country: string; title?: string; report: string; at: string; usd: number | null; lang: "en" | "ar"; model?: string; sources?: { url: string; title?: string }[]; idPart?: string };
+export type Source = { kind: string; iso: string; country: string; title?: string; report: string; at: string; usd: number | null; lang: "en" | "ar"; model?: string; sources?: { url: string; title?: string }[]; idPart?: string; /** The structured data of the version this one replaced, for the "what changed" panel. */ prev?: { at: string; blocks: string } };
 export const idOf = (s: Pick<Source, "kind" | "iso" | "at" | "idPart">) => `${s.kind}:${s.iso}:${s.at}${s.idPart ? `:${s.idPart}` : ""}`;
 const arabic = (t: string) => (t.match(/[؀-ۿ]/g) ?? []).length > (t.match(/[A-Za-z]/g) ?? []).length;
 
 // ---- reading what the browser holds
 const FAMILIES: { re: RegExp; kind: (m: RegExpExecArray) => string; iso: (m: RegExpExecArray) => string; lang?: (m: RegExpExecArray) => "en" | "ar" | undefined }[] = [
-  { re: /^gd-desk:(king-council|emb-intel|emb-plan|mofa-council|country-full|president-brief):([A-Z]{3})$/, kind: (m) => m[1], iso: (m) => m[2] },
+  { re: /^gd-desk:(king-council|emb-intel|emb-plan|mofa-council|country-full|president-brief|council-challenge):([A-Z]{3})$/, kind: (m) => m[1], iso: (m) => m[2] },
   { re: /^gd-case-council:([A-Z]{3})$/, kind: () => "case-council", iso: (m) => m[1] },
   { re: /^gd-case-architect:([A-Z]{3})$/, kind: () => "architect", iso: (m) => m[1] },
   { re: /^gd-scouncil:([A-Z]{3})$/, kind: () => "mach-council", iso: (m) => m[1] },
@@ -92,7 +110,7 @@ function toSource(key: string, raw: unknown): Source[] {
     const body = typeof j.report === "string" ? j.report : typeof j.brief === "string" ? j.brief : typeof j.text === "string" ? j.text : (j.brief && typeof j.brief === "object") ? objectToMarkdown(j.brief) : (j.prep && typeof j.prep === "object") ? objectToMarkdown(j.prep) : (j.stance && typeof j.stance === "object") ? objectToMarkdown(j.stance) : "";
     const at = typeof j.at === "string" ? j.at : ""; if (body.trim().length < 300 || !at) return [];
     const opt = (j.options ?? {}) as { lang?: string }; const lang = f.lang?.(m) ?? (opt.lang === "ar" ? "ar" : opt.lang === "en" ? "en" : arabic(body) ? "ar" : "en"); const usage = (j.usage ?? {}) as { usd?: number | null };
-    return [{ kind: f.kind(m), iso: f.iso(m), country: typeof j.name === "string" && j.name ? j.name : f.iso(m), report: body, at, usd: typeof usage.usd === "number" ? usage.usd : null, lang, model: typeof j.model === "string" ? j.model : undefined, sources: Array.isArray(j.sources) ? (j.sources as { url: string; title?: string }[]).filter((s) => s && typeof s.url === "string") : undefined, title: key.startsWith("gd-research:") ? `${KINDS.research.en}: ${m[1]}` : undefined }];
+    return [{ kind: f.kind(m), iso: f.iso(m), country: typeof j.name === "string" && j.name ? j.name : f.iso(m), report: body, at, usd: typeof usage.usd === "number" ? usage.usd : null, lang, model: typeof j.model === "string" ? j.model : undefined, sources: Array.isArray(j.sources) ? (j.sources as { url: string; title?: string }[]).filter((s) => s && typeof s.url === "string") : undefined, prev: readPrev(key) ?? undefined, title: key.startsWith("gd-research:") ? `${KINDS.research.en}: ${m[1]}` : undefined }];
   }
   const d = /^gd-desk-dir:(king|embassy|mofa):([A-Z]{3})$/.exec(key);
   if (d && Array.isArray(raw)) return (raw as Record<string, unknown>[]).filter((a) => a && typeof a.report === "string" && typeof a.at === "string" && (a.report as string).length > 300).map((a) => ({ kind: "directive", iso: d[2], country: d[2], report: a.report as string, at: a.at as string, usd: typeof a.usd === "number" ? a.usd : null, lang: a.lang === "ar" ? "ar" : "en", idPart: `${d[1]}-${String(a.id ?? "")}`, title: `${KINDS.directive.en} (${d[1] === "king" ? "THE KING" : d[1] === "embassy" ? "Embassy" : "Ministry"}): ${String(a.topic ?? "").slice(0, 90) || String(a.mode ?? "")}` }));
@@ -145,6 +163,7 @@ export function structuredMarkdown(kind: string, report: string, L: "en" | "ar")
     parts.push(sec(e("Key judgments", "الأحكام الرئيسية", L), tbl(["ID", e("Field", "الميدان", L), e("Judgment", "الحكم", L), e("Likelihood", "الاحتمال", L), e("Confidence", "الثقة", L), e("Evidence", "الدليل", L)], k.judgments.map((j) => [j.id, j.field, j.text, j.band, j.confidence, j.evidence.join(", ")]))));
     parts.push(sec(e("Risks and indicators", "المخاطر والمؤشرات", L), `${tbl([e("Risk", "الخطر", L), e("Impact", "الأثر", L), e("Trigger", "المحفّز", L), e("Mitigation", "المعالجة", L)], k.risks.map((r) => [r.name, r.impact, r.trigger, r.mitigation]))}\n\n${tbl([e("Indicator", "المؤشر", L), e("Threshold", "العتبة", L), e("Source", "المصدر", L)], k.watch.map((w) => [w.indicator, w.threshold, w.source]))}`.trim()));
   }
+  parts.push(...extendedStructured(kind, report, L)); // the call sheet, the stakeholder map, the budget, the negotiation tracks, the legal agenda: the tables the older annex did not print
   const body = parts.filter(Boolean).join("\n\n"); return body ? `# ${e("Structured annex", "الملحق المنظم", L)}\n\n${body}` : "";
 }
 
@@ -157,14 +176,33 @@ export function pdfMarkdown(s: Source): string {
   const st = structuredMarkdown(s.kind, s.report, L);
   return `${cover}${fl}\n\n${dropAnnex(s.report)}${st ? `\n\n${st}` : ""}${refs}`;
 }
-export const pdfHtml = (s: Source): string => briefingHtml(pdfMarkdown(s), { title: s.title ?? `${KINDS[s.kind] ? (s.lang === "ar" ? KINDS[s.kind].ar : KINDS[s.kind].en) : s.kind}: ${s.country}`, rtl: s.lang === "ar", foot: `${s.model ?? "Geo Desk"} · ${s.at}`, classification: classification(s.lang) });
+/** The illustrated document of a product: a cover with the call, the bottom line, the quality grade and the auditors' verdicts; the red flags as cards; the product's own dashboard (from the registry); the consolidated brief; the structured data as visuals (or the old tables when a product has no visual annex); the sources. Every block is a top-level child of the body, because the PDF builder places its page breaks between blocks. */
+export function pdfHtml(s: Source): string {
+  const L = s.lang; const k = KINDS[s.kind]; const product = s.title ?? (k ? (L === "ar" ? k.ar : k.en) : s.kind); const title = `${product}: ${s.country}`;
+  const head0 = headOf(s.kind, s.report, { sources: s.sources, lang: L }); let ill: ReturnType<(typeof ILLUSTRATORS)[string]> = null;
+  try { ill = ILLUSTRATORS[s.kind]?.({ kind: s.kind, report: s.report, L, head: head0, country: s.country, iso: s.iso, sources: s.sources ?? [] }) ?? null; } catch (err) { console.warn("[pdf] the visuals of", s.kind, "could not be drawn; the plain report is used.", err instanceof Error ? err.message : err); }
+  if (!ill) { try { ill = genericIllustrate({ kind: s.kind, report: s.report, L, head: head0, country: s.country, iso: s.iso, sources: s.sources ?? [] }, GROUP_LABEL[k?.group ?? "other"][L]); } catch { ill = null; } } // kinds with no illustrator of their own (or none that could read the product) get the generic cover, counts, contents and publishers
+  const head = { ...head0, confidence: ill?.confidence ?? head0.confidence, bottomLine: ill?.bottomLine ?? head0.bottomLine };
+  const std = standardBlocks(s.report, L, s.at, ill?.skipStandard ?? []);
+  const meta = metaRow([[e("Country", "الدولة", L), s.country], [e("Prepared", "أُعد في", L), `${s.at.slice(0, 16).replace("T", " ")} UTC`], [e("Model and cost", "النموذج والكلفة", L), `${s.model ?? "-"}${s.usd != null ? ` · US$${s.usd.toFixed(2)}` : ""}`]]);
+  const g = ill?.gaugeHtml ?? (head.score != null ? gauge(head.score, e("quality score", "درجة الجودة", L), head.grade ? `${e("grade", "التقدير", L)} ${head.grade}` : "") : "");
+  const refs = (s.sources ?? []).slice(0, 50); const src = refs.length ? `# ${e("Sources", "المصادر", L)}\n\n${refs.map((x, i) => `${i + 1}. [${(x.title || x.url).replace(/[\[\]]/g, "").slice(0, 110)}](${x.url})`).join("\n")}` : "";
+  // the extended tables for coalition, scenarios and milestones are dropped when the standard visuals draw the same data (every field is kept there); otherwise they stay
+  const skipS = ill?.skipStandard ?? []; const drawn = (key: "coalition" | "scenarios" | "milestones") => !skipS.includes(key) && std.std[key].length > 0;
+  const dup = (x: string) => (/^## (Coalition and friends plan|خطة التحالف والأصدقاء)/.test(x) && drawn("coalition")) || (/^## (Scenarios and tripwires|السيناريوهات وأسلاك التنبيه)/.test(x) && drawn("scenarios")) || (/^## (Milestones|المعالم)/.test(x) && drawn("milestones"));
+  const ext = extendedStructured(s.kind, s.report, L).filter((x) => x && !dup(x)); const extHtml = ext.length ? mdToHtml(`# ${e("More structured data", "بيانات منظمة إضافية", L)}\n\n${ext.join("\n\n")}`) : ""; // the other extended tables (call sheet, stakeholders, budget, tracks, influence) stay in the PDF even when a product draws its own visual annex
+  const annex = ill?.annex?.length ? [...ill.annex, ...(ill.keepTables ? [mdToHtml(structuredMarkdown(s.kind, s.report, L))] : extHtml ? [extHtml] : [])] : [mdToHtml(structuredMarkdown(s.kind, s.report, L))];
+  const blocks = [`<div class="cls">${esc(classification(L))}</div>`, `<h1>${esc(title)}</h1>`, hero({ kicker: ill?.kicker ?? product, title: ill?.title ?? "", titleColor: ill?.titleColor, bottomLine: head.bottomLine, gaugeHtml: g, chips: chipRow(head, L), extra: ill?.heroExtra }), meta, ...std.front, ...(s.prev ? whatChangedHtml(diffBlocks(s.prev.blocks, s.report), s.prev.at, L) : []), ...(ill?.front ?? []), ...flagBlocks(head, L), mdToHtml(stripMachine(stripReviewJson(dropAnnex(s.report)))), ...annex, ...std.annex, ...roundtableForProduct(s), src ? mdToHtml(src) : "", `<div class="foot">${esc(`${s.model ?? "Geo Desk"} · ${s.at}`)}</div>`].filter(Boolean);
+  const rtl = L === "ar";
+  return `<!doctype html><html lang="${rtl ? "ar" : "en"}" dir="${rtl ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${BRIEF_CSS}${REPORT_CSS}${STANDARD_CSS}h1.part{page-break-before:auto}</style></head><body>${blocks.join("\n")}</body></html>`;
+}
 export const pdfName = (s: Source) => `${s.kind}-${s.iso}-${s.at.slice(0, 10)}.pdf`;
 const metaOf = (s: Source, pages: number | null): Omit<ArchiveMeta, "size" | "savedAt"> => ({ id: idOf(s), iso: s.iso, country: s.country, kind: s.kind, title: s.title ?? `${KINDS[s.kind] ? (s.lang === "ar" ? KINDS[s.kind].ar : KINDS[s.kind].en) : s.kind}: ${s.country}`, lang: s.lang, at: s.at, usd: s.usd, pages, note: PDF_FORMAT });
 
 /** Makes the PDF, keeps it in the Archive and returns it. An existing archive copy of the same report is reused. */
 export async function archiveReport(s: Source, o: { onProgress?: (d: number, t: number) => void; force?: boolean } = {}): Promise<Blob> {
   const id = idOf(s); if (!o.force && (await getMeta(id))?.note === PDF_FORMAT) { const f = await getFile(id); if (f) return f; }
-  const blob = await buildPdf(pdfHtml(s), { onProgress: o.onProgress }); await putReport(metaOf(s, null), blob); return blob;
+  await prepareRoundtable(s.iso); const blob = await buildPdf(pdfHtml(await withPlaybook(s)), { onProgress: o.onProgress }); await putReport(metaOf(s, null), blob); return blob;
 }
 /** The button's action: archive and download. */
 export async function downloadReport(s: Source, o: { onProgress?: (d: number, t: number) => void } = {}): Promise<void> { saveBlobAs(await archiveReport(s, o), pdfName(s)); }

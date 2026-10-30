@@ -19,16 +19,16 @@ const unique = (xs: string[]) => new Set(xs).size === xs.length;
 
 async function main() {
   // ---- the rosters: ten for the head of state, seventeen and a Chief of Staff for the embassy
-  assert.equal(KING_AGENTS.length, 13); assert.equal(EMB_AGENTS.length, 21); assert.ok(unique(KING_AGENTS.map((a) => a.id)) && unique(EMB_AGENTS.map((a) => a.id)));
-  assert.deepEqual(KING_AGENTS.map((a) => a.n), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]); assert.deepEqual(EMB_AGENTS.map((a) => a.n), Array.from({ length: 21 }, (_, k) => k + 1));
+  assert.equal(KING_AGENTS.length, 13); assert.equal(EMB_AGENTS.length, 22); assert.ok(unique(KING_AGENTS.map((a) => a.id)) && unique(EMB_AGENTS.map((a) => a.id)));
+  assert.deepEqual(KING_AGENTS.map((a) => a.n), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]); assert.deepEqual(EMB_AGENTS.map((a) => a.n), Array.from({ length: 22 }, (_, k) => k + 1));
   for (const a of [...KING_AGENTS, ...EMB_AGENTS]) { assert.ok(a.en && a.ar && a.title.en && a.title.ar && a.field.en && a.field.ar, `${a.id} has English and Arabic names`); assert.ok(a.mandate.length > 80 && a.questions.length >= 4 && a.sources.length >= 2, `${a.id} is briefed`); assert.ok(/archetype|نموذج/.test(a.title.en + a.title.ar), `${a.id} is marked an archetype, not a real person`); }
   assert.ok(KING_AGENTS.some((a) => a.id === "redteam") && KING_AGENTS.some((a) => a.id === "precedent") && KING_AGENTS.some((a) => a.id === "law"), "the red team, the precedent keeper and the law desk sit on the Council");
   for (const need of ["pol", "econ", "invest", "private", "power", "security", "bilateral", "region", "resources", "consular", "culture", "humanitarian", "legal"]) assert.ok(EMB_AGENTS.some((a) => a.id === need), `the embassy has a ${need} desk`);
   // every specialist is in exactly one sitting of each product
   const inGroups = (gs: { agents: string[] }[]) => gs.flatMap((g) => g.agents);
   assert.deepEqual([...inGroups(KING_GROUPS)].sort(), KING_AGENTS.map((a) => a.id).sort(), "each of the thirteen sits exactly once");
-  assert.deepEqual([...inGroups(EMB_INTEL_GROUPS)].sort(), EMB_AGENTS.map((a) => a.id).sort(), "each of the twenty-one sits exactly once in the intelligence sitting");
-  assert.deepEqual([...inGroups(EMB_PLAN_GROUPS)].sort(), EMB_AGENTS.map((a) => a.id).sort(), "each of the twenty-one designs a line of effort in the plan sitting");
+  assert.deepEqual([...inGroups(EMB_INTEL_GROUPS)].sort(), EMB_AGENTS.map((a) => a.id).sort(), "each of the twenty-two sits exactly once in the intelligence sitting");
+  assert.deepEqual([...inGroups(EMB_PLAN_GROUPS)].sort(), EMB_AGENTS.map((a) => a.id).sort(), "each of the twenty-two designs a line of effort in the plan sitting");
   assert.equal(deskByCode("E3")?.id, "invest"); assert.equal(deskByCode("e13")?.id, "legal"); assert.equal(deskByCode("E99"), null);
 
   // ---- the constitution: tradecraft, sources, boundary
@@ -189,7 +189,7 @@ async function main() {
   const tr = h.series.find((s) => s.id === "trade"); assert.ok(tr && tr.first && tr.last && tr.last[0] > tr.first[0]); assert.ok(tr!.last![1] > 1e9 && tr!.last![1] < 1e12, "trade is scaled from US$ millions to dollars (Egypt is billions, not thousands)"); assert.ok(/US\$\d+(\.\d)?bn/.test(h.summary[0].en), "and printed in billions"); assert.ok(h.summary[0].en.includes("Egypt") && h.summary[0].en.includes("trade")); assert.ok(h.eras.find((e) => e.id === "trade")!.eras.length === 3);
   assert.ok(h.deals.length === egy.deals.length && h.deals.every((x, i, a) => i === 0 || a[i - 1].d >= x.d), "deals are listed newest first"); assert.equal(h.dealYears.reduce((a, y) => a + y.n, 0), h.deals.length);
   assert.equal(fmtV({ ...tr!, kind: "usd" }, 2.5e9), "US$2.5bn"); assert.equal(fmtV({ ...tr!, kind: "pct" }, 4.25), "4.3%");
-  const hf = deskExtraFacts(egy); assert.deepEqual(hf.map((x) => x.kind), ["uae-vehicles", "uae-advantage", "neighbour-relations", "uae-history"], "four computed fact entries join the Case File evidence"); assert.ok(hf[3].text.includes("Egypt") && hf[3].text.includes("Limits"));
+  const hf = deskExtraFacts(egy); assert.deepEqual(hf.map((x) => x.kind), ["uae-vehicles", "uae-advantage", "neighbour-relations", "uae-history", "uae-playbook", "uae-angles"], "six computed fact entries join the Case File evidence"); assert.ok(hf[3].text.includes("Egypt") && hf[3].text.includes("Limits"));
   // a country with no deals and no long series still produces an honest panel
   const sparse = { ...egy, deals: [], spine: egy.spine.map((s) => ({ ...s, has: false, series: [] })), capture: null } as typeof egy; const hs = uaeHistory(sparse); assert.equal(hs.series.length, 0); assert.ok(hs.summary.some((x) => /unknown, not zero/.test(x.en)) && hs.summary.some((x) => /No UAE deal headline/.test(x.en)));
 

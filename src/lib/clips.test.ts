@@ -1,5 +1,6 @@
 // Tests for the clip tray: add, de-dupe, cap, reorder, annotate, defensive parsing, the text and HTML the reports read.
 import assert from "node:assert/strict";
+import { countryContext, presidentContext } from "./desk/context";
 import { MAX_CLIPS, MAX_NOTE, addClip, annotateClip, clipsFact, clipsHtml, clipsMarkdown, clipsText, moveClip, parseClips, removeClip, type Clip } from "./clips";
 
 const mk = (id: string, over: Partial<Clip> = {}): Omit<Clip, "at" | "note"> => ({ id, iso: "JOR", text: `Item ${id}`, source: "Reuters", url: "https://example.com/a", date: "2026-10-28", angle: "economy", kind: "news", tone: "neutral", ...over });
@@ -23,4 +24,8 @@ assert.equal(clipsFact([]), ""); assert.ok(clipsFact(xs).startsWith("Field updat
 // the report sections: labelled, escaped, empty when there are no clips
 assert.equal(clipsHtml([]), ""); const h = clipsHtml([{ ...xs[0], text: "<b>x</b> & y", note: "n<script>" }], "en"); assert.ok(h.includes("Field updates clipped by the desk") && h.includes("&lt;b&gt;x&lt;/b&gt; &amp; y") && !h.includes("<script>"));
 assert.ok(clipsHtml(xs, "ar").includes("مستجدات ميدانية انتقاها المكتب")); assert.ok(clipsMarkdown(xs, "en", "Jordan").startsWith("# Field updates clipped by the desk: Jordan"));
+// the agents read the tray as a labelled section, in the Country Brief and the President's brief, and only when there is one
+const fact = clipsFact(xs); const cc = countryContext({ clips: fact }); const pc = presidentContext({ clips: fact });
+assert.ok(cc.includes("## Field updates clipped by the desk") && cc.includes("not verified by the platform") && cc.includes("Item a")); assert.ok(pc.includes("## Field updates clipped by the desk") && pc.includes("Item c"));
+assert.ok(!countryContext({}).includes("Field updates") && !presidentContext({ clips: "" }).includes("Field updates"), "no clips, no section");
 console.log("clips.test.ts: all assertions passed");

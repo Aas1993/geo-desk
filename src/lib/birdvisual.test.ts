@@ -1,6 +1,7 @@
 // Tests for the illustrated bird's eye page (the PDF's HTML): every section is drawn from the brief, nothing is injected, and the page follows the language.
 import assert from "node:assert/strict";
 import { birdHtml } from "./bird/visual";
+import { clipsHtml } from "./clips";
 import type { Bird } from "./bird/consolidate";
 
 const F = (tab: string, href: string) => ({ tab, href });
@@ -20,4 +21,6 @@ assert.ok(!en.includes("<script>alert(1)</script>") && en.includes("&lt;script&g
 assert.equal((en.match(/class="e"><b>Next 30 days/g) ?? []).length, 1, "moves with the same time are grouped under one marker");
 const ar = birdHtml(b, "ar", opts);
 assert.ok(ar.includes('dir="rtl"') && ar.includes("مجلس بمجلس") && ar.includes("تعميق"), "the Arabic page is right to left and uses the Arabic words");
+const fld = birdHtml(b, "en", { ...opts, fieldHtml: clipsHtml([{ id: "a", iso: "JOR", text: "Pipeline <attack>", source: "Wire", date: "2026-10-29", angle: "energy", kind: "news", tone: "risk", note: "ask", at: "2026-10-30T00:00:00Z" }], "en") });
+assert.ok(fld.includes("Field updates clipped by the desk") && fld.includes("Pipeline &lt;attack&gt;") && fld.indexOf("Field updates") < fld.indexOf("Audit"), "the clipped field updates are in the PDF, labelled, before the audit"); assert.ok(!en.includes("Field updates"), "no clips, no section");
 console.log("birdvisual: all checks passed");

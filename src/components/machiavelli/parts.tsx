@@ -1,7 +1,8 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { layoutTree, type PathNode } from "@/lib/machiavelli/strategy-parse";
 import { safeHttp } from "@/lib/url";
+import { useDragScroll } from "@/lib/dragScroll";
 import { Pill, mixc, type Lang } from "../falcon/bits";
 
 export const BRANCH: Record<string, { c: string; en: string; ar: string }> = { favourable: { c: "var(--ok)", en: "Favourable", ar: "مؤاتٍ" }, adverse: { c: "var(--risk)", en: "Adverse", ar: "سلبي" }, neutral: { c: "var(--t2)", en: "Neutral", ar: "محايد" }, baseline: { c: "var(--c2)", en: "Baseline", ar: "خط الأساس" }, shock: { c: "var(--warn)", en: "Shock", ar: "صدمة" } };
@@ -19,7 +20,8 @@ export function Tbl({ head, rows, w, empty }: { head: string[]; rows: (string | 
   return <div className="scroll-thin overflow-x-auto"><table className="w-full min-w-[560px] border-collapse text-[12px] leading-snug"><thead><tr>{head.map((h, i) => <th key={h + i} className="px-2 py-1.5 text-start text-[10.5px] font-semibold uppercase tracking-wide text-t2" style={w?.[i] ? { width: w[i] } : undefined}>{h}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i} className="border-t border-line align-top">{r.map((c, j) => <td key={j} className="px-2 py-1.5 text-t1">{typeof c === "string" ? <Inline text={c} /> : c}</td>)}</tr>)}</tbody></table></div>;
 }
 export function Tabs<T extends string>({ tabs, value, onChange, label }: { tabs: { id: T; label: string; n?: number }[]; value: T; onChange: (t: T) => void; label?: string }) {
-  return <div role="tablist" aria-label={label} className="scroll-thin flex gap-1 overflow-x-auto pb-1">{tabs.map((t) => <button key={t.id} role="tab" type="button" aria-selected={value === t.id} onClick={() => onChange(t.id)} className={`h-8 shrink-0 rounded-full px-3 text-[12.5px] ${value === t.id ? "bg-accent font-semibold text-[var(--accent-ink)]" : "bg-bg2 text-t1 hover:text-t0"}`}>{t.label}{t.n != null && <span className="num ms-1.5 text-[10.5px] opacity-70">{t.n}</span>}</button>)}</div>;
+  const ref = useRef<HTMLDivElement>(null); useDragScroll(ref);
+  return <div ref={ref} role="tablist" aria-label={label} className="scroll-thin flex cursor-grab gap-1 overflow-x-auto pb-1">{tabs.map((t) => <button key={t.id} role="tab" type="button" aria-selected={value === t.id} onClick={() => onChange(t.id)} className={`h-8 shrink-0 rounded-full px-3 text-[12.5px] ${value === t.id ? "bg-accent font-semibold text-[var(--accent-ink)]" : "bg-bg2 text-t1 hover:text-t0"}`}>{t.label}{t.n != null && <span className="num ms-1.5 text-[10.5px] opacity-70">{t.n}</span>}</button>)}</div>;
 }
 
 const wrap2 = (t: string, n: number): [string, string] => { if (t.length <= n) return [t, ""]; const sp = t.lastIndexOf(" ", n); const cut = sp > 12 ? sp : n; const rest = t.slice(cut).trim(); return [t.slice(0, cut).trim(), rest.length > n ? `${rest.slice(0, n - 1)}…` : rest]; };

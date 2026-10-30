@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Briefcase, ClipboardList, Scale, Compass, Crown, FileText, Flag, Gauge, Landmark, LayoutList, ListChecks, ScrollText, Users, X } from "lucide-react";
@@ -28,6 +28,7 @@ import { Reports } from "./Reports";
 import { Statecraft } from "./Statecraft";
 import { StrategyTab } from "./StrategyTab";
 import { bt, useTr } from "./bits";
+import { useDragScroll } from "@/lib/dragScroll";
 import { CouncilRoundTable } from "../roundtable/CouncilRoundTable";
 
 type View = "priorities" | "president" | "minister" | "detailed" | "reports"; type Sub = "trends" | "value" | "council" | "architect" | "strategy" | "log" | "desk" | "ready" | "roundtable";
@@ -47,6 +48,7 @@ const fromAud = (a: Pref["aud"]): [View, Sub?] => (a === "leader" ? ["president"
 /** The Case File: one country, one place. Four views of the same facts: the President's page, the Minister's view, the Detailed evidence and the Reports. Nothing is shown in two places: the views read the same data, the same Council and the same Architect, and the report builder assembles from them. */
 export function CaseApp() {
   const { lang } = useT(); const L = lang as Lang; const t = useTr(L); const { list, by } = useCountryList(); const [pref, setPref, ready] = useStored<Pref>("gd-case", { iso: null, view: "president", sub: "trends" });
+  const subNav = useRef<HTMLElement>(null); useDragScroll(subNav);
   const router = useRouter(); const [council, setCouncil] = useState<SavedProduct | null>(null); const [arch, setArch] = useState<ArchSaved | null>(null); const [intel, setIntel] = useState<SavedProduct | null>(null); const [plan, setPlan] = useState<SavedProduct | null>(null); const [preset, setPreset] = useState<{ id: TemplateId; n: number }>({ id: "president", n: 0 });
   const iso = pref.iso && pref.iso !== "ARE" ? pref.iso : null; const load = useJson<CaseData>(iso ? `/api/case/${iso}` : null); const d = load.data;
   const [view0, s0] = pref.view ? [pref.view, pref.sub] : fromAud(pref.aud); const view: View = iso ? view0 : "priorities"; const sub: Sub = s0 ?? pref.sub ?? "trends";
@@ -66,7 +68,7 @@ export function CaseApp() {
       <section className="rounded-[14px] border border-line bg-bg1 p-3" aria-label={t("Country", "الدولة")}><div className="flex items-end gap-3"><div className="min-w-60 flex-1"><span className="label mb-1 block">{t("Country", "الدولة")}</span><div className="flex items-center gap-1.5"><div className="min-w-0 flex-1"><CountryPicker list={list} value={iso} onPick={(i) => pick(i)} L={L} /></div>{iso && <button type="button" onClick={() => pick(null)} aria-label={t("Clear", "مسح")} className="grid size-9 place-items-center rounded-[8px] bg-bg3 text-t1 hover:text-t0"><X size={14} /></button>}</div></div></div>
         {d && <p className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-t1"><b className="text-[15px] text-t0">{d.flag} {nm}</b><Pill c="var(--t2)">{regionLabel(d.region, L)}</Pill>{d.scorecard && <Pill c="var(--t2)">{t("scorecard", "البطاقة")} {d.scorecard.overall}</Pill>}{d.posture.posture && <Pill c="var(--accent)">{t("posture", "الموقف")}: {bt(L, POSTURE[d.posture.posture].name)}</Pill>}<Pill c={council ? "var(--ok)" : "var(--t2)"}>{council ? t("Council on file", "المجلس محفوظ") : t("Council not run", "المجلس لم يُشغَّل")}</Pill><Pill c={arch ? "var(--ok)" : "var(--t2)"}>{arch ? t("Strategy on file", "الاستراتيجية محفوظة") : t("Strategy not written", "الاستراتيجية لم تُكتب")}</Pill><Pill c={intel ? "var(--ok)" : "var(--t2)"}>{intel ? t("Embassy brief on file", "موجز السفارة محفوظ") : t("Embassy brief not written", "موجز السفارة لم يُكتب")}</Pill></p>}{d && iso && <ChangeChip L={L} d={d} iso={iso} council={council} arch={arch} onGo={toTarget} />}</section>
       <nav aria-label={t("Views", "العروض")} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">{VIEWS.map((x) => { const I = x.icon; const on = view === x.id; return <button key={x.id} type="button" aria-current={on ? "page" : undefined} onClick={() => go(x.id)} className={`flex h-14 items-center gap-3 rounded-[12px] px-3.5 text-start ${on ? "bg-accent text-[var(--accent-ink)]" : "bg-bg1 text-t1 hover:text-t0"}`}><I size={20} className="shrink-0" /><span className="min-w-0"><span className="block text-[14px] font-semibold leading-tight">{L === "ar" ? x.ar : x.en}</span><span className={`block truncate text-[11px] leading-tight ${on ? "opacity-80" : "text-t2"}`}>{bt(L, x.sub)}</span></span></button>; })}</nav>
-      {view === "detailed" && <nav aria-label={t("Detailed sections", "أقسام التفصيلي")} className="scroll-thin -mx-1 flex gap-1 overflow-x-auto px-1 pb-1">{SUBS.map((x) => { const I = x.icon; const on = sub === x.id; return <button key={x.id} type="button" aria-current={on ? "page" : undefined} onClick={() => go("detailed", x.id)} className={`flex h-9 shrink-0 items-center gap-2 rounded-[10px] px-3 text-[12.5px] ${on ? "bg-bg3 font-semibold text-t0 ring-1 ring-accent" : "bg-bg1 text-t1 hover:text-t0"}`}><I size={14} />{L === "ar" ? x.ar : x.en}</button>; })}</nav>}
+      {view === "detailed" && <nav ref={subNav} aria-label={t("Detailed sections", "أقسام التفصيلي")} className="scroll-thin -mx-1 flex cursor-grab gap-1 overflow-x-auto px-1 pb-1">{SUBS.map((x) => { const I = x.icon; const on = sub === x.id; return <button key={x.id} type="button" aria-current={on ? "page" : undefined} onClick={() => go("detailed", x.id)} className={`flex h-9 shrink-0 items-center gap-2 rounded-[10px] px-3 text-[12.5px] ${on ? "bg-bg3 font-semibold text-t0 ring-1 ring-accent" : "bg-bg1 text-t1 hover:text-t0"}`}><I size={14} />{L === "ar" ? x.ar : x.en}</button>; })}</nav>}
       <main className="min-w-0">
         {view === "priorities" && <Priorities L={L} onOpen={openCountry} />}
         {iso && load.loading && !d && <p className="text-[12px] text-t2">{t("Building the Case File…", "جارٍ بناء ملف الحالة…")}</p>}

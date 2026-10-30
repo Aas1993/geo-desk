@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Award, Bell, Bot, Brain, Briefcase, CandlestickChart, Compass, Crown, Eye, Globe2, Handshake, Landmark, Languages, Menu, Moon, Sun, Users, Archive, Binoculars, Scale, Newspaper, FlaskConical } from "lucide-react";
 import { SearchBox } from "./SearchBox";
 import { useStore, useT } from "@/lib/store";
 import { useAlertCount } from "@/lib/alerts-client";
+import { useDragScroll } from "@/lib/dragScroll";
 import type { Headline } from "@/lib/types";
 
 export function Clock({ feedAt, feedOk }: { feedAt: number | null; feedOk: boolean }) {
@@ -27,11 +28,12 @@ export function Clock({ feedAt, feedOk }: { feedAt: number | null; feedOk: boole
 }
 
 function NavPills() {
-  const { t } = useT(); const path = usePathname();
+  const { t } = useT(); const path = usePathname(); const ref = useRef<HTMLElement>(null); useDragScroll(ref);
+  useEffect(() => { const k = setTimeout(() => ref.current?.querySelector<HTMLElement>("[aria-current=page]")?.scrollIntoView({ inline: "center", block: "nearest" }), 60); return () => clearTimeout(k); }, [path]); // the page you are on is always in view
   const item = (href: string, on: boolean, icon: React.ReactNode, label: string) => (
-    <Link href={href} aria-current={on ? "page" : undefined} className={`flex h-9 items-center gap-2 rounded-[9px] px-3 text-[12.5px] font-medium transition-colors ${on ? "bg-accent text-[var(--accent-ink)] shadow-[var(--glow)]" : "text-t1 hover:bg-bg3 hover:text-t0"}`}>{icon}<span className="hidden lg:inline">{label}</span></Link>
+    <Link href={href} aria-current={on ? "page" : undefined} className={`flex h-9 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[12.5px] font-medium transition-colors ${on ? "bg-accent text-[var(--accent-ink)] shadow-[var(--glow)]" : "text-t1 hover:bg-bg3 hover:text-t0"}`}>{icon}<span className="hidden lg:inline">{label}</span></Link>
   );
-  return <nav aria-label="Sections" className="glass hidden h-11 items-center gap-1 rounded-[12px] p-1 sm:flex">{item("/", path === "/", <Globe2 size={16} />, t("nav_world"))}{item("/case", path.startsWith("/case"), <Briefcase size={16} />, t("nav_case"))}{item("/king", path.startsWith("/king"), <Crown size={16} />, t("nav_king"))}{item("/mofa", path.startsWith("/mofa"), <Landmark size={16} />, t("nav_mofa"))}{item("/ambassador", path.startsWith("/ambassador"), <Handshake size={16} />, t("nav_amb"))}{item("/markets", path.startsWith("/markets"), <CandlestickChart size={16} />, t("nav_markets"))}{item("/falcon", path.startsWith("/falcon"), <Eye size={16} />, t("nav_falcon"))}{item("/deep", path.startsWith("/deep"), <Brain size={16} />, t("nav_deep"))}{item("/machiavelli", path.startsWith("/machiavelli"), <Compass size={16} />, t("nav_mach"))}{item("/influence", path.startsWith("/influence"), <Award size={16} />, t("nav_influence"))}{item("/room", path.startsWith("/room"), <Users size={16} />, t("nav_room"))}{item("/archive", path.startsWith("/archive"), <Archive size={16} />, t("nav_archive"))}{item("/bird", path.startsWith("/bird"), <Binoculars size={16} />, t("nav_bird"))}{item("/agent", path.startsWith("/agent"), <Bot size={16} />, t("nav_agent"))}{item("/compare", path.startsWith("/compare"), <Scale size={16} />, t("nav_compare"))}{item("/hub", path.startsWith("/hub"), <Newspaper size={16} />, t("nav_hub"))}{item("/lab", path.startsWith("/lab"), <FlaskConical size={16} />, t("nav_lab"))}</nav>;
+  return <nav ref={ref} aria-label="Sections" className="glass no-scrollbar hidden h-11 min-w-0 cursor-grab items-center gap-1 overflow-x-auto rounded-[12px] p-1 sm:flex">{item("/", path === "/", <Globe2 size={16} />, t("nav_world"))}{item("/agent", path.startsWith("/agent"), <Bot size={16} />, t("nav_agent"))}{item("/case", path.startsWith("/case"), <Briefcase size={16} />, t("nav_case"))}{item("/king", path.startsWith("/king"), <Crown size={16} />, t("nav_king"))}{item("/mofa", path.startsWith("/mofa"), <Landmark size={16} />, t("nav_mofa"))}{item("/ambassador", path.startsWith("/ambassador"), <Handshake size={16} />, t("nav_amb"))}{item("/markets", path.startsWith("/markets"), <CandlestickChart size={16} />, t("nav_markets"))}{item("/falcon", path.startsWith("/falcon"), <Eye size={16} />, t("nav_falcon"))}{item("/deep", path.startsWith("/deep"), <Brain size={16} />, t("nav_deep"))}{item("/machiavelli", path.startsWith("/machiavelli"), <Compass size={16} />, t("nav_mach"))}{item("/influence", path.startsWith("/influence"), <Award size={16} />, t("nav_influence"))}{item("/room", path.startsWith("/room"), <Users size={16} />, t("nav_room"))}{item("/archive", path.startsWith("/archive"), <Archive size={16} />, t("nav_archive"))}{item("/bird", path.startsWith("/bird"), <Binoculars size={16} />, t("nav_bird"))}{item("/compare", path.startsWith("/compare"), <Scale size={16} />, t("nav_compare"))}{item("/hub", path.startsWith("/hub"), <Newspaper size={16} />, t("nav_hub"))}{item("/lab", path.startsWith("/lab"), <FlaskConical size={16} />, t("nav_lab"))}</nav>;
 }
 
 export function TopBar({ feed }: { feed: { items: Headline[]; at: number | null; ok: boolean } }) {
@@ -39,11 +41,11 @@ export function TopBar({ feed }: { feed: { items: Headline[]; at: number | null;
   const { theme, toggleTheme, toggleLang, menuOpen, setMenu, alertsOpen, setAlertsOpen } = useStore(); const alerts = useAlertCount();
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start gap-2.5 p-3">
-      <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-2 sm:max-w-[470px]">
+      <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-2 sm:min-w-[170px] sm:max-w-[470px]">
         {world && <button aria-label={t("layers")} aria-expanded={menuOpen} onClick={() => setMenu(!menuOpen)} className={`glass hidden size-11 shrink-0 place-items-center rounded-[12px] transition-colors sm:grid ${menuOpen ? "text-accent hud-glow" : "text-t0 hover:text-accent"}`}><Menu size={19} /></button>}
         <SearchBox />
       </div>
-      <div className="pointer-events-auto ms-auto flex items-start gap-2.5">
+      <div className="pointer-events-auto ms-auto flex min-w-0 items-start gap-2.5">
         <NavPills />
         <div className="hidden md:block"><Clock feedAt={feed.at} feedOk={feed.ok} /></div>
         <button aria-label={t("alerts")} aria-expanded={alertsOpen} onClick={() => setAlertsOpen(!alertsOpen)} className={`glass relative grid size-11 place-items-center rounded-[12px] transition-colors ${alertsOpen ? "text-accent hud-glow" : "text-t0 hover:text-accent"}`}>

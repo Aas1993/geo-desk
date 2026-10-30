@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Award, Bot, Brain, Briefcase, Compass, Crown, Handshake, Landmark, Users, Archive, Binoculars, Layers, Globe2, CandlestickChart, Eye, Share2, LayoutDashboard, Sparkles, Scale, Newspaper, FlaskConical } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-store";
+import { useDragScroll } from "@/lib/dragScroll";
 import { RightRail } from "./RightRail";
 import { TopBar } from "./TopBar";
 import { Ticker } from "./Ticker";
@@ -38,11 +39,13 @@ function useHeadlines() {
 function MobileNav() {
   const { t, lang } = useT(); const path = usePathname(); const { menuOpen, setMenu, select } = useStore(); const [toast, setToast] = useState(false);
   const share = async () => { try { await navigator.clipboard.writeText(location.href); setToast(true); setTimeout(() => setToast(false), 1800); } catch {} };
-  const cls = (on: boolean) => `flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-[10px] leading-tight ${on ? "text-accent" : "text-t1"}`;
+  const cls = (on: boolean) => `flex min-w-[60px] shrink-0 flex-col items-center justify-center gap-0.5 px-1 text-[10px] leading-tight ${on ? "text-accent" : "text-t1"}`; const navRef = useRef<HTMLElement>(null); useDragScroll(navRef);
+  useEffect(() => { const k = setTimeout(() => navRef.current?.querySelector<HTMLElement>(".text-accent")?.scrollIntoView({ inline: "center", block: "nearest" }), 60); return () => clearTimeout(k); }, [path]); // the page you are on is always in view
   return (
     <>
-      <nav aria-label="Main" className="glass absolute inset-x-2 bottom-2 z-30 flex h-14 items-stretch rounded-[14px] sm:hidden">
+      <nav ref={navRef} aria-label="Main" className="glass no-scrollbar absolute inset-x-2 bottom-2 z-30 flex h-14 items-stretch overflow-x-auto rounded-[14px] sm:hidden">
         <Link href="/" onClick={() => { setMenu(false); select(null); }} className={cls(path === "/" && !menuOpen)}><Globe2 size={19} /><span className="max-w-full truncate">{t("nav_world")}</span></Link>
+        <Link href="/agent" className={cls(path.startsWith("/agent"))}><Bot size={19} /><span className="max-w-full truncate">{t("nav_agent")}</span></Link>
         <Link href="/case" className={cls(path.startsWith("/case"))}><Briefcase size={19} /><span className="max-w-full truncate">{t("nav_case")}</span></Link>
         <Link href="/king" className={cls(path.startsWith("/king"))}><Crown size={19} /><span className="max-w-full truncate">{t("nav_king")}</span></Link>
         <Link href="/mofa" className={cls(path.startsWith("/mofa"))}><Landmark size={19} /><span className="max-w-full truncate">{t("nav_mofa")}</span></Link>
@@ -55,7 +58,6 @@ function MobileNav() {
         <Link href="/room" className={cls(path.startsWith("/room"))}><Users size={19} /><span className="max-w-full truncate">{t("nav_room")}</span></Link>
         <Link href="/archive" className={cls(path.startsWith("/archive"))}><Archive size={19} /><span className="max-w-full truncate">{t("nav_archive")}</span></Link>
         <Link href="/bird" className={cls(path.startsWith("/bird"))}><Binoculars size={19} /><span className="max-w-full truncate">{t("nav_bird")}</span></Link>
-        <Link href="/agent" className={cls(path.startsWith("/agent"))}><Bot size={19} /><span className="max-w-full truncate">{t("nav_agent")}</span></Link>
         <Link href="/compare" className={cls(path.startsWith("/compare"))}><Scale size={19} /><span className="max-w-full truncate">{t("nav_compare")}</span></Link>
         <Link href="/hub" className={cls(path.startsWith("/hub"))}><Newspaper size={19} /><span className="max-w-full truncate">{t("nav_hub")}</span></Link>
         <Link href="/lab" className={cls(path.startsWith("/lab"))}><FlaskConical size={19} /><span className="max-w-full truncate">{t("nav_lab")}</span></Link>

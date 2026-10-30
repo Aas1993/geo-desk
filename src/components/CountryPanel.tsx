@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Star, X, ArrowLeftRight, Bookmark, Printer } from "lucide-react";
 import { useStore, useT } from "@/lib/store";
+import { useDragScroll } from "@/lib/dragScroll";
 import { displayName } from "@/lib/countries";
 import { useCountries } from "./SearchBox";
 import { OverviewTab, EconomyTab, TradeTab, MilitaryTab, SocietyTab, NewsTab } from "./tabs";
@@ -55,7 +56,7 @@ function WatchBtn({ iso3 }: { iso3: string }) {
 export function CountryPanel() {
   const { t, lang } = useT(); const d = useCountries();
   const { sel, tab, setTab, select, desk, setDesk, sheet, setSheet, cmpOpen, openCompare, cmp } = useStore();
-  const bar = useRef<HTMLDivElement>(null); const body = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLDivElement>(null); const body = useRef<HTMLDivElement>(null); useDragScroll(bar);
   const c = sel && d ? d.byIso.get(sel) : undefined;
   const detail = useDetail(c);
   useEffect(() => { body.current?.scrollTo({ top: 0 }); }, [sel, tab]);
@@ -89,7 +90,7 @@ export function CountryPanel() {
         <button onClick={() => void printOnePager(c, lang)} className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-bg3 px-3 text-[12px] text-t1"><Printer size={13} />{lang === "ar" ? "موجز (طباعة)" : "Brief (PDF)"}</button>
       </div>
       <div className="relative border-b border-line">
-        <div ref={bar} role="tablist" aria-label="Sections" onKeyDown={onKey} className="no-scrollbar flex overflow-x-auto px-2">
+        <div ref={bar} role="tablist" aria-label="Sections" onKeyDown={onKey} className="no-scrollbar flex cursor-grab overflow-x-auto px-2">
           {TABS.map((id) => (
             <button key={id} role="tab" aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)}
               className={`shrink-0 border-b-2 px-2 py-2.5 text-[12.5px] font-medium transition-colors ${tab === id ? "border-accent text-accent" : "border-transparent text-t1 hover:text-t0"}`}>{t(`tab_${id}` as "tab_overview")}</button>

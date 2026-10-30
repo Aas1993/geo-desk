@@ -9,7 +9,7 @@ const iso = new Set((read("../../public/data/countries.json") as { iso3: string 
 
 // FIPS codes are what GDELT's sourcecountry filter needs
 const fips = read("../../public/data/fips.json") as Record<string, string>;
-for (const k of iso) if (k !== "XKX") assert.match(fips[k] ?? "", /^[A-Z]{2}$/, `${k}: missing FIPS code`);
+for (const k of iso) assert.match(fips[k] ?? "", /^[A-Z]{2}$/, `${k}: missing FIPS code`);
 assert.equal(fips.GBR, "UK"); assert.equal(fips.DEU, "GM"); assert.equal(fips.ARE, "AE"); assert.equal(fips.NLD, "NL");
 assert.equal(new Set(Object.values(fips)).size, Object.keys(fips).length, "FIPS codes must be unique");
 

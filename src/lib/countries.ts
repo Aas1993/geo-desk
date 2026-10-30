@@ -20,12 +20,12 @@ export function loadCountries(): Promise<CountryData> {
       fetch("/data/countries.json").then((r) => { if (!r.ok) throw new Error(`countries ${r.status}`); return r.json() as Promise<Country[]>; }),
       fetch("/data/countries-50m.json").then((r) => { if (!r.ok) throw new Error(`shapes ${r.status}`); return r.json() as Promise<Topology>; }),
     ]);
-    const byNum = new Map(list.map((c) => [c.num, c])); const byIso = new Map(list.map((c) => [c.iso3, c]));
+    const byNum = new Map(list.map((c) => [c.num, c])); const byName = new Map(list.map((c) => [c.name, c])); const byIso = new Map(list.map((c) => [c.iso3, c]));
     const all = feature(topo, topo.objects.countries as never) as unknown as FeatureCollection<Geometry>;
     const bbox = new Map<string, [number, number, number, number]>();
     const labels: Feature[] = []; const feats: Feature<Geometry, { iso3: string; name: string; nameAr: string }>[] = [];
     for (const f of all.features) {
-      const c = byNum.get(String(f.id).padStart(3, "0")); if (!c) continue;
+      const c = f.id == null ? byName.get((f.properties as { name?: string } | null)?.name ?? "") : byNum.get(String(f.id).padStart(3, "0")); if (!c) continue; // a shape with no numeric id (Kosovo) is matched by name
       const polys: Position[][][] = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [];
       let best: [number, number, number, number] | null = null, bestArea = -1; let ext: [number, number, number, number] | null = null;
       for (const p of polys) {

@@ -48,6 +48,13 @@ const out = wb.map((c) => {
     ...(SPECIAL[c.id] ?? {}),
   };
 }).filter((c) => c.num);
+// Three entities the search must offer that the World Bank + Wikidata join drops: the Holy See (a UN observer state) and Taiwan are not on the World Bank list, and Kosovo has no ISO numeric code (412 is the UN Comtrade reporter code, and its map shape has no id, so countries.ts matches it by name). Figures are from Wikidata (population latest dated value, area) and are refreshed by hand.
+const EXTRA = [
+  { iso3: "VAT", iso2: "VA", qid: "Q237", num: "336", name: "Vatican City", nameAr: "الفاتيكان", capital: "Vatican City", lat: 41.904, lng: 12.453, region: "Europe & Central Asia", population: { v: 882, y: 2024 }, areaKm2: 0.49, currencies: ["Euro (EUR)"], languages: ["Italian", "Latin"], borders: ["ITA"] },
+  { iso3: "TWN", iso2: "TW", qid: "Q865", num: "158", name: "Taiwan", nameAr: "تايوان", capital: "Taipei", lat: 25.0375, lng: 121.5625, region: "East Asia & Pacific", population: { v: 23317031, y: 2025 }, areaKm2: 36193, currencies: ["New Taiwan dollar (TWD)"], languages: ["Mandarin Chinese"], borders: [] },
+  { iso3: "XKX", iso2: "XK", qid: "Q1246", num: "412", name: "Kosovo", nameAr: "كوسوفو", capital: "Pristina", lat: 42.6667, lng: 21.1667, region: "Europe & Central Asia", population: { v: 1586659, y: 2024 }, areaKm2: 10909, currencies: ["Euro (EUR)"], languages: ["Albanian", "Serbian"], borders: ["ALB", "MKD", "MNE", "SRB"] },
+];
+for (const e of EXTRA) if (!out.some((c) => c.iso3 === e.iso3)) out.push({ ...e, flag: flag(e.iso2) });
 // Refuse to overwrite a good file with a thin one: a partial Wikidata answer leaves most countries without a numeric code and they would all be filtered out above.
 const target = new URL("../public/data/countries.json", import.meta.url); const prev = existsSync(target) ? JSON.parse(readFileSync(target, "utf8")).length : 0;
 if (out.length < 190 || (prev && out.length < prev * 0.95)) { console.error(`REFUSING TO WRITE: ${out.length} countries (existing file has ${prev})`); process.exit(1); }

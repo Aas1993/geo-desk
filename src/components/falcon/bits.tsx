@@ -24,7 +24,7 @@ export const Pill = ({ c, children, title }: { c: string; children: React.ReactN
 export function CountryPicker({ list, value, onPick, L, exclude = "ARE" }: { list: Country[]; value: string | null; onPick: (iso3: string) => void; L: Lang; exclude?: string }) {
   const [q, setQ] = useState(""); const [open, setOpen] = useState(false); const cur = list.find((c) => c.iso3 === value);
   const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-  const hits = useMemo(() => { const n = norm(q.trim()); const all = list.filter((c) => c.iso3 !== exclude); return (n ? all.filter((c) => norm(c.name).includes(n) || (c.nameAr ?? "").includes(q.trim()) || c.iso3.toLowerCase() === n) : all).slice(0, 40); }, [list, q, exclude]);
+  const hits = useMemo(() => { const n = norm(q.trim()); const all = list.filter((c) => c.iso3 !== exclude).sort((a, b) => a.name.localeCompare(b.name)); /* with nothing typed the whole list is offered, scrollable; typing narrows it by name, Arabic name, capital or either code */ return n ? all.filter((c) => norm(c.name).includes(n) || norm(c.nameAr ?? "").includes(n) || norm(c.capital ?? "").includes(n) || c.iso3.toLowerCase() === n || (c.iso2 ?? "").toLowerCase() === n) : all; }, [list, q, exclude]);
   return (
     <div className="relative">
       <input value={open ? q : cur ? `${cur.flag} ${L === "ar" && cur.nameAr ? cur.nameAr : cur.name}` : q} onFocus={() => { setOpen(true); setQ(""); }} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onBlur={() => setTimeout(() => setOpen(false), 150)} placeholder={L === "ar" ? "اختر دولة…" : "Choose a country…"} aria-label={L === "ar" ? "الدولة" : "Country"} className="h-10 w-full rounded-[10px] border border-line bg-bg2 px-3 text-[13px] text-t0" />

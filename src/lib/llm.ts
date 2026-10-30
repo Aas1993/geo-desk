@@ -17,7 +17,7 @@ export function resolveModel(wanted: string): string {
 
 export class LlmError extends Error { constructor(message: string, public status?: number) { super(message); this.name = "LlmError"; } }
 
-type Block = { type: string; text?: string };
+type Block = { type: string; text?: string; cache_control?: unknown };
 type Params = { model: string; max_tokens: number; system?: string | Block[]; messages: { role: "user" | "assistant"; content: string | Block[] }[]; output_config?: { effort?: string; format?: { type: "json_schema"; schema: Record<string, unknown> } } };
 export type LlmMessage = { stop_reason: string | null; content: { type: "text"; text: string }[]; usage: { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number } };
 export type LlmClient = { messages: { create: (p: Params, o?: { signal?: AbortSignal }) => Promise<LlmMessage> } };

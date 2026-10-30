@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { oneLine, rejectCrossSite, safeMessage } from "@/lib/guard";
 import path from "node:path";
-import Anthropic from "@anthropic-ai/sdk";
+import { priceOf } from "@/lib/dossier/cost";
+import { llmClient, resolveModel, upstreamMessage } from "@/lib/llm";
 import { peekArticles } from "@/lib/media/gdelt";
 import { thinkTankItems, UAE_TERMS } from "@/lib/media/thinktanks";
 import { SCHEMA, SYSTEM, userMessage } from "@/lib/media/stance-prompt";
@@ -9,9 +10,8 @@ import type { Item, StanceRead, StanceResult } from "@/lib/media/types";
 
 export const maxDuration = 180;
 // Cheap by design: no web tools, low effort, headline-sized input, cached for hours, started only by a click.
-const MODEL = process.env.MEDIA_MODEL || process.env.BRIEF_MODEL || "claude-sonnet-5-5";
+const MODEL = resolveModel(process.env.MEDIA_MODEL || process.env.BRIEF_MODEL || "claude-sonnet-5-5");
 const MAX_PER_HOUR = Math.max(1, +(process.env.MEDIA_MAX_PER_HOUR ?? 12) || 12); const TTL = 3 * 3600_000;
-const PRICE: Record<string, { in: number; out: number; cacheRead: number; cacheWrite: number }> = { "claude-sonnet-5-5": { in: 2, out: 10, cacheRead: 0.2, cacheWrite: 2.5 }, "claude-opus-5-5": { in: 4, out: 20, cacheRead: 0.2, cacheWrite: 5 }, "claude-haiku-5-5": { in: 0.5, out: 2.5, cacheRead: 0.05, cacheWrite: 0.625 } };
 const g = globalThis as unknown as { __gdMedia?: { cache: Map<string, StanceResult>; running: Set<string>; runs: number[] } };
 const store = (g.__gdMedia ??= { cache: new Map(), running: new Set(), runs: [] });
 
@@ -43,7 +43,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
     const items = [...uniq.values()]; if (items.length < 4) return Response.json({ error: "thin", message: "Not enough recent coverage was found to judge a stance. Try again later." }, { status: 422 });
     store.runs.push(Date.now());
     const text = items.map((it) => `[${it.id}] (${it.kind === "thinktank" ? "think tank" : "media"}, ${oneLine(it.outlet, 80)}, ${new Date(it.ts).toISOString().slice(0, 10)}, TARGET: ${target(it)}) ${oneLine(it.title, 300)}`).join("\n");
-    const client = new Anthropic(); // credentials: ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login` profile
+    const client = llmClient(); // credentials: ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login` profile
     const msg = await client.messages.create({
       model: MODEL, max_tokens: 6000, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: userMessage({ items: text, country: name, arabic }) }],
       output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA as unknown as Record<string, unknown> } },
@@ -51,14 +51,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
     if (msg.stop_reason === "max_tokens" || msg.stop_reason === "refusal") return Response.json({ error: msg.stop_reason, message: msg.stop_reason === "refusal" ? "The model declined to judge this coverage." : "The read was cut off. Try again." }, { status: 502 });
     let read: StanceRead; try { read = JSON.parse(msg.content.map((b) => (b.type === "text" ? b.text : "")).join("")) as StanceRead; } catch { return Response.json({ error: "bad_output", message: "The model returned an unreadable result. Try again." }, { status: 502 }); }
     const ids = new Set(items.map((i) => i.id)); read.items = read.items.filter((i) => ids.has(i.id)); for (const n of read.narratives) n.ids = n.ids.filter((x) => ids.has(x)); read.narratives = read.narratives.filter((n) => n.ids.length);
-    const u = msg.usage; const pr = PRICE[MODEL]; const cr = u.cache_read_input_tokens ?? 0, cw = u.cache_creation_input_tokens ?? 0;
+    const u = msg.usage; const pr = priceOf(MODEL); const cr = u.cache_read_input_tokens ?? 0, cw = u.cache_creation_input_tokens ?? 0;
     const usd = pr ? (u.input_tokens * pr.in + u.output_tokens * pr.out + cr * pr.cacheRead + cw * pr.cacheWrite) / 1e6 : null;
     const done: StanceResult = { read, items, at: new Date().toISOString(), model: MODEL, usage: { input: u.input_tokens + cr + cw, output: u.output_tokens, usd } };
     store.cache.set(key, done); return Response.json({ ...done, cached: false });
   } catch (e) {
     if (req.signal.aborted) return Response.json({ error: "aborted" }, { status: 499 });
-    const status = e instanceof Anthropic.APIError ? e.status : undefined;
-    const message = status === 401 ? "Anthropic credentials are missing or expired. Set ANTHROPIC_API_KEY or run `ant auth login`." : status === 400 && /credit/i.test(String((e as Error).message)) ? "Your Anthropic credit balance is too low." : safeMessage(e);
+    const message = upstreamMessage(e, safeMessage);
     return Response.json({ error: "upstream", message }, { status: 502 });
   } finally { store.running.delete(key); }
 }

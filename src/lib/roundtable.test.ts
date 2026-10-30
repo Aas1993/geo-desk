@@ -12,6 +12,7 @@ import { angleReading, courseFromText, readSaved, readSeat, readState, type Seat
 import { baselineMap, consensus, differences, onScale, rowCells, rowOf, spreads } from "./roundtable/consensus";
 import { challengeContext, digestOf, readChallenge, withChallenge } from "./roundtable/challenge";
 import { roundtableBlocks } from "./roundtable/html";
+import { summaryOf, viewOf } from "./roundtable/view";
 import { roundtableMarkdown } from "./roundtable/markdown";
 import { roundtableMarkdownFor } from "./roundtable/pdf";
 import { BLOCK_BY, TEMPLATE_BY } from "./case/report";
@@ -120,4 +121,10 @@ assert.ok(pdfHtml(pdfSrc("mofa-council", kingReport)).includes("Foreign policy, 
 const hcp = pdfHtml(pdfSrc("council-challenge", body(good))); assert.ok(hcp.includes("The arbiter&#39;s recommendation for the UAE") && hcp.includes("Stage it behind three gates."), "the challenge's own PDF is drawn from its own text"); assert.ok(!hcp.includes("&lt;challenge&gt;") && !hcp.includes("<challenge>"), "the machine-readable block does not reach the PDF");
 assert.ok(hcp.includes("Staged") && hcp.includes("Council challenge: the arbiter&#39;s recommendation for the UAE"), "the challenge's cover shows the arbiter's course"); assert.ok(!hcp.includes("class=\"lead\">&lt;challenge"), "the cover's bottom line is the arbiter's, not the raw block");
 assert.ok(!pdfHtml(pdfSrc("research", kingReport)).includes("Council round table"), "a stock research note carries no round table");
+
+// ---- the plain-language summary
+const svw = viewOf({ rs: [R("data", "staged", { trade: 60 }), R("king", "staged", { trade: 80, security: 20 }), R("mofa", "staged", { trade: 30, security: 20 }), { ...R("falcon", "deepen", { trade: 55 }), redFlags: [{ flag: "x", severity: "serious", lens: "reality", why: "" }], ageDays: 45 }], baseline: { trade: 60 }, challenge: null, lens: "bird" });
+const sum = summaryOf(svw, "en"); assert.ok(sum[0].includes("3 of the 3 councils") && sum[0].includes("staged") && sum[0].includes("rule-built posture"), "the summary says how many give a course and what most say"); assert.ok(sum.some((x) => x.includes("They split most on") && x.includes("Trade")), "it names the angle they split on"); assert.ok(sum.some((x) => x.includes("red flags on Falcon Council") && x.includes("older than 30 days")), "it warns about red flags and age"); assert.ok(sum.at(-1)!.includes("run the challenge round"), "without a challenge it says which is not yet known");
+assert.ok(/[؀-ۿ]/.test(summaryOf(svw, "ar").join("")) && summaryOf(viewOf({ rs: [R("data", null)], baseline: {}, challenge: null, lens: "bird" }), "en").length === 0, "Arabic works and an empty table says nothing");
+assert.ok(summaryOf(viewOf({ rs: [R("king", "staged"), R("mofa", "staged"), R("falcon", "staged")], baseline: {}, challenge: pc, lens: "bird" }), "en").at(-1)!.includes("the arbiter recommends staged"), "with a challenge it quotes the arbiter");
 console.log("roundtable: all checks passed");

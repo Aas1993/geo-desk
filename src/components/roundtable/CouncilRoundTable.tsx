@@ -7,7 +7,7 @@ import type { Extras } from "@/lib/bird/score";
 import { downloadHtmlReport } from "@/lib/reportpdf";
 import { COURSE_C, COURSE_W, LENSES, SEAT_BY, angleName, type LensId, type SeatId } from "@/lib/roundtable/model";
 import { roundtableDoc } from "@/lib/roundtable/pdf";
-import { viewOf } from "@/lib/roundtable/view";
+import { summaryOf, viewOf } from "@/lib/roundtable/view";
 import { STALE_DAYS } from "@/lib/bird/runner";
 import { Block, Pill, type Lang } from "../falcon/bits";
 import { useTr } from "../case/bits";
@@ -31,6 +31,7 @@ export function CouncilRoundTable({ L, iso, name, d, lens, metrics }: { L: Lang;
         {nFiled === 0 && <p className="rounded-[12px] border border-dashed border-line p-3 text-[12.5px] leading-snug text-t1">{t("No council has a saved product for this country yet, so there is nothing to seat. Run the councils from their own tabs, or from Complete the picture on the Bird's eye view; then come back.", "لا يوجد منتج محفوظ لأي مجلس عن هذه الدولة بعد فلا ما يُجلَس. شغّل المجالس من تبويباتها أو من إكمال الصورة في نظرة الطائر ثم عد.")}</p>}
         {nFiled > 0 && (
           <div className="space-y-3">
+            <div className="rounded-[12px] border border-line border-s-4 border-s-accent bg-bg2 p-3" data-testid="rt-summary"><span className="label">{t("In short", "باختصار")}</span><ul className="mt-1 space-y-1 text-[12.5px] leading-snug text-t0">{summaryOf(v, L).map((x, i) => <li key={i} dir="auto">{x}</li>)}</ul><p className="mt-1.5 text-[11px] text-t2">{t("Click any council on the table to read what it says; the matrix below compares them angle by angle.", "انقر أي مجلس على الطاولة لقراءة ما يقوله؛ والمصفوفة أدناه تقارنها زاويةً زاوية.")}</p></div>
             <div className="grid gap-3 lg:grid-cols-[1.35fr_1fr]">
               <div className="rounded-[12px] border border-line bg-bg1 p-2"><TableDiagram v={v} L={L} sel={sel} onSel={setSel} /></div>
               <div className="space-y-3"><ConsensusMeter v={v} L={L} /><div className="rounded-[12px] border border-line bg-bg1 p-3"><span className="label mb-1.5 block">{t("The posture scale: where each council places the UAE's course", "مقياس الموقف: أين يضع كل مجلس مسار الإمارات")}</span><PostureScale v={v} L={L} sel={sel} onSel={setSel} /></div></div>

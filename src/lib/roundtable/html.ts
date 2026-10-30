@@ -2,7 +2,7 @@ import { ACC, INK, LINE, MUTE, OK, RISK, WARN, bar, card, cards, esc, h2, note, 
 import { deltaColor, ring } from "./consensus";
 import { COURSES, COURSE_C, COURSE_W, NO_COURSE, SEAT_BY, angleName, angleShort, type LensId, type SeatId } from "./model";
 import type { SeatReading } from "./read";
-import { viewOf, type View } from "./view";
+import { summaryOf, viewOf, type View } from "./view";
 import type { Challenge } from "../desk/challenge";
 
 // THE ROUND TABLE AS PDF BLOCKS: the same view the screen shows (viewOf), drawn as the diagram, the posture scale, the agreement matrix, a card per council and, when a challenge round has been run, the debate (scoreboard, challenge and rebuttal cards, agreements, dissent and the arbiter's verdict). Each returned string is one top-level block so the PDF builder can break pages between them; everything is escaped; text is in the report's language and the layout follows its direction.
@@ -61,6 +61,7 @@ export function roundtableBlocks(o: { rs: SeatReading[]; baseline: Record<string
   const missing = v.councils.filter((r) => !r.onFile).map((r) => nm(r.id, o.L));
   const modal = v.cons.modal ? COURSE_W[v.cons.modal][o.L] : "-";
   const out: string[] = [h2(`${t("Council round table", "الطاولة المستديرة للمجالس")}: ${o.L === "ar" ? v.lens.ar : v.lens.en}`), note(`${esc(o.L === "ar" ? v.lens.ask.ar : v.lens.ask.en)}<br><span class="sub">${esc(t("Every reading below is taken from the council's own saved output (its structured data where it has any, otherwise its own words) and is labelled as such; a council that has not been run is shown as not run, and nothing is filled in. The baseline is the free rule-built country score.", "كل قراءة أدناه مأخوذة من المنتج المحفوظ للمجلس نفسه (بياناته المنظمة إن وُجدت وإلا كلماته) وموسومة بذلك؛ والمجلس الذي لم يُشغَّل يظهر كغير مشغَّل ولا يُملأ شيء. الأساس هو درجة الدولة المبنية بالقواعد مجانًا."))}</span>`),
+    note(`<h3>${esc(t("In short", "باختصار"))}</h3><ul>${summaryOf(v, o.L).map((x) => `<li dir="auto">${esc(x)}</li>`).join("")}</ul>`, "ok"),
     statRow([{ n: `${v.filed.length}/${v.councils.length}`, label: t("councils on file", "مجالس محفوظة"), color: ACC }, { n: v.cons.score ?? "-", label: `${t("consensus on the course", "الإجماع على المسار")} (${v.cons.label === "strong" ? t("strong", "قوي") : v.cons.label === "majority" ? t("majority", "أغلبية") : v.cons.label === "split" ? t("split", "منقسم") : t("too few", "قليلة")})`, color: v.cons.score != null ? scoreC(v.cons.score) : MUTE }, { n: modal, label: t("course most councils give", "المسار الذي تعطيه أغلب المجالس"), color: v.cons.modal ? COURSE_C[v.cons.modal] : MUTE }, { n: v.spreads.filter((s) => s.dissent).length, label: t("angles the councils split on", "زوايا انقسمت عليها المجالس"), color: RISK }]),
     tableSvg(v, o.L),
     postureScale(v.filed.filter((r) => r.course).map((r) => ({ short: SEAT_BY.get(r.id)!.short, name: nm(r.id, o.L), v: r.course })), Object.fromEntries(COURSES.map((c) => [c, COURSE_W[c][o.L]])), o.L) + (v.filed.some((r) => !r.course) ? `<div class="legend">${esc(t("No clear course in its own text, so not placed", "لا مسار واضح في نصه فلم يوضع"))}: ${esc(v.filed.filter((r) => !r.course).map((r) => `${SEAT_BY.get(r.id)!.short} ${nm(r.id, o.L)}`).join(" · "))}</div>` : ""),

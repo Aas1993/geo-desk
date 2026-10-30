@@ -5,6 +5,7 @@ import { useT } from "@/lib/store";
 import { Card, EmptyState, Skeleton } from "./ui";
 import { safeHttp } from "@/lib/url";
 import { DossierWorkspace } from "./DossierWorkspace";
+import { CrossCheck } from "./CrossCheck";
 import type { InvestPayload, Flag } from "@/lib/invest-data";
 import type { Country } from "@/lib/types";
 
@@ -68,6 +69,7 @@ export function InvestTab({ c }: { c: Country }) {
         </div>
         {!o ? <p className="mt-3 rounded-[10px] bg-warn/10 p-2.5 text-[12px] leading-snug text-t0">{u.noStock}</p> : <div className="mt-3"><h4 className="label mb-1.5">{u.trend}</h4><Trend out={o.series ?? []} inw={d.stock.inward?.series ?? []} u={u as never} /></div>}
       </Card>
+      <CrossCheck iso={c.iso3} kind="invest" />
       <Card title={`${u.deals} · ${d.deals.total}`} icon="🤝">
         {!d.deals.total ? <p className="text-[12.5px] text-t1">{u.none}</p> : (<>
           <div className="mb-3 flex flex-wrap gap-3 text-[12px] text-t1"><span><b className="num text-t0">{d.deals.total}</b> {u.total}</span><span><b className="num text-t0">{d.deals.last365}</b> {u.d365}</span><span><b className="num text-t0">{d.deals.last90}</b> {u.d90}</span></div>

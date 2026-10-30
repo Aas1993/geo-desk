@@ -12,6 +12,7 @@ import { PartnershipCard, ClosestPartners } from "./Partnership";
 import { UaeTradeCard } from "./TradeIntel";
 import { OutlookCard, ExportDemand } from "./OutlookCard";
 import { BilateralCard } from "./tabs2";
+import { CrossCheck } from "./CrossCheck";
 import type { Country, CountryDetail, Headline, Series } from "@/lib/types";
 
 type D = { data: CountryDetail | null; loading: boolean; error: boolean; retry: () => void };
@@ -130,7 +131,7 @@ export function EconomyTab({ c, detail }: { c: Country; detail: D }) {
 
 export function TradeTab({ c, detail }: { c: Country; detail: D }) {
   const { t, lang } = useT();
-  return <>{c.iso3 !== "ARE" && <UaeTradeCard c={c} />}<BilateralCard c={c} /><Gate d={detail}>{({ indicators: i }) => {
+  return <>{c.iso3 !== "ARE" && <UaeTradeCard c={c} />}{c.iso3 !== "ARE" && <CrossCheck iso={c.iso3} kind="trade" />}<BilateralCard c={c} /><Gate d={detail}>{({ indicators: i }) => {
     const ex = last(i.exports), im = last(i.imports); const y = ex && im && ex.y === im.y;
     return (<>
       <div className="grid grid-cols-3 gap-2">

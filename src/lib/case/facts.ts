@@ -7,6 +7,7 @@ import { POSITION_ISSUES } from "./core";
 import { THRESHOLDS, POSTURE } from "./core";
 import type { CaseData } from "./load";
 import { techFact } from "../tech-server";
+import { crossFact } from "../crosscheck-server";
 
 // The shared evidence pack for the Strategic Council: the strategy fact pack (dossier, foresight, graph, strategic profile, rivals, aid, corridors, UAE context), the Deep desk's numeric facts (finance, exposure, screen, research cards)
 // and the Case File's own computed layer (lenses, value pillars, posture rule, instruments, neighbours, ten-year trends). One pack, built before any seat speaks (the specification's stage 2), with ids that run on from the strategy pack.
@@ -28,6 +29,7 @@ export async function caseFacts(iso3: string, c: CaseData, snap: Snapshot | null
   const held = c.spine.filter((s) => s.has && s.spine.latest).map((s) => `${s.met.name} ${s.spine.latest!.v} (${s.spine.latest!.y})${s.spine.change5 != null ? `, ${s.spine.change5 >= 0 ? "+" : ""}${s.spine.change5.toFixed(1)} over 5 years` : ""}${s.region != null ? `, region median ${s.region.toFixed(1)}` : ""}${s.uae != null ? `, UAE ${s.uae.toFixed(1)}` : ""}${s.spine.z != null && Math.abs(s.spine.z) >= 1.5 ? `, unusual (z ${s.spine.z.toFixed(1)})` : ""}`);
   for (let i = 0; i < held.length; i += 10) add("trends", `Ten-year trend spine for ${c.name} (${i / 10 + 1}): ${held.slice(i, i + 10).join("; ")}.`, "IMF WEO, World Bank WDI and WGI, IMF IMTS and direct-investment positions (Geo Desk trend spine)");
   const tf = await techFact(iso3, c.name); if (tf) add(tf.kind, tf.text, tf.src);
+  const cf = await crossFact(iso3, c.name); if (cf) add(cf.kind, cf.text, cf.src);
   const missing = c.spine.filter((s) => !s.has).map((s) => s.met.name); if (missing.length) add("trend-gaps", `Trend metrics with no data for ${c.name} (not zero): ${missing.join("; ")}.`, L);
   return { name: base.name, facts, gaps: [...base.gaps, ...(snap?.gaps ?? []), "Issue-by-issue stances toward UAE policy, rival investment and defence ties, education and cultural ties and public perception are not in the datasets: say so rather than infer them."] };
 }

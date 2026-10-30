@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { FlaskConical, X } from "lucide-react";
 import { useT } from "@/lib/store";
+import { useFollowCountry } from "@/lib/country";
 import type { CaseData } from "@/lib/case/load";
 import { regionLabel } from "@/lib/regions";
 import { CountryPicker, Pill, type Lang } from "../falcon/bits";
@@ -20,8 +21,9 @@ const NEEDS_COUNTRY: ToolId[] = ["scenario", "ledger", "decisions", "pack"];
 
 /** THE STRATEGY LAB: five tools that work for any country: the scenario sandbox, the coalition and vote map, the influence ledger over time, the decision log and the briefing-pack builder. Free: rules and held data only; the one optional model call (the scenario write-up) is click-started and capped. */
 export function LabApp() {
-  const { lang } = useT(); const L = lang as Lang; const t = useTr(L); const { list, by } = useCountryList(); const [pref, setPref] = useStored<{ iso: string | null; tool: ToolId }>("gd-labtool", { iso: null, tool: "scenario" });
+  const { lang } = useT(); const L = lang as Lang; const t = useTr(L); const { list, by } = useCountryList(); const [pref, setPref, ready] = useStored<{ iso: string | null; tool: ToolId }>("gd-labtool", { iso: null, tool: "scenario" });
   const iso = pref.iso && pref.iso !== "ARE" ? pref.iso : null; const tool: ToolId = TOOLS.some((x) => x[0] === pref.tool) ? pref.tool : "scenario";
+  useFollowCountry(iso, (i) => setPref((p) => ({ ...p, iso: i })), ready); // the country is shared by every page (src/lib/country.ts)
   const load = useJson<CaseData>(iso ? `/api/case/${iso}` : null); const d = load.data && load.data.iso3 === iso ? load.data : null; const cc = by.get(iso ?? "");
   const name = d ? (L === "ar" && d.nameAr ? d.nameAr : d.name) : cc ? (L === "ar" && cc.nameAr ? cc.nameAr : cc.name) : iso ?? "";
   // the map tools may pre-select a country from the URL (?iso=XXX) so the hub and the panel can link here

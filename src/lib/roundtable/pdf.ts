@@ -8,13 +8,11 @@ import { parseChallenge, type Challenge } from "../desk/challenge";
 import { readChallenge } from "./challenge";
 import { roundtableBlocks } from "./html";
 import { roundtableMarkdown } from "./markdown";
-import type { LensId } from "./model";
+import { ROUNDTABLE_KINDS, lensOfKind, type LensId } from "./model";
 import { readAll, readExtras, readHeld } from "./read";
 
 // THE ROUND TABLE IN PDFs. A product's PDF (the Ministry's, the embassy's, THE KING's, the Country brief, the President's brief, the Case File's, the desk officer's and the Bird's eye view) carries the Round Table for its own page's lens: what each council on file says, the agreement matrix and, when a challenge round has been run, the debate and the arbiter's verdict. The baseline needs the Case File, which is fetched once per country before the PDF is made (prepareRoundtable); without it the table is still drawn, with the baseline left out. Every council's reading is taken from what this browser holds.
-const KIND_LENS: Record<string, LensId> = { "mofa-council": "mofa", "emb-intel": "ambassador", "emb-plan": "ambassador", "king-council": "bird", "country-full": "country", "president-brief": "bird", "council-challenge": "bird", "case-council": "country", architect: "country", bird: "bird", "case-report": "country", "dossier-desk": "desk", desk: "desk", "falcon-council": "country", "mach-council": "country", "deep-council": "country" };
-export const ROUNDTABLE_KINDS = new Set(Object.keys(KIND_LENS));
-export const lensOfKind = (kind: string): LensId | null => KIND_LENS[kind] ?? null;
+export { ROUNDTABLE_KINDS, lensOfKind };
 const baselines = new Map<string, { d: CaseData; at: number }>();
 /** Fetches the Case File of a country once (for the baseline). Any failure leaves the table without a baseline. */
 export async function prepareRoundtable(iso: string): Promise<void> {

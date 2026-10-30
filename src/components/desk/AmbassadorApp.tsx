@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import Link from "next/link";
 import { Handshake, X } from "lucide-react";
 import { useT } from "@/lib/store";
+import { useFollowCountry } from "@/lib/country";
 import { advantage } from "@/lib/case/advantage";
 import type { CaseData } from "@/lib/case/load";
 import { refusalText } from "../machiavelli/forms";
@@ -49,6 +50,7 @@ const bottomLine = (brief: string) => /^## Bottom line[^\n]*\n([\s\S]*?)(?=^## |
 export function AmbassadorApp() {
   const { lang } = useT(); const L = lang as Lang; const t = useTr(L); const { list, by } = useCountryList(); const [pref, setPref, ready] = useStored<{ iso: string | null; tab?: Tab }>("gd-ambassador", { iso: null, tab: "chief" });
   const iso = pref.iso && pref.iso !== "ARE" ? pref.iso : null; const load = useJson<CaseData>(iso ? `/api/case/${iso}` : null); const d = load.data; const tab: Tab = pref.tab ?? "chief";
+  useFollowCountry(iso, (i) => setPref((p) => ({ ...p, iso: i })), ready); // the country is shared by every page (src/lib/country.ts)
   const filed = useFiled(iso); const [focus1, setFocus1] = useState(""); const [focus2, setFocus2] = useState(""); const [uc1, setUc1] = useState(true); const [uc2, setUc2] = useState(true); const [preset, setPreset] = useState<Preset>({ n: 0, topic: "" }); const tIntel = useRef(0); const tPlan = useRef(0); const logged = useRef("");
   useEffect(() => { if (!ready || pref.iso) return; const k = setTimeout(() => { try { const f = JSON.parse(localStorage.getItem("gd-deep-filters") ?? "null") as { iso?: string } | null; if (f?.iso && f.iso !== "ARE") setPref((p) => ({ ...p, iso: f.iso! })); } catch { /* ignore */ } }, 0); return () => clearTimeout(k); }, [ready, pref.iso, setPref]);
   const pick = useCallback((i: string | null) => { setPref((p) => ({ ...p, iso: i })); try { for (const k of ["gd-deep-filters", "gd-mach-filters", "gd-case"]) localStorage.setItem(k, JSON.stringify({ ...(JSON.parse(localStorage.getItem(k) ?? "{}") as object), iso: i })); } catch { /* ignore */ } }, [setPref]);

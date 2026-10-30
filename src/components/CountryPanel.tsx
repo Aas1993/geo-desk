@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Star, X, ArrowLeftRight, Bookmark, Printer } from "lucide-react";
 import { useStore, useT } from "@/lib/store";
 import { useDragScroll } from "@/lib/dragScroll";
+import { PANEL_TABS } from "@/lib/nav";
 import { displayName } from "@/lib/countries";
 import { useCountries } from "./SearchBox";
 import { OverviewTab, EconomyTab, TradeTab, MilitaryTab, SocietyTab, NewsTab } from "./tabs";
@@ -25,7 +26,7 @@ import { printOnePager } from "@/lib/one-pager";
 import { regionLabel } from "@/lib/regions";
 import type { Country, CountryDetail, TabId } from "@/lib/types";
 
-const TABS: TabId[] = ["overview", "hub", "councils", "brief", "intel", "investments", "foresight", "minister", "counterpart", "desk", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
+const TABS: readonly TabId[] = PANEL_TABS;
 const cache = new Map<string, CountryDetail>(); const stamp = new Map<string, number>(); // weather and air quality are part of the detail, so it is refreshed when older than 15 minutes
 const fresh = (iso: string) => (stamp.get(iso) ?? 0) > Date.now() - 900_000;
 

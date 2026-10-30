@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Briefcase, ClipboardList, Scale, Compass, Crown, FileText, Flag, Gauge, Landmark, LayoutList, ListChecks, ScrollText, Users, X } from "lucide-react";
 import { useT } from "@/lib/store";
+import { useFollowCountry } from "@/lib/country";
 import type { CaseData } from "@/lib/case/load";
 import { POSTURE } from "@/lib/case/core";
 import type { Target } from "@/lib/case/changes";
@@ -51,6 +52,7 @@ export function CaseApp() {
   const subNav = useRef<HTMLElement>(null); useDragScroll(subNav);
   const router = useRouter(); const [council, setCouncil] = useState<SavedProduct | null>(null); const [arch, setArch] = useState<ArchSaved | null>(null); const [intel, setIntel] = useState<SavedProduct | null>(null); const [plan, setPlan] = useState<SavedProduct | null>(null); const [preset, setPreset] = useState<{ id: TemplateId; n: number }>({ id: "president", n: 0 });
   const iso = pref.iso && pref.iso !== "ARE" ? pref.iso : null; const load = useJson<CaseData>(iso ? `/api/case/${iso}` : null); const d = load.data;
+  useFollowCountry(iso, (i) => setPref((p) => ({ ...p, iso: i })), ready); // the country is shared by every page (src/lib/country.ts)
   const [view0, s0] = pref.view ? [pref.view, pref.sub] : fromAud(pref.aud); const view: View = iso ? view0 : "priorities"; const sub: Sub = s0 ?? pref.sub ?? "trends";
   const go = useCallback((v: View, s?: Sub) => { setPref((p) => ({ ...p, view: v, sub: s ?? p.sub ?? "trends" })); try { history.replaceState(null, "", `#${v}${v === "detailed" ? `/${s ?? sub}` : ""}`); } catch { /* ignore */ } window.scrollTo?.(0, 0); }, [setPref, sub]);
   useEffect(() => { if (!ready) return; const t0 = setTimeout(() => { const [h, s] = location.hash.replace("#", "").split("/"); if (h === "king") router.replace("/king"); else if (h === "ambassador") router.replace("/ambassador"); else if (LEGACY[h]) go(LEGACY[h][0], LEGACY[h][1]); else if (h === "reports" && TEMPLATES.some((x) => x.id === s)) { setPreset((x) => ({ id: s as TemplateId, n: x.n + 1 })); go("reports"); } else if (VIEWS.some((x) => x.id === h)) go(h as View, SUBS.some((x) => x.id === s) ? (s as Sub) : undefined); }, 0); return () => clearTimeout(t0); }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps

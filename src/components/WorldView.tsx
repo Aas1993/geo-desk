@@ -1,4 +1,5 @@
 "use client";
+import { PANEL_TABS } from "@/lib/nav";
 import dynamic from "next/dynamic";
 import { useEffect } from "react";
 import { LayersDrawer } from "./LayersDrawer";
@@ -16,7 +17,7 @@ import { BY_ID, LAYERS } from "@/lib/layers/registry";
 import type { TabId } from "@/lib/types";
 
 const MapCanvas = dynamic(() => import("./MapCanvas"), { ssr: false, loading: () => <div className="absolute inset-0 grid place-items-center text-[13px] text-t2">{typeof document !== "undefined" && document.documentElement.lang === "ar" ? "جارٍ تحميل الخريطة…" : "Loading map…"}</div> });
-const TABS = ["overview", "hub", "councils", "brief", "intel", "investments", "foresight", "minister", "counterpart", "desk", "economy", "trade", "agreements", "diplomacy", "media", "military", "un", "society", "news"];
+const TABS: readonly string[] = PANEL_TABS;
 
 /** Reads ?sel / ?tab / ?cmp on load and keeps them in the URL afterwards. */
 function useUrlSync() {

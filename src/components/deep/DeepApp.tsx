@@ -1,4 +1,5 @@
 "use client";
+import { useFollowCountry } from "@/lib/country";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BarChart3, BookOpenText, Brain, Building2, Globe2, Landmark, LineChart, Gauge, Library, Ship, X } from "lucide-react";
@@ -33,6 +34,7 @@ const SECTORS = SCOPES.filter((s) => s.kind === "sector");
 /** FALCON EYE second feature set: ten tabs on shared filters and one shared data snapshot, joined by the Deep Intelligence workspace. */
 export function DeepApp() {
   const { lang } = useT(); const L = lang as Lang; const u = T[L]; const { list, by } = useCountryList(); const [f, setF] = useDeepFilters(); const [tab, setTab] = useState<Tab>("fe10"); const iso = f.iso && f.iso !== "ARE" ? f.iso : null;
+  useFollowCountry(iso, (i) => setF({ iso: i })); // the country is shared by every page (src/lib/country.ts)
   const snap = useSnapshot(iso); const res = useResearch(iso); const [today, setToday] = useState("");
   useEffect(() => { const t = setTimeout(() => { setToday(new Date().toISOString().slice(0, 10)); const h = location.hash.replace("#", "").split(":")[0] as Tab; if (TABS.some((x) => x.id === h)) setTab(h); }, 0); return () => clearTimeout(t); }, []);
   const go = useCallback((x: Tab) => { setTab(x); try { history.replaceState(null, "", `#${x}`); } catch { /* ignore */ } window.scrollTo?.(0, 0); }, []);

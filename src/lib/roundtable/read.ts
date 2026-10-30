@@ -127,7 +127,14 @@ export function readSeat(id: SeatId, p: Saved | null, now: number): SeatReading 
   if (!r.confidence) r.confidence = confOf(bodyText(text).slice(0, 6000));
   for (const a of ANGLE_IDS) r.angles[a] = angleReading(text, a);
   for (const sc of scorecard) { const a = DIM_ANGLE[sc.dim]; if (a) r.angles[a] = { n: Math.max(r.angles[a].n, 1), pos: r.angles[a].pos, neg: r.angles[a].neg, reading: STATUS_V[sc.status], from: "scorecard" }; }
+  for (const [a, v] of Object.entries(ownScores(text))) r.angles[a] = { n: Math.max(r.angles[a].n, 1), pos: r.angles[a].pos, neg: r.angles[a].neg, reading: v, from: "scorecard" }; // the council's own scores (see ANGLE_SCORES_RULE), compared as they are
   return r;
+}
+/** The council's own score of each angle, when its writer was asked for them (ANGLE_SCORES_RULE): the "angleScores" object of its structured data, 0 to 100, angles the platform knows only. Anything else in it is dropped. */
+export function ownScores(report: string): Record<string, number> {
+  const out: Record<string, number> = {}; const m = /"angleScores"\s*:\s*(\{[^{}]*\})/.exec(report); if (!m) return out;
+  try { for (const [k, v] of Object.entries(JSON.parse(m[1]) as Record<string, unknown>)) { const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN; if (ANGLE_IDS.includes(k.toLowerCase()) && Number.isFinite(n)) out[k.toLowerCase()] = Math.max(0, Math.min(100, Math.round(n))); } } catch { /* a cut-off object gives no scores */ }
+  return out;
 }
 /** The free seat: the rule-built posture and the rule-built score from the Case File data, which is the common baseline every council's reading is set against. */
 export function dataSeat(d: CaseData | null, baseline: { angles: { id: string; score: number | null; indicators: unknown[] }[] } | null): SeatReading {

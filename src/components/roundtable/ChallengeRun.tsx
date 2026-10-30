@@ -8,7 +8,7 @@ import type { Lang } from "../falcon/bits";
 import { useTr } from "../case/bits";
 import { LiveDesk } from "../bird/LiveDesk";
 
-// THE CHALLENGE RUN: a directive box that steers what the councils debate, and one click (with an in-page confirmation, because the app's browser dismisses a pop-up confirm) that runs the round: about US$0.7, capped at US$1.00, through the same desk route and limits as every other paid product. The digests are built free from what the browser holds; nothing is sent until the user confirms.
+// THE CHALLENGE RUN: a directive box that steers what the councils debate, and one click (with an in-page confirmation, because the app's browser dismisses a pop-up confirm) that runs the round: about US$0.6, capped at US$1.00, through the same desk route and limits as every other paid product. The digests are built free from what the browser holds; nothing is sent until the user confirms.
 const nowMs = () => Date.now();
 const SUGGEST: { en: string; ar: string }[] = [
   { en: "Which course serves the UAE best here, and which council is most likely to be wrong?", ar: "أي مسار يخدم الإمارات أفضل هنا، وأي مجلس أرجح أن يكون مخطئًا؟" },

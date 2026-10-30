@@ -1,4 +1,5 @@
 "use client";
+import { useFollowCountry } from "@/lib/country";
 import { useCallback, useEffect, useState } from "react";
 import { Compass, Gauge, GitBranch, Globe2, Landmark, ListChecks, Map as MapIcon, ScrollText, ShieldAlert, Wrench } from "lucide-react";
 import { useT } from "@/lib/store";
@@ -34,6 +35,7 @@ const HZ_AR: Record<string, string> = { all: "كل الآفاق", short: "قصي
 export function MachiavelliApp() {
   const { lang } = useT(); const L = lang as Lang; const u = T[L]; const { list, by } = useCountryList(); const set = useProfiles(); const [f, setF] = useFilters(); const [section, setSection] = useState<Section>("country"); const [today, setToday] = useState("");
   useEffect(() => { const t = setTimeout(() => { setToday(new Date().toISOString().slice(0, 10)); const h = location.hash.replace("#", "").split(":"); if (SECTIONS.some((s) => s.id === h[0])) setSection(h[0] as Section); }, 0); return () => clearTimeout(t); }, []);
+  useFollowCountry(f.iso && f.iso !== "ARE" ? f.iso : null, (i) => setF({ iso: i })); // the country is shared by every page (src/lib/country.ts)
   const go = useCallback((s: Section) => { setSection(s); try { history.replaceState(null, "", `#${s}${f.iso ? `:${f.iso}` : ""}`); } catch { /* ignore */ } window.scrollTo?.(0, 0); }, [f.iso]);
   const sets = set && set !== "err" ? set : null; const built = sets ? Object.entries(sets.sources).map(([k, v]) => `${k} ${v?.slice(0, 10) ?? "n/a"}`).join(" · ") : "";
   return (

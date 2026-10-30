@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Landmark, X } from "lucide-react";
 import { useT } from "@/lib/store";
+import { useFollowCountry } from "@/lib/country";
 import type { CaseData } from "@/lib/case/load";
 import { refusalText } from "../machiavelli/forms";
 import { Tabs } from "../machiavelli/parts";
@@ -47,6 +48,7 @@ const GROUP_OF = (id: string) => MOFA_GROUPS.find((g) => g.agents.includes(id))?
 export function MofaApp() {
   const { lang } = useT(); const L = lang as Lang; const t = useTr(L); const { list, by } = useCountryList(); const [pref, setPref, ready] = useStored<{ iso: string | null; tab?: Tab }>("gd-mofa", { iso: null, tab: "org" });
   const iso = pref.iso && pref.iso !== "ARE" ? pref.iso : null; const load = useJson<CaseData>(iso ? `/api/case/${iso}` : null); const d = load.data; const tab: Tab = pref.tab ?? "org";
+  useFollowCountry(iso, (i) => setPref((p) => ({ ...p, iso: i })), ready); // the country is shared by every page (src/lib/country.ts)
   const filed = useFiled(iso); const [focus, setFocus] = useState(""); const [useContext, setUseContext] = useState(true); const [preset, setPreset] = useState<Preset>({ n: 0, topic: "" }); const [sel, setSel] = useState<string | null>(null); const t0 = useRef(0); const logged = useRef("");
   const [track, setTrackState] = useState<Track>({});
   useEffect(() => { if (!ready || pref.iso) return; const k = setTimeout(() => { try { const f = JSON.parse(localStorage.getItem("gd-deep-filters") ?? "null") as { iso?: string } | null; if (f?.iso && f.iso !== "ARE") setPref((p) => ({ ...p, iso: f.iso! })); } catch { /* ignore */ } }, 0); return () => clearTimeout(k); }, [ready, pref.iso, setPref]);

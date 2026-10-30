@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Binoculars, FileDown, X } from "lucide-react";
 import { useT } from "@/lib/store";
+import { useFollowCountry } from "@/lib/country";
 import type { CaseData } from "@/lib/case/load";
 import { birdMarkdown, consolidate, type Bird, type Inputs, type Prod } from "@/lib/bird/consolidate";
 import { mdToHtml } from "@/lib/dossier/export";
@@ -46,8 +47,9 @@ const KEYS = (iso: string) => ({ king: `gd-desk:king-council:${iso}`, mofa: `gd-
 const readProd = (key: string): Prod => { const s = readSourceByKey(key)[0]; return s ? { report: s.report, at: s.at, usd: s.usd, sources: s.sources ?? [], lang: s.lang } : null; };
 /** THE BIRD'S EYE VIEW: the last tab. One page that consolidates what every tab says about a country into the top strategic view for a decision in the UAE's interest: the course the deciding tabs give and whether they agree, the auditors' red flags, the top insights, the ranked interests, the next moves, the opportunities and risks, the security triad, what to watch, and how ready and how well checked the evidence is. Free: it reads what is already saved and the Case File data; it starts no paid run. */
 export function BirdApp() {
-  const { lang } = useT(); const L = lang as Lang; const t = useTr(L); const { list, by } = useCountryList(); const [pref, setPref] = useStored<{ iso: string | null }>("gd-bird", { iso: null });
+  const { lang } = useT(); const L = lang as Lang; const t = useTr(L); const { list, by } = useCountryList(); const [pref, setPref, ready] = useStored<{ iso: string | null }>("gd-bird", { iso: null });
   const iso = pref.iso && pref.iso !== "ARE" ? pref.iso : null; const load = useJson<CaseData>(iso ? `/api/case/${iso}` : null); const d = load.data; const [tick, setTick] = useState(0); const [busy, setBusy] = useState(""); const [err, setErr] = useState("");
+  useFollowCountry(iso, (i) => setPref((p) => ({ ...p, iso: i })), ready); // the country is shared by every page (src/lib/country.ts)
   useEffect(() => { const on = () => setTick((n) => n + 1); window.addEventListener("storage", on); window.addEventListener("focus", on); return () => { window.removeEventListener("storage", on); window.removeEventListener("focus", on); }; }, []);
   const [profile, setProfile] = useState<Profile | null>(null); const [techAll, setTechAll] = useState<TechData | null>(null); useEffect(() => { let dead = false; loadTech().then((j) => { if (!dead) setTechAll(j); }).catch(() => {}); return () => { dead = true; }; }, []); const [view, setView] = useState<"report" | "president">("report"); const [ask, setAsk] = useState<AskSaved | null>(null); const [auto, setAuto] = useState(false); const [saved, setSaved] = useState(false); const [bird, setBird] = useState<Bird | null>(null); const [digest, setDigest] = useState(""); const [audit, setAudit] = useState<AuditSaved | null>(null); const nm = d ? (L === "ar" && d.nameAr ? d.nameAr : d.name) : iso ?? "";
   useEffect(() => { const k = setTimeout(() => { if (!iso) { setBird(null); return; } const ks = KEYS(iso); const inputs: Inputs = { iso, name: nm, d, track: readTrack(iso), now: Date.now(), products: { king: readProd(ks.king), mofa: readProd(ks.mofa), intel: readProd(ks.intel), plan: readProd(ks.plan), architect: readProd(ks.architect), council: readProd(ks.council), falcon: readProd(ks.falcon), deep: readProd(ks.deep), mach: readProd(ks.mach), country: readProd(ks.country) } }; const b = consolidate(inputs); setBird(b); setDigest(sourceDigest(inputs, b)); setAudit(readAudit(iso)); }, 0); return () => clearTimeout(k); }, [iso, d, nm, tick]);

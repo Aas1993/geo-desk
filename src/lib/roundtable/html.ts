@@ -67,6 +67,6 @@ export function roundtableBlocks(o: { rs: SeatReading[]; baseline: Record<string
     postureScale(v.filed.filter((r) => r.course).map((r) => ({ short: SEAT_BY.get(r.id)!.short, name: nm(r.id, o.L), v: r.course })), Object.fromEntries(COURSES.map((c) => [c, COURSE_W[c][o.L]])), o.L) + (v.filed.some((r) => !r.course) ? `<div class="legend">${esc(t("No clear course in its own text, so not placed", "لا مسار واضح في نصه فلم يوضع"))}: ${esc(v.filed.filter((r) => !r.course).map((r) => `${SEAT_BY.get(r.id)!.short} ${nm(r.id, o.L)}`).join(" · "))}</div>` : ""),
     matrixHtml(v, o.L), ...councilCards(v, o.L)];
   if (missing.length) out.push(note(esc(`${t("Not run for this country, so not seated: ", "لم تُشغَّل لهذه الدولة فلا مقعد لها: ")}${missing.join("; ")}.`), "warn"));
-  if (v.challenge) out.push(...debate(v, o.L)); else out.push(note(esc(t("No challenge round has been run for this country yet. Run it from the Round Table (about US$0.7) to have the councils challenge each other and the arbiter recommend for the UAE.", "لم تُجرَ جولة تحدٍّ لهذه الدولة بعد. شغّلها من الطاولة المستديرة (نحو 0.7 دولار) لتتحدى المجالس بعضها ويوصي الحَكَم للإمارات.")), ""));
+  if (v.challenge) out.push(...debate(v, o.L)); else out.push(note(esc(t("No challenge round has been run for this country yet. Run it from the Round Table (about US$0.6) to have the councils challenge each other and the arbiter recommend for the UAE.", "لم تُجرَ جولة تحدٍّ لهذه الدولة بعد. شغّلها من الطاولة المستديرة (نحو 0.6 دولار) لتتحدى المجالس بعضها ويوصي الحَكَم للإمارات.")), ""));
   return out;
 }

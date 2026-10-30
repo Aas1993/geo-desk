@@ -2,10 +2,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Award, Bot, Brain, Briefcase, Compass, Crown, Handshake, Landmark, Users, Archive, Binoculars, Layers, Globe2, CandlestickChart, Eye, Share2, LayoutDashboard, Sparkles, Scale, Newspaper, FlaskConical } from "lucide-react";
+import { Layers, Share2, LayoutDashboard, Sparkles } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard-store";
 import { useDragScroll } from "@/lib/dragScroll";
+import { NAV, navOn } from "@/lib/nav";
 import { RightRail } from "./RightRail";
+import { AgentDock } from "./agent/AgentDock";
+import { StorageGuard } from "./StorageGuard";
 import { TopBar } from "./TopBar";
 import { Ticker } from "./Ticker";
 import { AlertsPanel } from "./AlertsPanel";
@@ -44,23 +47,7 @@ function MobileNav() {
   return (
     <>
       <nav ref={navRef} aria-label="Main" className="glass no-scrollbar absolute inset-x-2 bottom-2 z-30 flex h-14 items-stretch overflow-x-auto rounded-[14px] sm:hidden">
-        <Link href="/" onClick={() => { setMenu(false); select(null); }} className={cls(path === "/" && !menuOpen)}><Globe2 size={19} /><span className="max-w-full truncate">{t("nav_world")}</span></Link>
-        <Link href="/agent" className={cls(path.startsWith("/agent"))}><Bot size={19} /><span className="max-w-full truncate">{t("nav_agent")}</span></Link>
-        <Link href="/case" className={cls(path.startsWith("/case"))}><Briefcase size={19} /><span className="max-w-full truncate">{t("nav_case")}</span></Link>
-        <Link href="/king" className={cls(path.startsWith("/king"))}><Crown size={19} /><span className="max-w-full truncate">{t("nav_king")}</span></Link>
-        <Link href="/mofa" className={cls(path.startsWith("/mofa"))}><Landmark size={19} /><span className="max-w-full truncate">{t("nav_mofa")}</span></Link>
-        <Link href="/ambassador" className={cls(path.startsWith("/ambassador"))}><Handshake size={19} /><span className="max-w-full truncate">{t("nav_amb")}</span></Link>
-        <Link href="/markets" className={cls(path.startsWith("/markets"))}><CandlestickChart size={19} /><span className="max-w-full truncate">{t("nav_markets")}</span></Link>
-        <Link href="/falcon" className={cls(path.startsWith("/falcon"))}><Eye size={19} /><span className="max-w-full truncate">{t("nav_falcon")}</span></Link>
-        <Link href="/deep" className={cls(path.startsWith("/deep"))}><Brain size={19} /><span className="max-w-full truncate">{t("nav_deep")}</span></Link>
-        <Link href="/machiavelli" className={cls(path.startsWith("/machiavelli"))}><Compass size={19} /><span className="max-w-full truncate">{t("nav_mach")}</span></Link>
-        <Link href="/influence" className={cls(path.startsWith("/influence"))}><Award size={19} /><span className="max-w-full truncate">{t("nav_influence")}</span></Link>
-        <Link href="/room" className={cls(path.startsWith("/room"))}><Users size={19} /><span className="max-w-full truncate">{t("nav_room")}</span></Link>
-        <Link href="/archive" className={cls(path.startsWith("/archive"))}><Archive size={19} /><span className="max-w-full truncate">{t("nav_archive")}</span></Link>
-        <Link href="/bird" className={cls(path.startsWith("/bird"))}><Binoculars size={19} /><span className="max-w-full truncate">{t("nav_bird")}</span></Link>
-        <Link href="/compare" className={cls(path.startsWith("/compare"))}><Scale size={19} /><span className="max-w-full truncate">{t("nav_compare")}</span></Link>
-        <Link href="/hub" className={cls(path.startsWith("/hub"))}><Newspaper size={19} /><span className="max-w-full truncate">{t("nav_hub")}</span></Link>
-        <Link href="/lab" className={cls(path.startsWith("/lab"))}><FlaskConical size={19} /><span className="max-w-full truncate">{t("nav_lab")}</span></Link>
+        {NAV.map((n) => { const I = n.icon; return <Link key={n.href} href={n.href} onClick={n.href === "/" ? () => { setMenu(false); select(null); } : undefined} className={cls(n.href === "/" ? path === "/" && !menuOpen : navOn(n, path))}><I size={19} /><span className="max-w-full truncate">{t(n.key as "nav_world")}</span></Link>; })}
         {path === "/" && <button onClick={() => setMenu(!menuOpen)} className={cls(menuOpen)}><Layers size={19} />{t("layers")}</button>}
         {path === "/" && <button onClick={() => { select(null); useDashboard.getState().setOpen(true); }} className={cls(false)}><LayoutDashboard size={19} />{lang === "ar" ? "اللوحة" : "Brief"}</button>}
         {path === "/" && <button onClick={() => { select(null); useDashboard.getState().setAsk(true); }} className={cls(false)}><Sparkles size={19} />{lang === "ar" ? "اسأل" : "Ask"}</button>}
@@ -82,6 +69,8 @@ export function Shell({ children }: { children: ReactNode }) {
       <ArchiveSweeper />
       <Ticker items={feed.items} />
       <MobileNav />
+      <AgentDock />
+      <StorageGuard />
     </div>
   );
 }

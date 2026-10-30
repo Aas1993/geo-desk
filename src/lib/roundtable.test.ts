@@ -8,9 +8,12 @@ import { CHALLENGE_GROUPS, challengeChiefRole, composeChallenge, idsIn, parseCha
 import { SUBJECTS } from "./review/pair";
 import { KINDS } from "./reportpdf";
 import { ANGLE_IDS, DEBATERS, LENSES, SEATS, SEAT_BY, challengeKey } from "./roundtable/model";
-import { angleReading, courseFromText, readSaved, readSeat, readState, type SeatReading } from "./roundtable/read";
+import { angleReading, courseFromText, ownScores, readSaved, readSeat, readState, type SeatReading } from "./roundtable/read";
+import { NAV, PANEL_TABS, navOn } from "./nav";
+import { dict } from "./i18n";
+import { labelOf, measure } from "./storage";
 import { baselineMap, consensus, differences, onScale, rowCells, rowOf, spreads } from "./roundtable/consensus";
-import { challengeContext, digestOf, readChallenge, withChallenge } from "./roundtable/challenge";
+import { challengeContext, challengeStatus, digestOf, readChallenge, withChallenge } from "./roundtable/challenge";
 import { roundtableBlocks } from "./roundtable/html";
 import { summaryOf, viewOf } from "./roundtable/view";
 import { roundtableMarkdown } from "./roundtable/markdown";
@@ -127,4 +130,20 @@ const svw = viewOf({ rs: [R("data", "staged", { trade: 60 }), R("king", "staged"
 const sum = summaryOf(svw, "en"); assert.ok(sum[0].includes("3 of the 3 councils") && sum[0].includes("staged") && sum[0].includes("rule-built posture"), "the summary says how many give a course and what most say"); assert.ok(sum.some((x) => x.includes("They split most on") && x.includes("Trade")), "it names the angle they split on"); assert.ok(sum.some((x) => x.includes("red flags on Falcon Council") && x.includes("older than 30 days")), "it warns about red flags and age"); assert.ok(sum.at(-1)!.includes("run the challenge round"), "without a challenge it says which is not yet known");
 assert.ok(/[؀-ۿ]/.test(summaryOf(svw, "ar").join("")) && summaryOf(viewOf({ rs: [R("data", null)], baseline: {}, challenge: null, lens: "bird" }), "en").length === 0, "Arabic works and an empty table says nothing");
 assert.ok(summaryOf(viewOf({ rs: [R("king", "staged"), R("mofa", "staged"), R("falcon", "staged")], baseline: {}, challenge: pc, lens: "bird" }), "en").at(-1)!.includes("the arbiter recommends staged"), "with a challenge it quotes the arbiter");
+
+// ---- the councils' own angle scores, the stale notice, the nav and the shared lists
+assert.deepEqual(ownScores('x "angleScores": {"trade": 72, "SECURITY": "35", "bogus": 50, "legal": 140, "info": "n/a"} y'), { trade: 72, security: 35, legal: 100 }, "own scores are read, clamped and limited to the known angles"); assert.deepEqual(ownScores("none"), {}); assert.deepEqual(ownScores('"angleScores": {"trade": 7'), {}, "a cut-off object gives no scores");
+const kj2 = { ...kingJson, angleScores: { trade: 77, security: 33 } }; const rk2 = readSeat("king", { report: `# Executive Brief\n\nStaged.\n<king>${JSON.stringify(kj2)}</king>`, at: "2026-10-20T00:00:00Z", usd: 0.6, sources: [], lang: "en" }, NOW);
+assert.equal(rk2.angles.trade.reading, 77); assert.equal(rk2.angles.trade.from, "scorecard", "its own score is compared as it is, not as a tone reading"); assert.equal(rk2.angles.security.reading, 33);
+const pres2 = readSeat("president", { report: `<president>${JSON.stringify({ ...presJson, angleScores: { trade: 61 } })}</president>`, at: "2026-10-29T00:00:00Z", usd: 0.7, sources: [], lang: "en" }, NOW); assert.equal(pres2.angles.trade.reading, 61, "its own angle score wins over the coarse scorecard rating");
+for (const prod of ["king-council", "mofa-council", "emb-intel", "emb-plan", "president-brief", "country-full"] as const) { const pl = planFor(prod, { ...o, topic: "" }, ""); assert.ok(pl.calls.find((c) => c.stage === 1)!.role({}).includes('"angleScores"'), `${prod}'s writer is asked for its own angle scores`); assert.ok(!pl.calls.filter((c) => c.stage !== 1).some((c) => c.role({}).includes('"angleScores"')), "only the final writer is asked"); }
+assert.ok(!planFor("council-challenge", o, ctx).calls.some((c) => c.role({}).includes("Leave an angle out rather than guess")), "the challenge has its own scores"); assert.ok(!planFor("king-directive", { ...o, topic: "x" }, "").calls.some((c) => c.role({}).includes('"angleScores"')), "a directive answer is not asked");
+const stat = challengeStatus("2026-10-29T00:00:00Z", pc, [{ id: "king", onFile: true, at: "2026-10-30T00:00:00Z" }, { id: "falcon", onFile: true, at: "2026-10-20T00:00:00Z" }, { id: "mach", onFile: true, at: "2026-10-01T00:00:00Z" }, { id: "mofa", onFile: false, at: null }]);
+assert.ok(stat.stale && stat.changed.join() === "king" && stat.added.join() === "mach", "a council saved after the round, and one it did not include, make it stale"); assert.equal(challengeStatus("2026-10-29T00:00:00Z", pc, [{ id: "king", onFile: true, at: "2026-10-01T00:00:00Z" }, { id: "falcon", onFile: true, at: "2026-10-02T00:00:00Z" }]).stale, false);
+assert.equal(new Set(NAV.map((n) => n.href)).size, NAV.length); assert.equal(NAV[0].href, "/"); assert.equal(NAV[1].href, "/agent", "the Desk agent is second, next to the World"); assert.ok(navOn(NAV[0], "/") && !navOn(NAV[0], "/case") && navOn(NAV.find((n) => n.href === "/case")!, "/case/x"));
+for (const n of NAV) for (const l of ["en", "ar"] as const) assert.ok((dict[l] as Record<string, string>)[n.key], `${n.key} has a ${l} label`);
+assert.ok(PANEL_TABS.includes("councils") && PANEL_TABS.includes("hub") && new Set(PANEL_TABS).size === PANEL_TABS.length, "the address bar and the panel read the same tab list");
+const fake = (o2: Record<string, string>) => ({ get length() { return Object.keys(o2).length; }, key: (i: number) => Object.keys(o2)[i] ?? null, getItem: (k: string) => o2[k] ?? null });
+const ms = measure(fake({ "gd-desk:king-council:JOR": JSON.stringify({ at: "2026-10-20T00:00:00Z", report: "x".repeat(60_000) }), "gd-desk:mofa-council:JOR": JSON.stringify({ report: "y".repeat(30_000) }), "gd-decisions:JOR": "z".repeat(50_000), "gd-case-council:NOR": "tiny" }));
+assert.deepEqual(ms.items.map((x) => x.key), ["gd-desk:king-council:JOR", "gd-desk:mofa-council:JOR"], "only large council products are offered, largest first; settings and decisions never are"); assert.equal(ms.items[0].at, "2026-10-20T00:00:00Z"); assert.ok(ms.share > 0.028 && ms.share < 0.04); assert.equal(labelOf("gd-prefs"), null); assert.equal(labelOf("gd-desk:council-challenge:JOR")!.en, "Council challenge · JOR");
 console.log("roundtable: all checks passed");

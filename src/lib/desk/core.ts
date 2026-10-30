@@ -15,7 +15,7 @@ export type Product = "king-council" | "king-directive" | "emb-intel" | "emb-pla
 export const PRODUCTS: Product[] = ["king-council", "king-directive", "emb-intel", "emb-plan", "emb-directive", "mofa-council", "mofa-directive", "country-full", "president-brief", "council-challenge"];
 export const DESK_CAP_USD = 1;
 /** What each product typically costs on one country, in US dollars (the ceiling is DESK_CAP_USD). Printed beside every button; replaced with measured figures after a live run. */
-export const PRODUCT_USD: Record<Product, number> = { "king-council": 0.6, "king-directive": 0.3, "emb-intel": 0.9, "emb-plan": 0.85, "emb-directive": 0.3, "mofa-council": 0.8, "mofa-directive": 0.3, "country-full": 0.9, "president-brief": 0.7, "council-challenge": 0.7 };
+export const PRODUCT_USD: Record<Product, number> = { "king-council": 0.6, "king-directive": 0.3, "emb-intel": 0.9, "emb-plan": 0.85, "emb-directive": 0.3, "mofa-council": 0.8, "mofa-directive": 0.3, "country-full": 0.9, "president-brief": 0.7, "council-challenge": 0.6 };
 export const worstOf = (maxTokens: number, searches: number) => (maxTokens * 10) / 1e6 + searches * 0.01 + 0.08;
 
 // ---- the universal constitution ----

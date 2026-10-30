@@ -7,6 +7,7 @@ import { EMB_AGENTS, EMB_BY, EMB_CHIEF, EMB_INTEL_GROUPS, EMB_PLAN_CHIEF, EMB_PL
 import { PRESIDENT_BY, PRESIDENT_CHIEF, PRESIDENT_GROUPS, PRESIDENT_SYSTEM, composePresident, presidentChiefRole, presidentGroupRole } from "./president";
 import { CHALLENGE_BY, CHALLENGE_CHIEF, CHALLENGE_GROUPS, CHALLENGE_SYSTEM, challengeChiefRole, challengeGroupRole, composeChallenge, idsIn } from "./challenge";
 import { COUNTRY_BY, COUNTRY_CHIEF, COUNTRY_GROUPS, COUNTRY_SYSTEM, composeCountry, countryChiefRole, countryGroupRole } from "./country";
+import { ANGLE_SCORES_RULE, ANGLE_SCORE_PRODUCTS } from "../roundtable/model";
 import { KING_AGENTS, KING_BY, KING_CHAIR, KING_GROUPS, KING_SYSTEM, composeKing, kingChairRole, kingDirectiveChairRole, kingDirectiveGroupRole, kingGroupRole } from "./king";
 
 // One description of every paid desk run, shared by the route that executes it and the screens that show what it costs and what it does. A run is a list of calls: the first call of stage 0 goes alone so the shared evidence is cached before the others read it, the rest of stage 0 go in parallel, and the final call (the Decision Chair or the Chief of Staff) writes the product from what they produced.
@@ -67,6 +68,8 @@ export function planFor(product: Product, o: DeskOptions, context: string): Desk
         { id: chief.id, agents: [], name: b(chief.en, chief.ar), role: (p) => (king ? kingDirectiveChairRole(p, { topic, mode: o.mode, urgency: o.urgency }) : mofa ? mofaDirectiveChiefRole(p, { topic, mode: o.mode, urgency: o.urgency }) : embDirectiveChiefRole(p, { topic, mode: o.mode, urgency: o.urgency })), searches: 0, maxTokens: 6500, stage: 1 }];
     }
   }
+  // the council states its own score of each angle it addressed, so the Round Table can compare real numbers instead of reading the tone of the text (src/lib/roundtable/read.ts reads it back)
+  if (ANGLE_SCORE_PRODUCTS.has(product)) calls = calls.map((c) => (c.stage === 1 ? { ...c, role: (p: Record<string, string>) => `${c.role(p)}${ANGLE_SCORES_RULE}` } : c));
   // Arabic needs roughly a third more output tokens for the same text, and a cut-off answer loses its structured data
   if (o.lang === "ar") calls = calls.map((c) => ({ ...c, maxTokens: Math.round(c.maxTokens * 1.3) }));
   return { product, system, calls, compose, contextLabel: ctxLabel, worst: worst(calls), ...(product === "country-full" ? { finalReserve: 0.7 } : product === "president-brief" || product === "council-challenge" ? { finalReserve: 0.85 } : product === "emb-intel" || product === "emb-plan" || product === "mofa-council" ? { finalReserve: 0.8 } : {}) };

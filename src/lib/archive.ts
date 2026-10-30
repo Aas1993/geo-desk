@@ -23,3 +23,7 @@ export const totalSize = (xs: ArchiveMeta[]) => xs.reduce((a, x) => a + x.size, 
 export const fmtSize = (n: number) => (n <= 0 ? "0 KB" : n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
 /** Asks the browser to keep the archive when it is short of space (it may decline). */
 export async function keepArchive(): Promise<boolean> { try { return (await navigator.storage?.persist?.()) ?? false; } catch { return false; } }
+/** Marks the kept PDFs that match as out of date (their note no longer names the current layout), so the sweeper makes them again from what the browser holds now. Returns how many were marked. */
+export async function markStale(match: (m: ArchiveMeta) => boolean): Promise<number> {
+  try { const n = await tx([META], "readwrite", async (t) => { const st = t.objectStore(META); const all = await done(st.getAll() as IDBRequest<ArchiveMeta[]>); let c = 0; for (const m of all) if (match(m) && m.note !== "stale") { st.put({ ...m, note: "stale" }); c++; } return c; }); if (n) ping(); return n; } catch { return 0; }
+}

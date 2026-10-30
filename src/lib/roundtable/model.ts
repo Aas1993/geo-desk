@@ -1,7 +1,7 @@
 import type { B } from "../case/core";
 import { ANGLES } from "../bird/score";
 
-// THE COUNCIL ROUND TABLE: every council on the platform seated around one table, each with the course it gives the UAE on a country, what it says, how well it was checked and how it reads the country's fourteen angles, so the councils can be compared and (on a click, for about US$0.7) made to challenge each other. This file holds the seats, the pages' domain lenses and the types; reading a saved product is read.ts, the arithmetic of agreement is consensus.ts, the paid challenge is challenge.ts.
+// THE COUNCIL ROUND TABLE: every council on the platform seated around one table, each with the course it gives the UAE on a country, what it says, how well it was checked and how it reads the country's fourteen angles, so the councils can be compared and (on a click, for about US$0.6) made to challenge each other. This file holds the seats, the pages' domain lenses and the types; reading a saved product is read.ts, the arithmetic of agreement is consensus.ts, the paid challenge is challenge.ts.
 // Nothing here is a verdict. What a council "reads" is taken from its own saved output and labelled as such; a council with nothing on file is shown as not run, never filled in.
 export type Course = "deepen" | "staged" | "hedge" | "hold";
 /** The posture scale runs from the most reserved course to the most committed one. */
@@ -53,3 +53,12 @@ export const ANGLE_IDS = ALL;
 /** Column headings of the matrix: one short word or two for each angle. */
 export const ANGLE_SHORT: Record<string, { en: string; ar: string }> = { political: { en: "Politics", ar: "السياسة" }, diplomatic: { en: "Diplomacy", ar: "الدبلوماسية" }, military: { en: "Military", ar: "العسكري" }, security: { en: "Security", ar: "الأمن" }, economic: { en: "Economy", ar: "الاقتصاد" }, trade: { en: "Trade", ar: "التجارة" }, logistics: { en: "Logistics", ar: "اللوجستيات" }, energy: { en: "Energy", ar: "الطاقة" }, tech: { en: "Tech", ar: "التقنية" }, soft: { en: "Soft power", ar: "القوة الناعمة" }, influence: { en: "Influence", ar: "النفوذ" }, legal: { en: "Legal", ar: "القانوني" }, climate: { en: "Climate", ar: "المناخ" }, info: { en: "Narrative", ar: "السرد" } };
 export const angleShort = (id: string, L: "en" | "ar") => ANGLE_SHORT[id]?.[L] ?? angleName(id, L);
+
+/** Which page's lens each kind of saved product is read through when its PDF carries the Round Table. */
+const KIND_LENS: Record<string, LensId> = { "mofa-council": "mofa", "emb-intel": "ambassador", "emb-plan": "ambassador", "king-council": "bird", "country-full": "country", "president-brief": "bird", "council-challenge": "bird", "case-council": "country", architect: "country", bird: "bird", "case-report": "country", "dossier-desk": "desk", desk: "desk", "falcon-council": "country", "mach-council": "country", "deep-council": "country" };
+export const ROUNDTABLE_KINDS = new Set(Object.keys(KIND_LENS));
+export const lensOfKind = (kind: string): LensId | null => KIND_LENS[kind] ?? null;
+
+/** The products whose final writer is asked to add its own score of each angle to its structured data, and the sentence that asks. The score is the council's reading of the same thing the rule-built country score measures (how favourable and solid the angle is for the UAE), so the Round Table can compare them with it directly. */
+export const ANGLE_SCORE_PRODUCTS = new Set(["king-council", "mofa-council", "emb-intel", "emb-plan", "president-brief", "country-full"]);
+export const ANGLE_SCORES_RULE = `\n\nOne more key in your structured JSON, put last inside the same block: "angleScores", an object from angle id to an integer from 0 to 100, only for the angles your own analysis actually addressed (the ids are ${ANGLES.map((a) => a.id).join(", ")}). A high score is a stable, aligned, open front with headroom for the UAE; a low score is a fragile, distant or closed one; it is your own reading from the evidence, not a copy of any earlier score. Leave an angle out rather than guess. Do not mention it in the markdown.`;

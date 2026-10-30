@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { Users, X } from "lucide-react";
 import { useT } from "@/lib/store";
+import { useFollowCountry } from "@/lib/country";
 import { parseReviews } from "@/lib/desk/core";
 import { EMB_AGENTS, embDesk } from "@/lib/desk/embassy";
 import { KING_AGENTS, kingAnnex } from "@/lib/desk/king";
@@ -21,8 +22,9 @@ const report = (f: Filed, c: CouncilSpec): string | null => (c.saved === "king-c
 const ROLES: Record<string, { en: string; ar: string }> = { statecraft: { en: "reads as a senior statecraft strategist whose only client is the UAE's long-term interest, and red-flags anything that would not serve it", ar: "يقرأ كاستراتيجي كبير في فن الحكم عميله الوحيد مصلحة الإمارات بعيدة المدى، ويرفع علمًا أحمر على ما لا يخدمها" }, reality: { en: "reads as a forensic evidence auditor, checks every consequential fact, figure and name against the evidence on file and red-flags what is invented, stale or unsourced", ar: "يقرأ كمدقق أدلة جنائي، يفحص كل حقيقة ورقم واسم مؤثر مقابل الأدلة المحفوظة ويرفع علمًا أحمر على المختلق أو القديم أو غير المسند" } };
 /** THE ROOM: every council on the platform as a round table, with the two independent auditors at the foot of each. For a chosen country, a seat is filled in when its work is in a saved product in this browser. A council's own page shows the same table live while it sits. This page never starts a paid run. */
 export function RoomApp() {
-  const { lang } = useT(); const L = lang as Lang; const t = useTr(L); const { list, by } = useCountryList(); const [pref, setPref] = useStored<{ iso: string | null }>("gd-room", { iso: null });
+  const { lang } = useT(); const L = lang as Lang; const t = useTr(L); const { list, by } = useCountryList(); const [pref, setPref, ready] = useStored<{ iso: string | null }>("gd-room", { iso: null });
   const iso = pref.iso && pref.iso !== "ARE" ? pref.iso : null; const f = useFiled(iso); const pick = useCallback((i: string | null) => setPref({ iso: i }), [setPref]); const [open, setOpen] = useState<string | null>(null);
+  useFollowCountry(iso, (i) => setPref((p) => ({ ...p, iso: i })), ready); // the country is shared by every page (src/lib/country.ts)
   const cards = useMemo(() => COUNCILS.map((c) => {
     const rep = report(f, c); const done = (id: string): boolean => { if (!rep) return false; if (c.saved === "king-council") { const a = KING_AGENTS.find((x) => x.id === id); return !!a && !!kingAnnex(rep, a); } if (c.saved === "mofa-council") { const a = MOFA_AGENTS.find((x) => x.id === id); return !!a && !!mofaRole(rep, a); } if (c.saved === "emb-intel" || c.saved === "emb-plan") { const a = EMB_AGENTS.find((x) => x.id === id); return !!a && !!embDesk(rep, a); } return false; };
     const reviews = rep ? parseReviews(rep).length : 0; const perSeat = c.saved === "king-council" || c.saved === "mofa-council" || c.saved === "emb-intel" || c.saved === "emb-plan";

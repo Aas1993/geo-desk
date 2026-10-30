@@ -1,0 +1,38 @@
+// Synthetic, complete products for tests and for looking at the visuals when the products saved in a browser were cut off at the model's output limit. They are labelled as test data in their text and are never written anywhere by the app.
+export const REVIEWS = (): string => `\n\n# Statecraft Review\nok\n<statecraft_review>${JSON.stringify({ verdict: "revise", standing: "mixed", summary: "Sound strategy, thin evidence on the rail terms.", strengths: ["Gates are explicit"], issues: [{ where: "J2", severity: "high", problem: "Figure F5 is unsourced", fix: "Source it" }], unsupported: ["The corridor volume"], boundary: [], conflicts: [], missing: ["The terms note"], redFlags: [{ flag: "Figure F5 is unsourced", severity: "critical", why: "Money could be committed on it", ask: "Source it before the gate" }] })}</statecraft_review>\n\n# Reality Review\nok\n<reality_review>${JSON.stringify({ verdict: "approve", standing: "sound", summary: "Facts trace to the evidence pack.", strengths: ["Dated sources"], issues: [], unsupported: [], boundary: [], conflicts: [], missing: [], redFlags: [] })}</reality_review>`;
+export const KING_JSON = {
+  decision: { course: "staged", confidence: "moderate", headline: "TEST FIXTURE: commit in stages behind dated gates and keep an exit.", rationale: "Ties are strong but the terms are unknown; staging limits liability while keeping options open.", conditions: ["Terms note by 31 January", "Compliance screening before any tranche", "No deployment or guarantee"], ifWrong: "The cost is delay; assets are not at risk." },
+  options: [
+    { course: "deepen", summary: "Commit fully now.", for: ["Speed", "Signals commitment"], against: ["Unknown terms", "Stranded capital"], requires: ["A signed offtake"], reversibility: "hard", firstMove: "Sign the framework." },
+    { course: "staged", summary: "Commit in tranches behind gates.", for: ["Limits liability"], against: ["Slower"], requires: ["Gate dates", "Suspension rights"], reversibility: "moderate", firstMove: "Request the terms note." },
+    { course: "hedge", summary: "Keep options with several partners.", for: ["Optionality", "Low cost", "Reversible"], against: ["Signals ambivalence"], requires: ["A second partner"], reversibility: "easy", firstMove: "Open talks with a second partner." },
+    { course: "hold", summary: "Watch and wait.", for: ["No exposure"], against: ["Rivals move first", "Goodwill fades"], requires: ["Nothing"], reversibility: "easy", firstMove: "Set a review date." },
+  ],
+  judgments: [
+    { id: "J1", field: "geo", text: "A rival will fill the gap within a year if the UAE waits.", band: "likely", confidence: "moderate", basis: "Two announced tenders", evidence: ["F1", "F2"], indicator: "Tender award" },
+    { id: "J2", field: "macro", text: "The currency is fragile and will not stabilise before the programme.", band: "very likely", confidence: "high", basis: "Reserves cover", evidence: ["F5"], indicator: "Reserve cover under 3 months" },
+    { id: "J3", field: "law", text: "Treaty protections are thin for new investment.", band: "roughly even", confidence: "low", basis: "No ratified investment treaty", evidence: [], indicator: "Ratification" },
+    { id: "J4", field: "invest", text: "UAE exposure is concentrated in one port.", band: "almost certain", confidence: "high", basis: "Deal register", evidence: ["F8"], indicator: "New deals" },
+  ],
+  risks: [
+    { name: "Currency shock", likelihood: "likely (55-70%)", impact: "high", trigger: "Reserves under 3 months", mitigation: "Hard-currency repayment", owner: "Treasury" },
+    { name: "Sanctions exposure", likelihood: "unlikely", impact: "high", trigger: "A listing", mitigation: "Screening", owner: "Compliance" },
+    { name: "Counterparty default", likelihood: "roughly even", impact: "medium", trigger: "Missed payment", mitigation: "Escrow", owner: "Desk" },
+    { name: "Reputational drift", likelihood: "", impact: "low", trigger: "Press", mitigation: "Narrative plan", owner: "Media office" },
+  ],
+  watch: [{ indicator: "Reserve cover", signal: "Falling", threshold: "Under 3 months", source: "IMF" }, { indicator: "Tender award", signal: "A rival wins", threshold: "Any award", source: "Official gazette" }],
+  decisionsAsked: ["Approve the staged course"], assumptions: ["The terms note arrives"], changeMind: ["A signed rival offtake"], gaps: ["Terms of the rail concession"],
+  soWhat: "TEST FIXTURE: staged commitment keeps the UAE's port and corridor options alive while the terms are unknown.",
+  angles: [{ id: "gov", status: "covered", note: "Leadership and succession read" }, { id: "friends", status: "covered" }, { id: "military", status: "thin", note: "Policy level only" }, { id: "tech", status: "notfound", note: "Needs the tech registry" }, { id: "econ", status: "covered" }, { id: "legal", status: "thin" }],
+  scenarios: [{ kind: "base", name: "Slow gated progress", likelihood: "likely", summary: "Terms arrive late; tranches stay gated.", tripwires: [{ indicator: "Terms note", threshold: "Not by 31 January", move: "Move to hold" }] }, { kind: "upside", name: "Fast close", likelihood: "unlikely", summary: "A signed offtake.", tripwires: [] }, { kind: "downside", name: "Currency break", likelihood: "roughly even", summary: "Reserves under 3 months.", tripwires: [{ indicator: "Reserve cover", threshold: "Under 3 months", move: "Suspend tranches" }] }],
+  milestones: { "30d": [{ id: "M1", title: "Request the terms note", owner: "Desk", start: "2026-11-01", end: "2026-11-30", gate: "Terms received", measure: "Note on file" }], "100d": [{ id: "M2", title: "Compliance screening", owner: "Compliance", start: "2026-11-15", end: "2027-02-10", gate: "Screening cleared", measure: "Report", dependsOn: ["M1"] }], "1y": [{ id: "M3", title: "First tranche", owner: "Treasury", start: "2027-02-10", end: "2027-09-30", gate: "Review gate 31 March 2027", measure: "Disbursed against milestones", resources: "not estimated" }] },
+  coalition: [{ name: "Saudi Arabia", kind: "country", stance: "partner", offer: "Joint financing", ask: "Support at the board", seat: "Regional bank board" }, { name: "African Development Bank", kind: "institution", offer: "Co-lending", ask: "Safeguards" }],
+  ledger: [{ instrument: "Ports and logistics", uae: 70, headroom: 20, rivals: { China: 85, Türkiye: 40 }, note: "Rival rail terms" }, { instrument: "Finance", uae: 35, headroom: 50, rivals: { China: 60 } }],
+  precedents: [{ year: "2019", what: "Port concession in a neighbour", outcome: "Delivered late", lesson: "Gate the tranches" }, { year: "2012", what: "A deposit", outcome: "Rolled over twice", lesson: "Set a hard exit" }],
+};
+export const kingReport = (): string => `# Executive Brief\n\nTEST FIXTURE. Commit in stages. [F1]\n\n# Detailed Brief\n\n## Situation\ntext\n\n# Specialist Annex\n\n## Geopolitics and Regional Order\n**Headline.** A rival is circling.\n\n# Structured data\n\nNote.\n<king>\n${JSON.stringify(KING_JSON)}\n</king>${REVIEWS()}`;
+const usage = { searches: 20, usd: 0.6, input: 1, output: 1, cacheRead: 0, cacheWrite: 0 };
+/** localStorage entries (key → value) for a synthetic country ("NOR"), for looking at the pages in a browser. Each product's work adds its own file fixtures-<product>.ts that exports a STORE of the same shape. */
+export const STORE: Record<string, unknown> = {
+  "gd-desk:king-council:NOR": { report: kingReport(), sources: [{ url: "https://www.imf.org/x", title: "IMF" }, { url: "https://www.reuters.com/y", title: "Reuters" }], usage, at: "2026-10-30T10:00:00.000Z", model: "test-fixture", name: "Norway", options: { lang: "en" }, cached: false, product: "king-council", facts: [{ id: "F1", kind: "TEST", text: "Test fact", src: "fixture" }] },
+};

@@ -1,4 +1,4 @@
-export type Exchange = "ADX" | "DFM";
+export type Exchange = "ADX" | "DFM" | "QSE";
 export type Listing = {
   exchange: Exchange; symbol: string; name: string; nameAr?: string | null; currency: string; type: string; mic: string;
   /** DFM only: the ticker DFM's own disclosure feed uses for this issuer, when we could match one. */

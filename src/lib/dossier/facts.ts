@@ -1,0 +1,71 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { countryFacts } from "@/lib/ask/facts";
+import { LAYERS } from "@/lib/layers/registry";
+import { tradeSummary, usdM, type OutlookData, type PartnershipData, type TradeData } from "@/lib/intel";
+import type { Fact } from "@/lib/brief/facts";
+import { intelFor } from "@/lib/intel-data";
+import { investFor } from "@/lib/invest-data";
+import { foresightFacts, foresightFor } from "@/lib/foresight-data";
+import { loadGraph } from "@/lib/falcon/graph";
+import { graphText } from "@/lib/falcon/graph-core";
+
+export type Tile = { label: string; value: string; sub?: string };
+const rd = async <T,>(f: string): Promise<T | null> => { try { return JSON.parse(await readFile(path.join(process.cwd(), "public/data", f), "utf8")) as T; } catch { return null; } };
+type Visit = { u: string; d: string; t: string; c: string[]; k: string; l: number; dir?: string };
+
+/** The app's own fact pack for the detailed brief: everything the shorter briefs see, plus five-year series, memberships, the agreements list and more engagements. Also returns dashboard tiles drawn straight from the datasets, never from the model. */
+export async function dossierFacts(iso3: string): Promise<{ name: string; nameAr: string | null; facts: Fact[]; gaps: string[]; tiles: Tile[] } | null> {
+  const base = await countryFacts(iso3); if (!base) return null; const facts = [...base.facts]; let n = facts.length; const add = (kind: string, text: string, src: string, url?: string, t?: number) => facts.push({ id: `F${++n}`, kind, text, src, url, t });
+  const [tr, ol, pi, ag, orgs, vs, aid, ms, fl, inv, cs] = await Promise.all([rd<TradeData>("trade.json"), rd<OutlookData>("outlook.json"), rd<PartnershipData>("partnership.json"), rd<{ countries: Record<string, { mofa: { t: string; type: string; year?: number | null }[]; moft: { t: string; type: string; year?: number | null }[]; cepa: { status: string; signed: string | null; inForce: string | null } | null; committees: { meetings: number | null }[]; offices: unknown[] }> }>("agreements.json"), rd<{ orgs: Record<string, string[]> }>("orgs.json"), rd<{ items: Visit[] }>("visits.json"), rd<{ countries: Record<string, { usd: number; year: number }> }>("layers/aid.json"), rd<{ countries: Record<string, { type: string; name: string; head: { role: string; name: string } | null; phone?: string; email?: string }[]> }>("missions.json"), rd<{ countries: Record<string, { counts: Record<string, number> }> }>("flights.json"), rd<{ countries: Record<string, { outward?: { usd: number; year: number; rank?: number } }> }>("investment.json"), rd<{ name: string; nameAr: string | null; iso3: string }[]>("countries.json")]);
+  const c = cs?.find((x) => x.iso3 === iso3);
+
+  if (tr?.countries[iso3]) { const rows = tr.countries[iso3].a.slice(-6); const cagr = rows.length >= 2 ? (Math.pow((rows.at(-1)![1] + rows.at(-1)![2]) / (rows[0][1] + rows[0][2]), 1 / (rows.at(-1)![0] - rows[0][0])) - 1) * 100 : null;
+    add("trade-series", `UAE goods trade with ${base.name}, annual, US$ millions (UAE customs via IMF IMTS; exports incl. re-exports): ${rows.map((r) => `${r[0]}: exports ${r[1]}, imports ${r[2]}, total ${r[1] + r[2]}`).join("; ")}${cagr != null && isFinite(cagr) ? `. Compound annual growth of total trade ${rows[0][0]}-${rows.at(-1)![0]}: ${cagr.toFixed(1)}%` : ""}.`, "IMF IMTS"); }
+  const oe = ol?.countries[iso3]; if (oe) { const ys = [2021, 2022, 2023, 2024, 2025, 2026, 2027]; const line = (label: string, s?: Record<number, number>, unit = "") => (s ? `${label}: ${ys.map((y) => `${y}${y >= 2025 ? "F" : ""} ${s[y] != null ? s[y] + unit : "n/a"}`).join(", ")}` : ""); // F marks forecast/estimate years in the live WEO database
+    add("macro-series", `IMF World Economic Outlook (${ol!.vintage}) series for ${base.name}, years marked F are IMF estimates or projections: ${[line("real GDP growth", oe.growth, "%"), line("inflation", oe.inflation, "%"), line("unemployment", oe.unemployment, "%"), line("current account % GDP", oe.ca), line("government debt % GDP", oe.debt), line("nominal GDP, US$ millions, current prices", oe.gdp)].filter(Boolean).join("; ")}.`, "IMF World Economic Outlook"); }
+  const a = ag?.countries[iso3]; if (a) { const all = [...a.mofa, ...a.moft]; add("agreements-list", `UAE agreements and MoUs with ${base.name} (titles as published by MOFA / Ministry of Foreign Trade; dates are mostly not published): ${all.slice(0, 24).map((x) => `${x.t}${x.year ? ` (${x.year})` : ""} [${x.type}]`).join("; ")}${all.length > 24 ? `; and ${all.length - 24} more` : ""}.`, "MOFA / Ministry of Foreign Trade"); }
+  const mem = orgs ? LAYERS.filter((l) => l.kind === "members" && l.members && orgs.orgs[l.members]?.includes(iso3)).map((l) => l.en.split(" · ")[0].replace(/ —.*/, "")) : []; if (mem.length) add("memberships", `${base.name} is a member of: ${mem.join(", ")} (per Wikidata and each organisation's own list).`, "Wikidata and organisation lists");
+  if (mem.some((m) => /OPEC/.test(m)) === false && orgs && !orgs.orgs.opec?.includes("ARE")) add("note", "The UAE is not in the app's OPEC and OPEC+ lists: it announced its exit from both effective 1 May 2026 (membership lists in this app were updated accordingly; confirm the current status from an official source before quoting it).", "Geo Desk membership notes");
+  const more = (vs?.items ?? []).filter((x) => x.c.includes(iso3)).slice(8, 22); for (const x of more) add("engagement", `${x.d} · ${x.k}${x.l === 3 ? " (head of state/government level)" : x.l === 2 ? " (ministerial)" : ""}${x.dir === "in" ? " (visit to the UAE)" : x.dir === "out" ? " (visit from the UAE)" : ""}: ${x.t}`, "WAM headline (auto-classified)", `https://www.wam.ae/en/article/${x.u}`, Date.parse(x.d));
+  const ad = aid?.countries[iso3]; if (ad) add("aid", `Net official development assistance received by ${base.name} from all donors: US$${(ad.usd / 1e6).toFixed(0)} million (${ad.year}). The UAE's own share is not separated in this source.`, "World Bank WDI DT.ODA.ODAT.CD");
+
+  // dashboard tiles: straight from the datasets
+  const tiles: Tile[] = []; const p = pi?.countries[iso3]; if (p) tiles.push({ label: "UAE Partnership Index", value: `${p.score}/100`, sub: `rank ${p.rank} of ${pi!.n}` });
+  const ts = tr ? tradeSummary(tr, iso3) : null; if (ts) tiles.push({ label: `Goods trade ${ts.year}`, value: `${usdM(ts.total)}`, sub: `${ts.yoy != null ? `${ts.yoy >= 0 ? "+" : ""}${ts.yoy.toFixed(0)}% y/y · ` : ""}#${ts.rank} partner` });
+  const o = inv?.countries[iso3]?.outward; if (o) tiles.push({ label: "UAE investment there", value: `$${(o.usd / 1e9).toFixed(1)}bn`, sub: `${o.year}${o.rank ? ` · #${o.rank}` : ""}` });
+  if (a) tiles.push({ label: "Agreements", value: String(a.mofa.length + a.moft.length), sub: a.cepa ? `CEPA ${a.cepa.status}` : "no CEPA documented" });
+  const f = fl?.countries[iso3]; if (f) tiles.push({ label: "Direct flights", value: String(f.counts.active + f.counts.seasonal), sub: f.counts.suspended ? `${f.counts.suspended} suspended` : "destinations" });
+  const mm = ms?.countries[iso3]; const amb = mm?.find((m) => m.type === "embassy")?.head; if (mm?.length) tiles.push({ label: "UAE missions", value: String(mm.length), sub: amb ? `Amb. ${amb.name}` : undefined });
+  const last = (vs?.items ?? []).find((x) => x.c.includes(iso3) && x.l >= 2); if (last) tiles.push({ label: "Last senior engagement", value: last.d, sub: last.k });
+  const g26 = oe?.growth?.[2026]; if (g26 != null) tiles.push({ label: "IMF growth 2026F", value: `${g26.toFixed(1)}%`, sub: oe?.inflation?.[2026] != null ? `inflation ${oe.inflation[2026]}%` : undefined });
+  try { const it = await intelFor(iso3); const q: Record<string, string> = { mutual: "mutual", "uae-leverage": "UAE leverage", "uae-exposed": "UAE exposed", light: "light ties", partial: "partial" };
+    if (it?.scorecard) tiles.push({ label: "Country scorecard", value: `${it.scorecard.overall}/100`, sub: `rank ${it.scorecard.rank} of ${it.scorecard.of}${it.scorecard.coverage < 100 ? ` · ${it.scorecard.coverage}% data` : ""}` });
+    if (it?.leverage) tiles.push({ label: "Leverage (them / UAE)", value: `${it.leverage.theirs ?? "–"} / ${it.leverage.ours ?? "–"}`, sub: q[it.leverage.quadrant] });
+    if (it?.temperature) tiles.push({ label: "Bilateral temperature", value: `${it.temperature.g > 0 ? "+" : ""}${it.temperature.g.toFixed(2)}`, sub: it.temperature.worldG != null ? `all countries ${it.temperature.worldG > 0 ? "+" : ""}${it.temperature.worldG.toFixed(2)}` : undefined });
+    if (it && it.deals.total) tiles.push({ label: "UAE deals in WAM", value: String(it.deals.total), sub: `${it.deals.last90} in 90 days` });
+  } catch { /* tiles are optional */ }
+  return { name: base.name, nameAr: c?.nameAr ?? null, facts, gaps: base.gaps, tiles };
+}
+
+/** The fact pack of the detailed brief plus the investment detail: the IMF series, every deal found (the base pack carries the newest eight), who is active, the treaties and the risk indicators. Used by the investment dossier. */
+export async function investDossierFacts(iso3: string) {
+  const g = await dossierFacts(iso3); if (!g) return null; const p = await investFor(iso3); if (!p) return g; const facts = [...g.facts]; let n = facts.length; const add = (kind: string, text: string, src: string, url?: string, t?: number) => facts.push({ id: `F${++n}`, kind, text, src, url, t });
+  const bn = (v: number) => `US$${(v / 1e9).toFixed(2)}bn`; const ser = (s?: [number, number][]) => (s?.length ? s.map(([y, v]) => `${y} ${bn(v)}`).join(", ") : "no series");
+  add("investment-series", `IMF direct-investment position series for ${g.name} (mirror data, net position, all instruments): UAE in ${g.name}: ${p.stock.outward ? ser(p.stock.outward.series) : "no IMF record"}; ${g.name} in the UAE: ${p.stock.inward ? ser(p.stock.inward.series) : "no IMF record"}.`, "IMF Direct Investment Positions (mirror data)");
+  if (p.deals.byInvestor.length) add("investor-activity", `UAE entities found in WAM deal headlines for ${g.name} since late 2024, with number of deals and the latest date: ${p.deals.byInvestor.slice(0, 12).map((x) => `${x.name} ${x.n} (${x.last})`).join("; ")}. Sector mix: ${p.deals.bySector.map(([k, v]) => `${k} ${v}`).join(", ")}.`, "WAM headlines (rule-classified)");
+  const have = new Set(facts.filter((f) => f.kind === "deal").map((f) => f.url)); for (const x of p.deals.items.slice(0, 30)) { const url = `https://www.wam.ae/en/article/${x.u}`; if (have.has(url)) continue; add("deal", `${x.d} · ${x.by.join(", ")}${x.sector ? ` · ${x.sector}` : ""}: ${x.t}`, "WAM headline", url, Date.parse(x.d)); }
+  add("protection", `Investment protection for UAE capital in ${g.name} on the MOFA and Ministry of Foreign Trade lists: ${p.protection.investment} investment agreement(s), ${p.protection.tax} double-taxation treaty(ies), ${p.protection.air} air-services agreement(s), ${p.protection.total} agreements in all; CEPA: ${p.protection.cepa ? `${p.protection.cepa.status}${p.protection.cepa.inForce ? `, in force ${p.protection.cepa.inForce}` : ""}` : "none documented"}; joint committee meetings recorded: ${p.protection.committees ?? "none"}.${p.protection.titles.length ? ` Titles: ${p.protection.titles.map((x) => x.t).join("; ")}.` : ""} Titles only: texts, dates and entry into force are not published on those lists.`, "MOFA / Ministry of Foreign Trade");
+  const r = p.risk; const f1 = (v: number | null, s = "") => (v == null ? "n/a" : `${v.toFixed(1)}${s}`);
+  add("risk-indicators", `Risk context for UAE capital in ${g.name}: World Bank governance scores (0-100, higher is better): regulatory quality ${f1(r.regulatoryQuality)}, rule of law ${f1(r.ruleOfLaw)}, control of corruption ${f1(r.corruption)}, political stability ${f1(r.stability)}; IMF this year: growth ${f1(r.growth, "%")}, inflation ${f1(r.inflation, "%")}, government debt ${f1(r.debt, "% of GDP")}, current account ${f1(r.currentAccount, "% of GDP")}; sanctions-list entries with an address there (OFAC and UN): ${r.sanctions ?? "n/a"}.`, "World Bank WGI, IMF WEO, OFAC / UN");
+  return { ...g, facts };
+}
+
+/** The fact pack of the detailed brief plus the foresight baseline: the IMF path to the end of its horizon, one baseline fact per front, the geography and the calendar. Used by the foresight dossier. */
+export async function foresightDossierFacts(iso3: string) {
+  const g = await dossierFacts(iso3); if (!g) return null; const p = await foresightFor(iso3);
+  const x = p ? foresightFacts(p, g.facts.length) : { facts: [] as Fact[], gaps: [] as string[] };
+  const gr = await loadGraph(); const gt = gr ? graphText(gr, iso3) : null; const all = [...g.facts, ...x.facts];
+  if (gt) all.push({ id: `F${all.length + 1}`, kind: "graph", text: gt, src: "Geo Desk knowledge graph (datasets joined by typed, weighted, sourced links; inferred links are labelled)" });
+  return { ...g, facts: all, gaps: [...g.gaps, ...x.gaps] };
+}

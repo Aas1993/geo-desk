@@ -8,6 +8,7 @@ import type { Bar, Dividend, Earning, Filing, Profile, Quote, Statement, Stats }
 import type { Lang } from "@/lib/format";
 import { KV, Panel, Pending, Unavailable } from "./markets-ui";
 import { RangeBar } from "./market-charts";
+import { safeHttp } from "@/lib/url";
 
 export function KeyStats({ q, stats, cur }: { q: Quote | null; stats: Stats | null; cur: string }) {
   const { t, lang } = useT();
@@ -133,10 +134,10 @@ export function IncomeTab({ dividends, earnings, stats, cur }: { dividends: Divi
     <div className="grid gap-4 lg:grid-cols-2">
       <Panel title={t("st_divHistory")}>
         {stats && <div className="mb-3 grid grid-cols-3 gap-2"><div className="rounded-[6px] border border-line bg-bg2 px-3 py-2"><div className="label !text-[9.5px]">{t("st_divYield")}</div><div className="num mt-1 text-[16px] font-medium text-accent">{frac(stats.dividendYield, lang, 2)}</div></div><div className="rounded-[6px] border border-line bg-bg2 px-3 py-2"><div className="label !text-[9.5px]">{t("st_divRate")}</div><div className="num mt-1 text-[16px] font-medium">{price(stats.dividendRate, lang)}</div></div><div className="rounded-[6px] border border-line bg-bg2 px-3 py-2"><div className="label !text-[9.5px]">{t("st_payout")}</div><div className="num mt-1 text-[16px] font-medium">{frac(stats.payoutRatio, lang, 0)}</div></div></div>}
-        {sorted.length === 0 ? <p className="text-[13px] text-t2">{t("noData")}</p> : <table className="w-full text-[13px]"><thead><tr><th className="label pb-2 text-start">Ex-date</th><th className="label pb-2 text-end">{cur}/share</th></tr></thead><tbody>{sorted.map((d) => <tr key={d.exDate} className="border-t border-line/60"><td className="py-2 num text-t1">{dateShort(d.exDate, lang)}</td><td className="py-2 num text-end font-medium">{price(d.amount, lang)}</td></tr>)}</tbody></table>}
+        {sorted.length === 0 ? <p className="text-[13px] text-t2">{t("noData")}</p> : <table className="w-full text-[13px]"><thead><tr><th className="label pb-2 text-start">{lang === "ar" ? "تاريخ الاستحقاق" : "Ex-date"}</th><th className="label pb-2 text-end">{cur}/{lang === "ar" ? "سهم" : "share"}</th></tr></thead><tbody>{sorted.map((d) => <tr key={d.exDate} className="border-t border-line/60"><td className="py-2 num text-t1">{dateShort(d.exDate, lang)}</td><td className="py-2 num text-end font-medium">{price(d.amount, lang)}</td></tr>)}</tbody></table>}
       </Panel>
       <Panel title={t("st_earnHistory")}>
-        {earnings.length === 0 ? <p className="text-[13px] text-t2">{t("noData")}</p> : <table className="w-full text-[13px]"><thead><tr><th className="label pb-2 text-start">Date</th><th className="label pb-2 text-end">{t("st_estimate")}</th><th className="label pb-2 text-end">{t("st_actual")}</th><th className="label pb-2 text-end">{t("st_surprise")}</th></tr></thead><tbody>{earnings.map((e) => <tr key={e.date} className="border-t border-line/60"><td className="py-2 num text-t1">{dateShort(e.date, lang)}</td><td className="py-2 num text-end text-t1">{ratio(e.estimate, lang, 3)}</td><td className="py-2 num text-end font-medium">{ratio(e.actual, lang, 3)}</td><td className={`py-2 num text-end ${dir(e.surprisePct)}`}>{signed(e.surprisePct, lang, 1, "%")}</td></tr>)}</tbody></table>}
+        {earnings.length === 0 ? <p className="text-[13px] text-t2">{t("noData")}</p> : <table className="w-full text-[13px]"><thead><tr><th className="label pb-2 text-start">{lang === "ar" ? "التاريخ" : "Date"}</th><th className="label pb-2 text-end">{t("st_estimate")}</th><th className="label pb-2 text-end">{t("st_actual")}</th><th className="label pb-2 text-end">{t("st_surprise")}</th></tr></thead><tbody>{earnings.map((e) => <tr key={e.date} className="border-t border-line/60"><td className="py-2 num text-t1">{dateShort(e.date, lang)}</td><td className="py-2 num text-end text-t1">{ratio(e.estimate, lang, 3)}</td><td className="py-2 num text-end font-medium">{ratio(e.actual, lang, 3)}</td><td className={`py-2 num text-end ${dir(e.surprisePct)}`}>{signed(e.surprisePct, lang, 1, "%")}</td></tr>)}</tbody></table>}
       </Panel>
     </div>
   );
@@ -148,18 +149,18 @@ export function AboutPanel({ p }: { p: Profile }) {
     <Panel title={t("st_about")}>
       {p.description && <p className="mb-3 text-[13px] leading-relaxed text-t1">{p.description}</p>}
       {p.sector && <KV k={t("st_sector")} v={p.sector} />}{p.industry && <KV k={t("st_industry")} v={p.industry} />}{p.employees != null && <KV k={t("st_employees")} v={intl(p.employees, "en")} />}{p.ceo && <KV k="CEO" v={p.ceo} />}{(p.city || p.country) && <KV k={t("st_hq")} v={[p.city, p.country].filter(Boolean).join(", ")} />}
-      {p.website && <KV k={t("st_website")} v={<a href={p.website} target="_blank" rel="noreferrer" className="text-accent hover:underline">{p.website.replace(/^https?:\/\/(www\.)?/, "")}</a>} />}
+      {p.website && <KV k={t("st_website")} v={<a href={safeHttp(p.website)} target="_blank" rel="noreferrer" className="text-accent hover:underline">{p.website.replace(/^https?:\/\/(www\.)?/, "")}</a>} />}
     </Panel>
   );
 }
 
 type FilingsRes = { available: boolean; reason?: string; items: Filing[]; total: number; error?: string };
-export function FilingsTab({ base, exchange }: { base: string; exchange: "ADX" | "DFM" }) {
+export function FilingsTab({ base, exchange }: { base: string; exchange: "ADX" | "DFM" | "QSE" }) {
   const { t, lang } = useT(); const [skip, setSkip] = useState(0); const [extra, setExtra] = useState<Filing[]>([]);
   const first = useApi<FilingsRes>(`${base}/filings?skip=0`); const more = useApi<FilingsRes>(skip > 0 ? `${base}/filings?skip=${skip}` : null);
   if (first.loading) return <Pending rows={6} />;
   const r = first.result; if (!r || !r.ok) return <Unavailable error="upstream" message={r && !r.ok ? r.message : undefined} onRetry={first.retry} />;
-  if (!r.data.available) return <Panel><p className="text-[13px] text-t1">{r.data.reason === "adx_no_feed" || exchange === "ADX" ? t("mk_adxNote") : (lang === "ar" ? "لا يوجد ربط لهذا الرمز في تغذية دبي المالي." : "This ticker could not be matched to an issuer in DFM's disclosure feed.")}</p></Panel>;
+  if (!r.data.available) return <Panel><p className="text-[13px] text-t1">{r.data.reason === "adx_no_feed" || exchange === "ADX" ? t("mk_adxNote") : r.data.reason === "qse_no_feed" || exchange === "QSE" ? t("mk_qseNote") : (lang === "ar" ? "لا يوجد ربط لهذا الرمز في تغذية دبي المالي." : "This ticker could not be matched to an issuer in DFM's disclosure feed.")}</p></Panel>;
   const moreItems = more.result?.ok && more.result.data.items ? more.result.data.items : [];
   const items = [...r.data.items, ...extra, ...moreItems.filter((m) => !r.data.items.some((i) => i.id === m.id) && !extra.some((i) => i.id === m.id))];
   const total = r.data.total;
@@ -168,7 +169,7 @@ export function FilingsTab({ base, exchange }: { base: string; exchange: "ADX" |
       {items.length === 0 ? <p className="text-[13px] text-t2">{t("st_noFilings")}</p> : <ol className="relative ms-2 border-s border-line">
         {items.map((f) => (
           <li key={f.id} className="relative pb-5 ps-5 last:pb-0"><i className="absolute -start-[5px] top-1.5 size-2.5 rounded-full border-2 border-bg1 bg-accent" />
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><time className="num text-[11.5px] text-t2">{dateShort(f.date, lang)}</time>{f.type && <span className="rounded border border-line2 px-1.5 text-[10px] uppercase tracking-wide text-t1">{f.type}</span>}{f.period && <span className="text-[11px] text-t2">{f.period}</span>}{f.dividendsPaymentDate && <span className="text-[11px] text-up">Dividend · {f.dividendsPaymentDate}</span>}</div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><time className="num text-[11.5px] text-t2">{dateShort(f.date, lang)}</time>{f.type && <span className="rounded border border-line2 px-1.5 text-[10px] uppercase tracking-wide text-t1">{f.type}</span>}{f.period && <span className="text-[11px] text-t2">{f.period}</span>}{f.dividendsPaymentDate && <span className="text-[11px] text-up">{lang === "ar" ? "توزيعات" : "Dividend"} · {f.dividendsPaymentDate}</span>}</div>
             <div className="mt-1 text-[13.5px] leading-snug" dir="auto">{f.headline}</div>
             {f.docs.length > 0 && <div className="mt-1.5 flex flex-wrap gap-2">{f.docs.map((d) => <a key={d.id} href={d.url} target="_blank" rel="noreferrer" className="rounded-[5px] border border-line bg-bg2 px-2 py-1 text-[11.5px] text-accent hover:border-accent" title={d.description}>PDF{d.language ? ` · ${d.language.toUpperCase()}` : ""}</a>)}</div>}
           </li>))}

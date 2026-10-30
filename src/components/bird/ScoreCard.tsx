@@ -1,0 +1,58 @@
+"use client";
+import { useMemo, useState } from "react";
+import { SlidersHorizontal } from "lucide-react";
+import type { CaseData } from "@/lib/case/load";
+import type { Profile } from "@/lib/bird/profile";
+import { ANGLES, PRESETS, band, scoreCountry, type AngleScore } from "@/lib/bird/score";
+import { Block, Pill, type Lang } from "../falcon/bits";
+import { useTr } from "../case/bits";
+import { Bar, Gauge, SCORE_C } from "./visuals";
+
+const SHORT: Record<string, { en: string; ar: string }> = { political: { en: "Politics", ar: "السياسة" }, diplomatic: { en: "Diplomacy", ar: "الدبلوماسية" }, military: { en: "Military", ar: "العسكري" }, security: { en: "Security", ar: "الأمن" }, economic: { en: "Economy", ar: "الاقتصاد" }, trade: { en: "Trade", ar: "التجارة" }, logistics: { en: "Logistics", ar: "اللوجستيات" }, energy: { en: "Energy", ar: "الطاقة" }, tech: { en: "Tech/space", ar: "التقنية" }, soft: { en: "Soft power", ar: "الناعمة" }, influence: { en: "Influence", ar: "النفوذ" }, legal: { en: "Legal", ar: "القانوني" }, climate: { en: "Climate", ar: "المناخ" }, info: { en: "Narrative", ar: "السرد" } };
+const BAND: Record<string, { en: string; ar: string }> = { strong: { en: "strong", ar: "قوي" }, solid: { en: "solid", ar: "متين" }, mixed: { en: "mixed", ar: "متفاوت" }, fragile: { en: "fragile", ar: "هش" }, none: { en: "not scored", ar: "غير مقيّم" } };
+
+/** Draws the angles as a radar: the filled shape is the score, the faint ring is 50, a gap (no data) is drawn at the centre and left out of the shape's fill. Tap an axis to open that angle below. */
+function Radar({ angles, sel, onSel, L }: { angles: AngleScore[]; sel: string | null; onSel: (id: string) => void; L: Lang }) {
+  const R = 104, C = 150, n = angles.length; const pt = (i: number, f: number) => { const a = (Math.PI * 2 * i) / n - Math.PI / 2; return [C + Math.cos(a) * R * f, C + Math.sin(a) * R * f] as const; };
+  const poly = angles.map((a, i) => pt(i, (a.score ?? 0) / 100).join(",")).join(" ");
+  return (
+    <svg viewBox="-40 -5 380 310" className="mx-auto w-full max-w-[400px]" role="img" aria-label={L === "ar" ? "مخطط رادار لدرجات الزوايا" : "Radar of the angle scores"}>
+      {[0.25, 0.5, 0.75, 1].map((f) => <polygon key={f} points={angles.map((_, i) => pt(i, f).join(",")).join(" ")} fill="none" stroke="var(--line)" strokeWidth={f === 0.5 ? 1.4 : 0.7} strokeDasharray={f === 0.5 ? "3 3" : undefined} />)}
+      {angles.map((_, i) => <line key={i} x1={C} y1={C} x2={pt(i, 1)[0]} y2={pt(i, 1)[1]} stroke="var(--line)" strokeWidth="0.6" />)}
+      <polygon points={poly} fill="color-mix(in srgb, var(--accent) 24%, transparent)" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" />
+      {angles.map((a, i) => { const [x, y] = pt(i, (a.score ?? 0) / 100); const [lx, ly] = pt(i, 1.2); const on = sel === a.id; return (
+        <g key={a.id} onClick={() => onSel(a.id)} style={{ cursor: "pointer" }} role="button" tabIndex={0} aria-label={`${L === "ar" ? a.ar : a.en}: ${a.score ?? "-"}`} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSel(a.id); }}>
+          <circle cx={x} cy={y} r={on ? 6 : 4} fill={a.score == null ? "var(--bg1)" : SCORE_C(a.score)} stroke={a.score == null ? "var(--t2)" : "var(--bg1)"} strokeWidth="1.5" strokeDasharray={a.score == null ? "2 2" : undefined}><title>{`${L === "ar" ? a.ar : a.en}: ${a.score ?? (L === "ar" ? "غير مقيّم" : "not scored")}`}</title></circle>
+          <text x={lx} y={ly + 3} textAnchor={lx < C - 8 ? "end" : lx > C + 8 ? "start" : "middle"} fontSize="9.5" fontWeight={on ? 700 : 400} fill={on ? "var(--accent)" : "var(--t1)"}>{L === "ar" ? SHORT[a.id].ar : SHORT[a.id].en}</text></g>); })}
+    </svg>
+  );
+}
+
+/** THE COUNTRY SCORE: the overall reading and one score per angle, with the weights in the reader's hands (presets and sliders), the radar, and for every angle the indicators behind it, the rule that scaled each to 0 to 100, the source and how much is measured. An angle with no data is shown as a gap, never scored. */
+export function ScoreCard({ d, p, L }: { d: CaseData; p: Profile | null; L: Lang }) {
+  const t = useTr(L); const [w, setW] = useState<Record<string, number>>({}); const [preset, setPreset] = useState("balanced"); const [sel, setSel] = useState<string | null>(null); const [tune, setTune] = useState(false);
+  const m = p?.metrics; const sc = useMemo(() => scoreCountry(d, { flightsLive: m?.flightsLive ?? null, visits12: m?.visits12 ?? null, agreements: m ? m.agreements : null, cepa: m ? m.cepa : null, hasMission: m ? m.hasMission : null, tech: m?.tech ?? null }, w), [d, m, w]);
+  const pick = (id: string) => { setPreset(id); setW(PRESETS.find((x) => x.id === id)?.w ?? {}); }; const scored = sc.angles.filter((a) => a.score != null); const best = [...scored].sort((a, z) => (z.score as number) - (a.score as number)); const gaps = sc.angles.filter((a) => a.score == null);
+  const open = sc.angles.find((a) => a.id === sel);
+  return (
+    <div id="bird-score" className="scroll-mt-20"><Block title={t("The country score: every aspect", "درجة الدولة: كل الجوانب")} hint={t("One 0 to 100 reading per angle and an overall score, built by stated rules from the data the platform holds. High means a stable, aligned, open front with headroom for the UAE; low means fragile, distant or closed. Move the weights to fit the decision. An angle with no data is a gap, not a zero.", "قراءة من 0 إلى 100 لكل زاوية ودرجة إجمالية، مبنية بقواعد معلنة من بيانات المنصة. المرتفع يعني جبهة مستقرة ومنسجمة ومفتوحة وفيها هامش للإمارات؛ والمنخفض هش أو بعيد أو مغلق. حرّك الأوزان بما يناسب القرار. الزاوية بلا بيانات فجوة لا صفر.")}
+      right={<Pill c={SCORE_C(sc.overall ?? 0)}>{sc.overall != null ? `${sc.overall}/100 · ${t(BAND[band(sc.overall)].en, BAND[band(sc.overall)].ar)}` : t("not scored", "غير مقيّم")}</Pill>}>
+      <div className="grid items-center gap-4 md:grid-cols-[auto_1fr]">
+        <div className="flex flex-col items-center gap-2"><Gauge value={sc.overall ?? 0} size={132} label={t("overall country score", "الدرجة الإجمالية للدولة")} sub={`${t("measured", "مقيس")} ${Math.round(sc.coverage * 100)}%`} /><Radar angles={sc.angles} sel={sel} onSel={(id) => setSel(sel === id ? null : id)} L={L} /></div>
+        <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-1.5" role="group" aria-label={t("Weighting", "الترجيح")}>{PRESETS.map((x) => <button key={x.id} type="button" onClick={() => pick(x.id)} className="rounded-full border px-3 py-1 text-[12px]" style={{ borderColor: preset === x.id ? "var(--accent)" : "var(--line)", background: preset === x.id ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "var(--bg2)", color: preset === x.id ? "var(--accent)" : "var(--t1)" }}>{t(x.en, x.ar)}</button>)}<button type="button" onClick={() => setTune((v) => !v)} aria-expanded={tune} className="ms-auto inline-flex items-center gap-1 rounded-full border border-line px-3 py-1 text-[12px] text-t1 hover:border-accent"><SlidersHorizontal size={13} aria-hidden />{t("weights", "الأوزان")}</button></div>
+          {tune && <ul className="mb-2 grid gap-x-4 gap-y-1 rounded-[10px] bg-bg2 p-2.5 sm:grid-cols-2">{ANGLES.map((a) => <li key={a.id} className="flex items-center gap-2 text-[11.5px] text-t1"><span className="w-28 truncate">{L === "ar" ? SHORT[a.id].ar : SHORT[a.id].en}</span><input type="range" min={0} max={3} step={0.5} value={w[a.id] ?? a.weight} aria-label={L === "ar" ? a.ar : a.en} onChange={(e) => { setPreset("custom"); setW((x) => ({ ...x, [a.id]: Number(e.target.value) })); }} className="flex-1" /><span className="numt w-6 text-end text-t2">{w[a.id] ?? a.weight}</span></li>)}</ul>}
+          <ul className="space-y-1.5">{sc.angles.map((a) => { const on = sel === a.id; return (
+            <li key={a.id}><button type="button" onClick={() => setSel(on ? null : a.id)} aria-expanded={on} className="grid w-full grid-cols-[9.5rem_1fr_auto] items-center gap-2 rounded-[8px] px-1 py-0.5 text-start hover:bg-bg2" style={{ background: on ? "var(--bg2)" : undefined }}><span className="truncate text-[12px] text-t0">{L === "ar" ? a.ar : a.en}</span>{a.score != null ? <Bar share={a.score / 100} color={SCORE_C(a.score)} text={String(a.score)} /> : <span className="text-[11px] text-t2">{t("not scored: no data", "غير مقيّم: لا بيانات")}</span>}<span className="numt w-10 text-end text-[10.5px] text-t2" title={t("how much of the angle is measured", "مقدار ما قيس من الزاوية")}>{Math.round(a.coverage * 100)}%</span></button></li>); })}</ul>
+          <p className="mt-2 text-[11px] leading-snug text-t2">{scored.length ? `${t("Strongest:", "الأقوى:")} ${best.slice(0, 2).map((a) => `${L === "ar" ? SHORT[a.id].ar : SHORT[a.id].en} ${a.score}`).join(", ")}. ${t("Weakest:", "الأضعف:")} ${best.slice(-2).reverse().map((a) => `${L === "ar" ? SHORT[a.id].ar : SHORT[a.id].en} ${a.score}`).join(", ")}.` : ""} {gaps.length > 0 && `${t("Not scored:", "غير مقيّمة:")} ${gaps.map((a) => (L === "ar" ? SHORT[a.id].ar : SHORT[a.id].en)).join(", ")}.`} {t("The right-hand figure is how much of the angle is measured.", "الرقم الأيمن مقدار ما قيس من الزاوية.")}</p>
+        </div>
+      </div>
+      {open && <div className="mt-3 rounded-[12px] border border-line bg-bg2 p-3" role="region" aria-label={L === "ar" ? open.ar : open.en}>
+        <p className="text-[13px] font-semibold text-t0">{L === "ar" ? open.ar : open.en} <span className="ms-1 text-t2">{open.score != null ? `${open.score}/100 · ${t(BAND[band(open.score)].en, BAND[band(open.score)].ar)}` : t("not scored", "غير مقيّم")} · {t("measured", "مقيس")} {Math.round(open.coverage * 100)}%</span></p>
+        {open.indicators.length > 0 && <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[520px] text-[12px]"><thead><tr className="text-t2"><th className="py-1 pe-2 text-start font-medium">{t("Indicator", "المؤشر")}</th><th className="pe-2 text-start font-medium">{t("Value", "القيمة")}</th><th className="pe-2 text-start font-medium">{t("Score", "الدرجة")}</th><th className="pe-2 text-start font-medium">{t("How it is scaled", "كيف يُقاس")}</th><th className="text-start font-medium">{t("Source", "المصدر")}</th></tr></thead><tbody>{open.indicators.map((i) => <tr key={i.label} className="border-t border-line align-top"><td className="py-1.5 pe-2 text-t0">{i.label}{i.proxy && <span className="ms-1 rounded-full bg-bg3 px-1.5 text-[9.5px] text-warn">{t("proxy", "بديل")}</span>}</td><td className="numt pe-2 text-t1">{i.value}</td><td className="pe-2"><Bar share={i.score / 100} color={SCORE_C(i.score)} text={String(i.score)} /></td><td className="pe-2 text-t2">{i.rule}</td><td className="text-t2">{i.source}</td></tr>)}</tbody></table></div>}
+        {open.gap && <p className="mt-2 text-[11.5px] leading-snug text-warn" dir="auto">{open.gap}</p>}
+      </div>}
+      {d.scorecard && <p className="mt-3 text-[11.5px] leading-snug text-t2">{t(`For comparison, the Case File's own national-interest scorecard reads ${Math.round(d.scorecard.overall)} (${d.scorecard.tier}) and the partnership index ${d.partnership ? `${d.partnership.score}/100 (#${d.partnership.rank} of ${d.partnership.n})` : "is not held"}. This score is wider: it adds governance, economy, resources, connectivity, legal, climate and narrative.`, `للمقارنة، تقرأ بطاقة المصلحة الوطنية في ملف الحالة ${Math.round(d.scorecard.overall)} (${d.scorecard.tier}) ومؤشر الشراكة ${d.partnership ? `${d.partnership.score}/100 (المرتبة ${d.partnership.rank} من ${d.partnership.n})` : "غير محفوظ"}. وهذه الدرجة أوسع: تضيف الحوكمة والاقتصاد والموارد والربط والقانوني والمناخ والسرد.`)}</p>}
+    </Block></div>
+  );
+}

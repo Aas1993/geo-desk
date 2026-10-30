@@ -14,17 +14,18 @@ let cache: Promise<CountryData> | null = null;
 function ringBbox(ring: Position[]) { let a = 180, b = 90, c = -180, d = -90; for (const [x, y] of ring) { if (x < a) a = x; if (x > c) c = x; if (y < b) b = y; if (y > d) d = y; } return [a, b, c, d] as [number, number, number, number]; }
 
 export function loadCountries(): Promise<CountryData> {
-  return (cache ??= (async () => {
+  if (cache) return cache;
+  const p: Promise<CountryData> = (async (): Promise<CountryData> => {
     const [list, topo] = await Promise.all([
-      fetch("/data/countries.json").then((r) => r.json() as Promise<Country[]>),
-      fetch("/data/countries-50m.json").then((r) => r.json() as Promise<Topology>),
+      fetch("/data/countries.json").then((r) => { if (!r.ok) throw new Error(`countries ${r.status}`); return r.json() as Promise<Country[]>; }),
+      fetch("/data/countries-50m.json").then((r) => { if (!r.ok) throw new Error(`shapes ${r.status}`); return r.json() as Promise<Topology>; }),
     ]);
-    const byNum = new Map(list.map((c) => [c.num, c])); const byIso = new Map(list.map((c) => [c.iso3, c]));
+    const byNum = new Map(list.map((c) => [c.num, c])); const byName = new Map(list.map((c) => [c.name, c])); const byIso = new Map(list.map((c) => [c.iso3, c]));
     const all = feature(topo, topo.objects.countries as never) as unknown as FeatureCollection<Geometry>;
     const bbox = new Map<string, [number, number, number, number]>();
     const labels: Feature[] = []; const feats: Feature<Geometry, { iso3: string; name: string; nameAr: string }>[] = [];
     for (const f of all.features) {
-      const c = byNum.get(String(f.id).padStart(3, "0")); if (!c) continue;
+      const c = f.id == null ? byName.get((f.properties as { name?: string } | null)?.name ?? "") : byNum.get(String(f.id).padStart(3, "0")); if (!c) continue; // a shape with no numeric id (Kosovo) is matched by name
       const polys: Position[][][] = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [];
       let best: [number, number, number, number] | null = null, bestArea = -1; let ext: [number, number, number, number] | null = null;
       for (const p of polys) {
@@ -43,6 +44,8 @@ export function loadCountries(): Promise<CountryData> {
       type: "Feature", properties: { iso3: c.iso3, name: c.capital!, nameAr: c.capital!, home: c.iso3 === "ARE" ? 1 : 0 }, geometry: { type: "Point", coordinates: [c.lng!, c.lat!] },
     }));
     return { list, byIso, byNum, geo: { type: "FeatureCollection", features: feats }, bbox, labelPts: { type: "FeatureCollection", features: labels }, capitals: { type: "FeatureCollection", features: capitals } };
-  })());
+  })();
+  cache = p; p.catch(() => { if (cache === p) cache = null; }); // a failed load must not be remembered: the next caller retries
+  return p;
 }
 export const displayName = (c: Country, lang: "en" | "ar") => (lang === "ar" && c.nameAr ? c.nameAr : c.name);

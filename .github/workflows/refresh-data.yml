@@ -1,0 +1,54 @@
+name: Refresh official data
+# The UAE agreements dataset comes from MOFA and the Ministry of Foreign Trade. This rebuilds it every day and, when anything changed,
+# opens a pull request so a human sees what changed (a new CEPA or treaty showing up is itself news). A failed scrape fails the run and changes nothing.
+on:
+  schedule: [{ cron: "17 3 * * *" }]
+  workflow_dispatch:
+permissions: { contents: write, pull-requests: write }
+concurrency: { group: refresh-data, cancel-in-progress: false }
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false } # the token is only attached to the one push below
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: node scripts/build-agreements.mjs
+      - run: node scripts/build-flights.mjs
+      - run: node scripts/build-investment.mjs
+      - run: node scripts/build-missions.mjs
+      - run: node scripts/build-visits.mjs --months=24
+      - run: node scripts/build-trade.mjs
+      - run: node scripts/build-rivals.mjs # reads trade.json
+      - run: node scripts/build-outlook.mjs
+      # the dated IMF vintage store and the World Bank financial-conditions file feed the Deep Intelligence desk
+      - run: node scripts/snapshot-vintage.mjs
+      - run: node scripts/build-finconditions.mjs
+      - run: node scripts/build-trends.mjs
+      - run: node scripts/capture-counts.mjs
+      - run: node scripts/build-leverage.mjs
+      # the index reads everything above, so it runs last
+      - run: node scripts/build-partnership.mjs
+      # the scorecard reads the partnership index and every dataset above, so it runs after them
+      - run: node scripts/build-scorecard.mjs
+      # the knowledge graph reads the datasets above, and the monitoring snapshot reads the world model built from them, so both run last
+      - run: node scripts/build-graph.mjs
+      - run: npx tsx scripts/snapshot-monitor.ts
+      - name: Check the data, then open or update a PR if it changed
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          rc=0; node scripts/data-changed.mjs public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json public/data/scorecard.json public/data/rivals.json public/data/leverage.json public/data/deals.json public/data/graph.json public/data/monitor/history.json public/data/vintages/weo.json public/data/finconditions.json public/data/trends.json public/data/vintages/capture.json || rc=$?
+          if [ "$rc" -eq 1 ]; then echo "No data changes"; exit 0; fi
+          if [ "$rc" -ne 0 ]; then echo "::error::the change check failed"; exit 1; fi
+          npm test # PRs opened with GITHUB_TOKEN do not trigger CI, so the tests run here, before anything is committed
+          branch="data/refresh"
+          git config user.name "geo-desk-bot"; git config user.email "geo-desk-bot@users.noreply.github.com"
+          git checkout -B "$branch"; git add public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json public/data/scorecard.json public/data/rivals.json public/data/leverage.json public/data/deals.json public/data/graph.json public/data/monitor/history.json public/data/vintages/weo.json public/data/finconditions.json public/data/trends.json public/data/vintages/capture.json
+          git commit -m "Refresh UAE agreements, flights, investment, missions, visits, trade, outlook and partnership data ($(date -u +%F))"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$branch" # one standing branch: a re-run or the next day updates the same PR instead of failing
+          if [ "$(gh pr list --head "$branch" --state open --json number -q length)" = "0" ]; then
+            gh pr create --base main --head "$branch" --title "Refresh UAE agreements, flights, investment, missions, visits, trade, outlook and partnership data" --body "Automated daily rebuild (MOFA and Ministry of Foreign Trade agreements, flights, IMF investment, trade and outlook, missions, WAM visits and UAE company deals, then the leverage dataset and the Partnership Index). Tests passed in the job. The data files are single-line JSON, so review the numbers in the app rather than the diff. This branch is reused: a later run updates this PR."
+          fi

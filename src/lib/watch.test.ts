@@ -1,0 +1,25 @@
+// Tests for the non-friendly-states watch list and the index benchmarks.
+import assert from "node:assert/strict";
+import { assess, listed, FIRE_AT, MIN_EVENTS, type Inputs, type Tension } from "./machiavelli/hostility";
+import { benchmark, spearman, type Row } from "./machiavelli/benchmarks";
+
+const mk = (iso3: string, o: Partial<Inputs> = {}): Inputs => ({ iso3, name: iso3, nameAr: null, region: "R", tone: { g: 1.5, conflict: 0.2, n: 100, trend: 0 }, alignment: 0.8, sanc: { ofac: 5, un: 0, gdp: 100_000 }, c: { trade: 60, engagement: 60, agreements: 60 }, ...o });
+// a population of 40 ordinary partners gives the percentiles a field to rank against
+const field: Inputs[] = Array.from({ length: 40 }, (_, i) => mk(`C${String(i).padStart(2, "0")}`, { tone: { g: 1 + i * 0.05, conflict: 0.1 + i * 0.004, n: 100, trend: 0 }, alignment: 0.6 + i * 0.008, sanc: { ofac: i, un: 0, gdp: 100_000 } }));
+const REG: Tension[] = [{ iso3: "ADV", kind: "territorial", en: "A dispute", ar: "نزاع", sources: [{ label: "s", url: "https://example.org" }], asOf: "2026-10-29", verified: false }, { iso3: "OLD", kind: "litigation", en: "A case", ar: "قضية", sources: [], asOf: "2026-10-29", verified: false }];
+const bad = (iso3: string, o: Partial<Inputs> = {}) => mk(iso3, { tone: { g: -3, conflict: 0.8, n: 200, trend: 0 }, alignment: 0.05, sanc: { ofac: 900, un: 40, gdp: 100_000 }, ...o });
+const rows = assess([...field, bad("ADV"), bad("UNF"), bad("TWO", { alignment: 0.9, sanc: { ofac: 1, un: 0, gdp: 100_000 } }), bad("ONE", { tone: { g: 1.5, conflict: 0.2, n: 100, trend: -3 }, alignment: 0.9, sanc: { ofac: 1, un: 0, gdp: 100_000 } }), mk("OLD", {}), mk("MICRO", { tone: null, alignment: null, sanc: null, c: { trade: 0, engagement: 0, agreements: 0 } }), mk("FEW", { tone: { g: -3, conflict: 0.9, n: 5, trend: -5 } })], REG);
+const by = (i: string) => rows.find((r) => r.iso3 === i)!;
+assert.equal(by("ADV").tier, "adversarial", "a documented dispute plus measured friction is adversarial"); assert.equal(by("UNF").fired, 3, "events, UN divergence and sanctions fire together"); assert.equal(by("UNF").tier, "unfriendly", "three of four core signals without a register entry is unfriendly");
+assert.equal(by("TWO").fired, 1, "one core signal fires (events)"); assert.equal(by("TWO").tier, null, "a single signal is never listed"); assert.equal(by("ONE").tier, null, "a worsening trend alone is an aggravator and does not count");
+assert.equal(by("OLD").tier, "tension", "a documented dispute the data do not confirm stays a documented tension"); assert.equal(by("MICRO").tier, null, "distance is not hostility: no data, not listed"); assert.equal(by("FEW").sigs[0].fires, false, "too few events (below MIN_EVENTS) never fire the events signal"); assert.ok(MIN_EVENTS >= 20 && FIRE_AT >= 85);
+assert.ok(by("UNF").reasons.length >= 3 && by("ADV").reasons[0].en.startsWith("Documented"), "every flag lists its reasons, the documented dispute first"); assert.ok(by("ADV").friction! > 80);
+const l = listed(rows); assert.deepEqual(l.map((r) => r.tier).filter((t, i, a) => a.indexOf(t) === i), ["adversarial", "unfriendly", "tension"].filter((t) => l.some((r) => r.tier === t)), "adversarial first, then unfriendly, then documented tension"); assert.ok(l.every((r) => r.tier && r.coverage !== "thin" || r.tension), "nothing thinly covered is listed without a documented tension");
+assert.ok(assess([mk("X")], []).every((r) => r.tier === null), "with no field to rank against nobody is flagged");
+
+// ---- benchmarks
+assert.equal(spearman(Array.from({ length: 10 }, (_, i) => [i, i * 2] as [number, number])), 1); assert.equal(spearman(Array.from({ length: 10 }, (_, i) => [i, -i] as [number, number])), -1); assert.equal(spearman([[1, 2], [2, 3]]), null, "under eight pairs is not a correlation"); assert.equal(spearman(Array.from({ length: 9 }, (_, i) => [i, 5] as [number, number])), null, "a constant has no rank correlation");
+const rr = (i: number): Row => ({ iso3: `C${i}`, name: `C${i}`, final: i / 10, dims: { trade: i, gov: i, align: i, hard: 10 - i }, tradeUsdM: Math.exp(i), partnershipScore: i * 3, scorecardOverall: i * 2, gdpUsdM: Math.exp(i / 2), wgiMean: i * 5, unAgreement: i / 20 });
+const bs = benchmark(Array.from({ length: 30 }, (_, i) => rr(i + 1)), ["C30", "C29", "C28", "ZZZ"]); assert.equal(bs.checks.length, 8); assert.ok(bs.checks.find((c) => c.id === "gov-wgi")!.ok === true && bs.checks.find((c) => c.id === "trade-vol")!.ok === true && bs.checks.find((c) => c.id === "hard-vs-gdp")!.ok === false && bs.checks.find((c) => c.id === "hard-vs-gdp")!.rho === -1, "a perfect relationship holds, and an inverse one falls outside its expected range"); assert.ok(bs.checks.find((c) => c.id === "final-partner")!.ok === false, "a correlation of 1 between the final score and the Partnership Index is reported as redundancy");
+assert.equal(bs.anchors[0].hit, 3, "three of the four anchors rank in the top 30"); assert.equal(bs.anchors[0].of, 4); assert.ok(bs.total > 0 && bs.passed <= bs.total && bs.notes.length >= 2);
+console.log("watch: all checks passed");

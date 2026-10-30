@@ -1,4 +1,9 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import type { CountryDetail, Leader, Series, Weather } from "@/lib/types";
+
+let known: Set<string> | null = null;
+const isos = async () => (known ??= new Set((JSON.parse(await readFile(path.join(process.cwd(), "public/data/countries.json"), "utf8")) as { iso3: string }[]).map((c) => c.iso3)));
 
 const DAY = 86400;
 const UA = { "User-Agent": "geo-desk/0.1 (dev; contact: local)" };
@@ -11,7 +16,7 @@ const WB: Record<string, string> = {
 
 async function wbSeries(iso3: string, code: string): Promise<Series> {
   try {
-    const r = await fetch(`https://api.worldbank.org/v2/country/${iso3}/indicator/${code}?format=json&per_page=40&date=2005:2026`, { next: { revalidate: DAY } });
+    const r = await fetch(`https://api.worldbank.org/v2/country/${iso3}/indicator/${code}?format=json&per_page=40&date=2005:2026`, { next: { revalidate: DAY }, signal: AbortSignal.timeout(15_000) });
     const j = await r.json();
     return ((j[1] ?? []) as { date: string; value: number | null }[])
       .filter((x) => x.value != null).map((x) => ({ y: +x.date, v: x.value as number })).sort((a, b) => a.y - b.y);
@@ -52,8 +57,8 @@ async function leaders(qid: string | null): Promise<Leader[] | null> {
 async function weather(lat: number, lng: number): Promise<Weather | null> {
   try {
     const [w, a] = await Promise.all([
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code,is_day&timezone=auto`, { next: { revalidate: 900 } }).then((r) => r.json()),
-      fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=us_aqi`, { next: { revalidate: 900 } }).then((r) => r.json()).catch(() => null),
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code,is_day&timezone=auto`, { next: { revalidate: 900 }, signal: AbortSignal.timeout(10_000) }).then((r) => r.json()),
+      fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=us_aqi`, { next: { revalidate: 900 }, signal: AbortSignal.timeout(10_000) }).then((r) => r.json()).catch(() => null),
     ]);
     return { temp: w.current?.temperature_2m ?? null, code: w.current?.weather_code ?? null, isDay: w.current?.is_day === 1, tz: w.timezone ?? null, aqi: a?.current?.us_aqi ?? null };
   } catch { return null; }
@@ -62,8 +67,9 @@ async function weather(lat: number, lng: number): Promise<Weather | null> {
 export async function GET(req: Request, { params }: { params: Promise<{ iso3: string }> }) {
   const { iso3: raw } = await params;
   const iso3 = raw.toUpperCase();
-  if (!/^[A-Z]{3}$/.test(iso3)) return Response.json({ error: "bad iso3" }, { status: 400 });
-  const u = new URL(req.url); const qid = u.searchParams.get("qid"); const lat = parseFloat(u.searchParams.get("lat") ?? ""); const lng = parseFloat(u.searchParams.get("lng") ?? "");
+  if (!/^[A-Z]{3}$/.test(iso3) || !(await isos()).has(iso3)) return Response.json({ error: "bad iso3" }, { status: 400 });
+  const u = new URL(req.url); const q0 = u.searchParams.get("qid"); const qid = q0 && /^Q\d{1,10}$/.test(q0) ? q0 : null; const lat0 = parseFloat(u.searchParams.get("lat") ?? ""), lng0 = parseFloat(u.searchParams.get("lng") ?? ""); // coordinates are range-checked and rounded to 0.1 degree, so the weather cache cannot be filled with arbitrary points
+  const ok = Math.abs(lat0) <= 90 && Math.abs(lng0) <= 180; const lat = ok ? Math.round(lat0 * 10) / 10 : NaN, lng = ok ? Math.round(lng0 * 10) / 10 : NaN;
   const keys = Object.keys(WB);
   const [series, ld, wx] = await Promise.all([
     Promise.all(keys.map((k) => wbSeries(iso3, WB[k]))),

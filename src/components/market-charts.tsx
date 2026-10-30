@@ -107,7 +107,7 @@ export function PriceChart({ full, from, interval, lang }: { full: Bar[]; from: 
         {hb && (
           <div className="pointer-events-none absolute start-2 top-2 z-10 rounded-[6px] border border-line2 bg-bg1/95 px-3 py-2 text-[11.5px] shadow-lg" style={{ direction: "ltr" }}>
             <div className="mb-1 font-medium text-t0">{hb.t.length > 10 ? hb.t.slice(0, 16) : hb.t}</div>
-            <div className="num grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 text-t1"><span>O</span><span className="text-t0">{fmtPrice(hb.o, lang)}</span><span>H</span><span className="text-t0">{fmtPrice(hb.h, lang)}</span><span>L</span><span className="text-t0">{fmtPrice(hb.l, lang)}</span><span>C</span><span className="text-t0">{fmtPrice(hb.c, lang)}</span><span>Vol</span><span className="text-t0">{big(hb.v, lang, 1)}</span>
+            <div className="num grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 text-t1"><span>O</span><span className="text-t0">{fmtPrice(hb.o, lang)}</span><span>H</span><span className="text-t0">{fmtPrice(hb.h, lang)}</span><span>L</span><span className="text-t0">{fmtPrice(hb.l, lang)}</span><span>C</span><span className="text-t0">{fmtPrice(hb.c, lang)}</span><span>{lang === "ar" ? "الحجم" : "Vol"}</span><span className="text-t0">{big(hb.v, lang, 1)}</span>
               {hp && <><span>Δ</span><span className={hb.c >= hp.c ? "up" : "down"}>{signed(((hb.c / hp.c) - 1) * 100, lang, 2, "%")}</span></>}
               {overlays.filter((o) => !o.key.startsWith("BB") && o.data[hover!] != null).map((o) => <Fragment key={o.key}><span style={{ color: o.color }}>{o.key}</span><span className="text-t0">{fmtPrice(o.data[hover!] as number, lang)}</span></Fragment>)}
             </div>

@@ -8,14 +8,14 @@ export const comtradeCode = (isoNum: number) => FIX[isoNum] ?? isoNum;
 type Rec = { flowCode: string; cmdCode: string; primaryValue: number | null };
 const cache = new Map<string, { ts: number; v: Rec[] | null }>();
 const TTL = 24 * 3600 * 1000;
-let chain: Promise<unknown> = Promise.resolve();
+let chain: Promise<unknown> = Promise.resolve(); let queued = 0; const MAX_QUEUE = 20;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function raw(url: string): Promise<Rec[] | null> {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const r = await fetch(url, { cache: "no-store", headers: { "User-Agent": "geo-desk/0.1" } });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const r = await fetch(url, { cache: "no-store", headers: { "User-Agent": "geo-desk/0.1" }, signal: AbortSignal.timeout(20_000) });
     const text = await r.text();
-    if (r.status === 429 || /Rate limit/i.test(text)) { const m = /in (\d+) second/.exec(text); await sleep(((m ? +m[1] : 3) + 1) * 1000); continue; }
+    if (r.status === 429 || /Rate limit/i.test(text)) { const m = /in (\d+) second/.exec(text); if (m && +m[1] > 60) return null; await sleep(Math.min(60, (m ? +m[1] : 3) + 1) * 1000); continue; } // a long "retry in N seconds" fails fast rather than stalling the shared queue
     if (!r.ok) return null;
     try { return (JSON.parse(text).data ?? []) as Rec[]; } catch { return null; }
   }
@@ -24,7 +24,9 @@ async function raw(url: string): Promise<Rec[] | null> {
 function query(reporter: number, partner: number, period: number, cmd: string): Promise<Rec[] | null> {
   const url = `${BASE}?reporterCode=${reporter}&partnerCode=${partner}&period=${period}&cmdCode=${cmd}&flowCode=X,M`;
   const hit = cache.get(url); if (hit && Date.now() - hit.ts < TTL) return Promise.resolve(hit.v);
-  const run = chain.then(async () => { const v = await raw(url); if (v) cache.set(url, { ts: Date.now(), v }); await sleep(900); return v; });
+  if (queued >= MAX_QUEUE) return Promise.resolve(null);
+  queued++;
+  const run = chain.then(async () => { try { const v = await raw(url); if (v) cache.set(url, { ts: Date.now(), v }); await sleep(900); return v; } finally { queued--; } });
   chain = run.catch(() => {}); return run;
 }
 

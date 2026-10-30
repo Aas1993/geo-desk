@@ -1,0 +1,18 @@
+"use client";
+import type { Lang } from "../falcon/bits";
+import { Block, Pill } from "../falcon/bits";
+import { useTr } from "../case/bits";
+import type { ProfileSet } from "./useRun";
+
+/** How far each index agrees with independent references: construction checks prove the arithmetic, convergent checks are the real test, and the anchor check asks whether the UAE's largest trading partners rank high. A failed check is a finding, never tuned away silently. */
+export function Validation({ set, L }: { set: ProfileSet; L: Lang }) {
+  const t = useTr(L); const b = set.benchmarks;
+  return (
+    <Block title={t("Index validation: do the scores agree with independent references?", "التحقق من المؤشرات: هل تتفق الدرجات مع مراجع مستقلة؟")} hint={t("Each index is tested against something built differently (Spearman rank correlation), and the final score is asked whether the UAE's largest trading partners rank high. The bounds were written before the results; a failed check is reported, not tuned away.", "يُختبر كل مؤشر مقابل شيء مبني بطريقة مختلفة (ارتباط الرتب لسبيرمان)، ويُسأل عن الدرجة النهائية هل تتصدر الإمارات شركاؤها التجاريون الأكبر. وكُتبت الحدود قبل النتائج؛ والفحص الفاشل يُعلن لا يُضبط.")} right={<Pill c={b.passed === b.total ? "var(--ok)" : "var(--warn)"}>{b.passed}/{b.total} {t("held", "تحقق")}</Pill>}>
+      <div className="scroll-thin overflow-x-auto"><table className="w-full min-w-[760px] border-collapse text-[12px]"><thead><tr className="text-[10.5px] uppercase tracking-wide text-t2"><th className="px-2 py-1.5 text-start font-semibold">{t("Check", "الفحص")}</th><th className="px-2 text-start font-semibold">{t("Kind", "النوع")}</th><th className="px-2 text-end font-semibold">ρ</th><th className="px-2 text-end font-semibold">{t("Expected", "المتوقع")}</th><th className="px-2 text-center font-semibold">{t("Held", "تحقق")}</th><th className="px-2 text-end font-semibold">n</th></tr></thead>
+        <tbody>{b.checks.map((c) => <tr key={c.id} className="border-t border-line align-top"><td className="px-2 py-1.5"><b className="text-t0">{L === "ar" ? c.ar : c.en}</b><p className="mt-0.5 max-w-[440px] text-[11px] leading-snug text-t2">{L === "ar" ? c.why.ar : c.why.en}</p></td><td className="px-2 py-1.5"><Pill c={c.kind === "convergent" ? "var(--accent)" : "var(--t2)"}>{c.kind === "convergent" ? t("convergent", "تقاربي") : t("construction", "بنائي")}</Pill></td><td className="num px-2 py-1.5 text-end text-t0">{c.rho == null ? "n/a" : c.rho.toFixed(2)}</td><td className="num px-2 py-1.5 text-end text-t1">{c.expect[0]} to {c.expect[1]}</td><td className="px-2 py-1.5 text-center">{c.ok == null ? "—" : c.ok ? <span className="text-ok">✓</span> : <span className="text-risk">✗</span>}</td><td className="num px-2 py-1.5 text-end text-t2">{c.n}</td></tr>)}</tbody></table></div>
+      {b.anchors.map((a) => <div key={a.id} className="mt-3 rounded-[10px] bg-bg2 p-3 text-[12px] leading-snug"><div className="flex flex-wrap items-center gap-2"><b className="text-t0">{L === "ar" ? a.ar : a.en}</b><Pill c={a.ok ? "var(--ok)" : "var(--risk)"}>{a.hit}/{a.of} (≥ {a.expectAtLeast})</Pill></div><p className="mt-1.5 flex flex-wrap gap-1.5">{a.items.map((x) => <span key={x.iso3} className="num rounded-full border px-2 py-0.5 text-[11px]" style={{ borderColor: x.in ? "var(--ok)" : "var(--risk)", color: x.in ? "var(--t0)" : "var(--risk)" }}>{x.name} #{x.rank}</span>)}</p></div>)}
+      <ul className="mt-3 list-disc space-y-1.5 ps-5 text-[11.5px] leading-snug text-t2">{b.notes.map((x, i) => <li key={i} dir="auto">{L === "ar" ? x.ar : x.en}</li>)}</ul>
+    </Block>
+  );
+}

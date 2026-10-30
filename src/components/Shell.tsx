@@ -1,11 +1,18 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Layers, Globe2, CandlestickChart, Share2 } from "lucide-react";
-import { Dock } from "./Dock";
+import { Layers, Share2, LayoutDashboard, Sparkles } from "lucide-react";
+import { useDashboard } from "@/lib/dashboard-store";
+import { useDragScroll } from "@/lib/dragScroll";
+import { NAV, navOn } from "@/lib/nav";
+import { RightRail } from "./RightRail";
+import { AgentDock } from "./agent/AgentDock";
+import { StorageGuard } from "./StorageGuard";
 import { TopBar } from "./TopBar";
 import { Ticker } from "./Ticker";
+import { AlertsPanel } from "./AlertsPanel";
+import { ArchiveSweeper } from "./ArchiveSweeper";
 import { useStore, useT } from "@/lib/store";
 import type { Headline } from "@/lib/types";
 
@@ -16,8 +23,8 @@ function usePrefs() {
     try {
       const raw = localStorage.getItem("gd-prefs");
       const p = JSON.parse(raw || "{}");
-      useStore.getState().hydrate({ theme: p.theme ?? "dark", lang: p.lang ?? "en", scale: p.scale ?? 1, desk: p.desk ?? null, onboarded: !!p.onboarded, layers: { capitals: true, labels: true, borders: true, ticker: true, ...p.layers } });
-    } catch { useStore.getState().hydrate({ onboarded: false }); }
+      useStore.getState().hydrate({ theme: p.theme ?? "dark", lang: p.lang ?? "en", scale: p.scale ?? 1, desk: p.desk ?? null, onboarded: !!p.onboarded, layers: { capitals: true, labels: true, borders: true, ticker: true, ...p.layers }, filters: p.filters ?? {}, timeWindow: p.timeWindow ?? "all", projection: p.projection ?? "globe", basemap: p.basemap ?? "dark", terminator: !!p.terminator, ready: true });
+    } catch { useStore.getState().hydrate({ onboarded: false, ready: true }); }
   }, []);
   useEffect(() => { const d = document.documentElement; d.dataset.theme = theme; d.lang = lang; d.dir = lang === "ar" ? "rtl" : "ltr"; d.style.setProperty("--text-scale", String(scale)); d.style.setProperty("--dir", lang === "ar" ? "-1" : "1"); }, [theme, lang, scale]);
 }
@@ -33,15 +40,17 @@ function useHeadlines() {
 }
 
 function MobileNav() {
-  const { t } = useT(); const path = usePathname(); const { menuOpen, setMenu, select } = useStore(); const [toast, setToast] = useState(false);
+  const { t, lang } = useT(); const path = usePathname(); const { menuOpen, setMenu, select } = useStore(); const [toast, setToast] = useState(false);
   const share = async () => { try { await navigator.clipboard.writeText(location.href); setToast(true); setTimeout(() => setToast(false), 1800); } catch {} };
-  const cls = (on: boolean) => `flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] ${on ? "text-accent" : "text-t1"}`;
+  const cls = (on: boolean) => `flex min-w-[60px] shrink-0 flex-col items-center justify-center gap-0.5 px-1 text-[10px] leading-tight ${on ? "text-accent" : "text-t1"}`; const navRef = useRef<HTMLElement>(null); useDragScroll(navRef);
+  useEffect(() => { const k = setTimeout(() => navRef.current?.querySelector<HTMLElement>(".text-accent")?.scrollIntoView({ inline: "center", block: "nearest" }), 60); return () => clearTimeout(k); }, [path]); // the page you are on is always in view
   return (
     <>
-      <nav aria-label="Main" className="absolute inset-x-0 bottom-0 z-30 flex h-14 items-stretch border-t border-line bg-bg1 sm:hidden">
-        <Link href="/" onClick={() => { setMenu(false); select(null); }} className={cls(path === "/" && !menuOpen)}><Globe2 size={19} />{t("nav_world")}</Link>
-        <Link href="/markets" className={cls(path.startsWith("/markets"))}><CandlestickChart size={19} />{t("nav_markets")}</Link>
+      <nav ref={navRef} aria-label="Main" className="glass no-scrollbar absolute inset-x-2 bottom-2 z-30 flex h-14 items-stretch overflow-x-auto rounded-[14px] sm:hidden">
+        {NAV.map((n) => { const I = n.icon; return <Link key={n.href} href={n.href} onClick={n.href === "/" ? () => { setMenu(false); select(null); } : undefined} className={cls(n.href === "/" ? path === "/" && !menuOpen : navOn(n, path))}><I size={19} /><span className="max-w-full truncate">{t(n.key as "nav_world")}</span></Link>; })}
         {path === "/" && <button onClick={() => setMenu(!menuOpen)} className={cls(menuOpen)}><Layers size={19} />{t("layers")}</button>}
+        {path === "/" && <button onClick={() => { select(null); useDashboard.getState().setOpen(true); }} className={cls(false)}><LayoutDashboard size={19} />{lang === "ar" ? "اللوحة" : "Brief"}</button>}
+        {path === "/" && <button onClick={() => { select(null); useDashboard.getState().setAsk(true); }} className={cls(false)}><Sparkles size={19} />{lang === "ar" ? "اسأل" : "Ask"}</button>}
         <button onClick={share} className={cls(false)}><Share2 size={19} />{t("share")}</button>
       </nav>
       {toast && <div role="status" className="glass anim-rise absolute bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full px-4 py-2 text-[13px]">{t("copied")}</div>}
@@ -53,11 +62,15 @@ export function Shell({ children }: { children: ReactNode }) {
   usePrefs(); const feed = useHeadlines();
   return (
     <div className="fixed inset-0 overflow-hidden bg-bg0 text-t0">
-      <Dock />
-      <TopBar feed={feed} />
       {children}
+      <TopBar feed={feed} />
+      <RightRail />
+      <AlertsPanel />
+      <ArchiveSweeper />
       <Ticker items={feed.items} />
       <MobileNav />
+      <AgentDock />
+      <StorageGuard />
     </div>
   );
 }

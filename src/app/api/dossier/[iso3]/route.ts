@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { isAuthError, isNoCredit, resolveModel, upstreamMessage } from "@/lib/llm";
 import { type Tile } from "@/lib/dossier/facts";
 import { BUDGET } from "@/lib/dossier/options";
 import { resolveProduct } from "@/lib/dossier/products";
@@ -8,7 +9,7 @@ import { maxRunUsd } from "@/lib/dossier/cost";
 import { EFFORTS, runModelTask, type Source, type Usage } from "@/lib/dossier/run";
 
 export const maxDuration = 800; // a comprehensive briefing researches and writes for several minutes
-const MODEL = process.env.DOSSIER_MODEL || "claude-sonnet-5-5"; // Sonnet by default: about half the price of Opus per token, which is what keeps a run under the dollar ceiling
+const MODEL = resolveModel(process.env.DOSSIER_MODEL || "claude-sonnet-5-5"); // Sonnet by default: about half the price of Opus per token, which is what keeps a run under the dollar ceiling
 const ENV_EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as (typeof EFFORTS)[number]) : null; // otherwise: low for short runs (less thinking, fewer tokens), medium for long ones
 const effortFor = (long: boolean): (typeof EFFORTS)[number] => ENV_EFFORT ?? (long ? "medium" : "low");
 const MAX_PER_HOUR = Math.max(1, +(process.env.DOSSIER_MAX_PER_HOUR ?? 4) || 4);
@@ -64,9 +65,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
         if (ac.signal.aborted) return finish();
         console.error("[dossier] run failed:", e instanceof Error ? e.message : e);
         const authish = e instanceof Error && /authentication|api key|credential|x-api-key|oauth|refresh token|invalid_grant|expired/i.test(e.message);
-        const nocredit = e instanceof Error && /credit balance/i.test(e.message);
-        const kind = nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError || authish ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : e instanceof Anthropic.BadRequestError ? "bad_request" : "upstream";
-        send({ type: "error", error: kind, message: safeMessage(e) });
+        const nocredit = isNoCredit(e);
+        const kind = nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError || isAuthError(e) || authish ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : e instanceof Anthropic.BadRequestError ? "bad_request" : "upstream";
+        send({ type: "error", error: kind, message: upstreamMessage(e, safeMessage) });
       } finally { store.running.delete(key); finish(); }
     },
   });

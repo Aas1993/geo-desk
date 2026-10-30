@@ -31,13 +31,15 @@ export function unwrapJson(s: string): string {
   if (body.startsWith("{") || body.startsWith("[")) return body; const a = body.indexOf("{"), z = body.lastIndexOf("}"); return a >= 0 && z > a ? body.slice(a, z + 1) : body;
 }
 
-async function hfCall(body: Record<string, unknown>, signal?: AbortSignal): Promise<Record<string, unknown>> {
+/** Opens a chat-completions request and returns the raw response once the status is good; a bad status becomes an LlmError carrying the provider's message. */
+export async function hfOpen(body: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
   const token = process.env.HF_TOKEN; if (!token) throw new LlmError("HF_TOKEN is not set.", 401);
   const r = await fetch(`${HF_BASE}/chat/completions`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
+  if (r.ok) return r;
   const text = await r.text(); let j: Record<string, unknown> = {}; try { j = JSON.parse(text); } catch { /* a non-JSON error page */ }
-  if (!r.ok) { const e = j.error; throw new LlmError(typeof e === "string" ? e : (e as { message?: string } | undefined)?.message ?? (text.slice(0, 200) || `HTTP ${r.status}`), r.status); }
-  return j;
+  const e = j.error; throw new LlmError(typeof e === "string" ? e : (e as { message?: string } | undefined)?.message ?? (text.slice(0, 200) || `HTTP ${r.status}`), r.status);
 }
+const hfCall = async (body: Record<string, unknown>, signal?: AbortSignal): Promise<Record<string, unknown>> => (await hfOpen(body, signal)).json();
 
 function hfClient(): LlmClient {
   return { messages: { async create(p, o) {

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { isAuthError, isNoCredit, resolveModel, upstreamMessage } from "@/lib/llm";
 import { concurrentCap, hourlyCap, inBatchMode, withBatch } from "@/lib/dossier/batch";
 import { renderFacts } from "@/lib/ask/facts";
 import { noteText, rejectCrossSite, safeMessage } from "@/lib/guard";
@@ -15,7 +16,7 @@ import { deskExtraFacts } from "@/lib/desk/context";
 import { planFor, type Call } from "@/lib/desk/plan";
 
 export const maxDuration = 800;
-const MODEL = process.env.DOSSIER_MODEL || "claude-sonnet-5-5";
+const MODEL = resolveModel(process.env.DOSSIER_MODEL || "claude-sonnet-5-5");
 const ENV_EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as Effort) : null;
 const CAP = maxRunUsd(process.env.DOSSIER_MAX_RUN_USD); // every call of one run together never spends more than this
 const FINAL_RESERVE = 1.15; // the final writer reads every earlier text and may pay for a cold cache, so the earlier calls never spend the share it needs
@@ -72,7 +73,7 @@ export const POST = withBatch(async function POST(req: Request) {
             for (const s of r.sources) if (!seen.has(s.url)) { seen.add(s.url); sources.push(s); }
             const start = r.report.search(/^#{1,3} /m); const text = (start > 0 && x.stage === 0 ? r.report.slice(start) : r.report).trim(); out[x.id] = text;
             results.push({ id: x.id, name: nameOf(x), text, usd, searches: r.usage.searches, failed: r.failedSteps, status: "done", note: r.costStopped ? "stopped at the cost ceiling" : undefined }); send({ type: "agent", id: x.id, status: "done", usd, searches: r.usage.searches, failed: r.failedSteps });
-          } catch (e) { inflight.delete(x.id); if (ac.signal.aborted) throw e; const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[desk] ${product} ${x.id} failed:`, msg); results.push({ id: x.id, name: nameOf(x), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); send({ type: "agent", id: x.id, status: "error", message: msg }); }
+          } catch (e) { inflight.delete(x.id); if (ac.signal.aborted || isNoCredit(e) || isAuthError(e)) throw e; /* no money or no key stops every call: say so once */ const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[desk] ${product} ${x.id} failed:`, msg); results.push({ id: x.id, name: nameOf(x), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); send({ type: "agent", id: x.id, status: "error", message: msg }); }
         };
         const skipped = (x: Call, why: string) => { results.push({ id: x.id, name: nameOf(x), text: "", usd: 0, searches: 0, failed: 0, status: "skipped", note: why }); send({ type: "agent", id: x.id, status: "skipped", message: why }); };
         const stage0 = plan.calls.filter((x) => x.stage === 0); const fin = plan.calls.find((x) => x.stage === 1);
@@ -98,8 +99,8 @@ export const POST = withBatch(async function POST(req: Request) {
       } catch (e) {
         if (req.signal.aborted) return finish();
         console.error("[desk] run failed:", e instanceof Error ? e.message : e);
-        const nocredit = e instanceof Error && /credit balance/i.test(e.message); const authish = e instanceof Error && /authentication|api key|credential|x-api-key|oauth|refresh token|invalid_grant|expired/i.test(e.message);
-        send({ type: "error", error: nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError || authish ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : "upstream", message: safeMessage(e) });
+        const nocredit = isNoCredit(e); const authish = e instanceof Error && /authentication|api key|credential|x-api-key|oauth|refresh token|invalid_grant|expired/i.test(e.message);
+        send({ type: "error", error: nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError || isAuthError(e) || authish ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : "upstream", message: upstreamMessage(e, safeMessage) });
       } finally { if (owned) pool.running.delete(key); finish(); }
     },
   });

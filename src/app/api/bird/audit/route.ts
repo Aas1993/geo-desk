@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { isAuthError, isNoCredit, resolveModel, upstreamMessage } from "@/lib/llm";
 import { renderFacts } from "@/lib/ask/facts";
 import { rejectCrossSite, safeMessage } from "@/lib/guard";
 import { maxRunUsd } from "@/lib/dossier/cost";
@@ -13,7 +14,7 @@ import { BIRD_AUDITORS, SUBJECTS } from "@/lib/review/pair";
 import { runAuditors } from "@/lib/review/run";
 
 export const maxDuration = 300;
-const MODEL = process.env.DOSSIER_MODEL || "claude-sonnet-5-5";
+const MODEL = resolveModel(process.env.DOSSIER_MODEL || "claude-sonnet-5-5");
 const ENV_EFFORT = (EFFORTS as readonly string[]).includes(process.env.DOSSIER_EFFORT ?? "") ? (process.env.DOSSIER_EFFORT as Effort) : null;
 const CAP = maxRunUsd(process.env.DOSSIER_MAX_RUN_USD); const MAX_PER_HOUR = Math.max(1, +(process.env.BIRD_AUDIT_MAX_PER_HOUR ?? 12) || 12); const TTL = 6 * 3600_000;
 const g = globalThis as unknown as { __gdBird?: { runs: number[]; running: Set<string>; cache: Map<string, unknown> } }; const st = (g.__gdBird ??= { runs: [], running: new Set<string>(), cache: new Map() });
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
         const report = outs.map((x) => x.text).filter(Boolean).join("\n\n"); const done = { report, agents: outs.map((x) => ({ ...x, text: "" })), sources, usage: total, at: new Date().toISOString(), model: MODEL, name: gathered.name, usd: spent };
         if (outs.some((x) => x.status === "done")) { st.cache.set(key, done); while (st.cache.size > 30) st.cache.delete(st.cache.keys().next().value as string); } else { const i = st.runs.pop(); void i; }
         send({ type: "done", cached: false, ...done });
-      } catch (e) { if (req.signal.aborted) return finish(); console.error("[bird-audit] failed:", e instanceof Error ? e.message : e); const nocredit = e instanceof Error && /credit balance/i.test(e.message); send({ type: "error", error: nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : "upstream", message: safeMessage(e) }); }
+      } catch (e) { if (req.signal.aborted) return finish(); console.error("[bird-audit] failed:", e instanceof Error ? e.message : e); const nocredit = isNoCredit(e); send({ type: "error", error: nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError || isAuthError(e) ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : "upstream", message: upstreamMessage(e, safeMessage) }); }
       finally { if (owned) st.running.delete(key); finish(); }
     },
   });

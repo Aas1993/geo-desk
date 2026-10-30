@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { isAuthError, isNoCredit } from "../llm";
 import { outputRoom, runUsd } from "../dossier/cost";
 import { runModelTask, type Effort, type RunEvent, type Source, type Usage } from "../dossier/run";
 import { worstOf } from "../desk/core";
@@ -25,7 +26,7 @@ export async function runAuditors(o: AuditRun): Promise<{ outs: AuditOut[]; spen
       const usd = r.usage.usd ?? runUsd(r.usage, o.model); r.usage.usd = usd; spent += usd; for (const k of ["input", "output", "cacheRead", "cacheWrite", "searches", "fetches"] as const) o.total[k] += r.usage[k]; o.total.usd = spent;
       for (const s of r.sources) if (!seen.has(s.url)) { seen.add(s.url); o.sources.push(s); }
       outs.push({ id: a.id, name: name(a), text: r.report.trim(), usd, searches: r.usage.searches, failed: r.failedSteps, status: "done", note: r.costStopped ? "stopped at the cost ceiling" : undefined }); o.send({ type: "agent", id: a.id, status: "done", usd, searches: r.usage.searches, failed: r.failedSteps });
-    } catch (e) { if (o.signal.aborted) throw e; const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[review] ${o.label} ${a.id} failed:`, msg); outs.push({ id: a.id, name: name(a), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); o.send({ type: "agent", id: a.id, status: "error", message: msg }); }
+    } catch (e) { if (o.signal.aborted || isNoCredit(e) || isAuthError(e)) throw e; const msg = e instanceof Error ? e.message.slice(0, 120) : "error"; console.error(`[review] ${o.label} ${a.id} failed:`, msg); outs.push({ id: a.id, name: name(a), text: "", usd: 0, searches: 0, failed: 0, status: "error", note: msg }); o.send({ type: "agent", id: a.id, status: "error", message: msg }); }
   }));
   outs.sort((x, y) => AUD.findIndex((a) => a.id === x.id) - AUD.findIndex((a) => a.id === y.id));
   return { outs, spent };

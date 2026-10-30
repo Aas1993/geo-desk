@@ -1,4 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { isAuthError, isNoCredit, provider, resolveModel, upstreamMessage } from "@/lib/llm";
+import { runModelTask } from "@/lib/dossier/run";
 import { rejectCrossSite } from "@/lib/guard";
 import { gather, renderFacts } from "@/lib/research/gather";
 import { SYSTEM, userMessage } from "@/lib/research/prompt";
@@ -6,10 +8,10 @@ import { findListing } from "@/lib/markets/universe";
 import { normaliseNote } from "@/lib/research/normalise";
 import { connection } from "next/server";
 import { safeMessage } from "@/lib/guard";
-import { PRICE, maxRunUsd, outputRoom, runUsd } from "@/lib/dossier/cost";
+import { maxRunUsd, outputRoom, priceOf, runUsd } from "@/lib/dossier/cost";
 
 export const maxDuration = 300;
-const MODEL = process.env.RESEARCH_MODEL || "claude-sonnet-5-5"; // Sonnet by default: about half the price of Opus per token, which keeps a note under the dollar ceiling
+const MODEL = resolveModel(process.env.RESEARCH_MODEL || "claude-sonnet-5-5"); // Sonnet by default: about half the price of Opus per token, which keeps a note under the dollar ceiling
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 const EFFORT = (EFFORTS as readonly string[]).includes(process.env.RESEARCH_EFFORT ?? "") ? (process.env.RESEARCH_EFFORT as (typeof EFFORTS)[number]) : "medium";
 const MAX_PER_HOUR = Math.max(1, +(process.env.RESEARCH_MAX_PER_HOUR ?? 6) || 6); const MAX_CONCURRENT = 2; const MAX_TURNS = 5;
@@ -74,7 +76,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ exchang
         };
 
         let costStopped = false;
-        for (let turn = 0; turn < MAX_TURNS && !costStopped; turn++) {
+        const onHf = provider() === "hf"; // an open model on Hugging Face: the same run through run-hf.ts, with Tavily for the web (the Claude loop below is skipped)
+        if (onHf) {
+          const r = await runModelTask({ client: client as never, model: MODEL, system: SYSTEM, firstText: userMessage({ facts: renderFacts(facts), asOf: facts.asOf, arabic, exchange: l.exchange }), budget: { maxTokens: 24_000, searches: SEARCHES, fetches: FETCHES, fetchTokens: FETCH_TOKENS }, effort: EFFORT, maxUsd: MAX_RUN_USD, signal: ac.signal, send, label: "research" });
+          report = r.report; stop = r.stop; costStopped = r.costStopped; sources.push(...r.sources); Object.assign(u, r.usage);
+        }
+        for (let turn = 0; turn < (onHf ? 0 : MAX_TURNS) && !costStopped; turn++) {
           const maxTok = Math.max(1500, Math.min(24_000, outputRoom(cost(), MAX_RUN_USD, MODEL)));
           const tac = new AbortController(); ac.signal.addEventListener("abort", () => tac.abort(), { once: true });
           const s = client.beta.messages.stream({
@@ -120,16 +127,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ exchang
         }
         if (costStopped) report += `\n\n> Stopped at the per-run cost limit of $${MAX_RUN_USD.toFixed(2)}: this note is incomplete.\n`;
         if (stop === "refusal") { send({ type: "error", error: "refusal", message: "The model declined to write this note." }); return finish(); }
-        u.usd = PRICE[MODEL] ? cost() : null;
+        u.usd = priceOf(MODEL) ? cost() : null;
         const done: Done = { report: normaliseNote(report), sources, usage: u, at: new Date().toISOString(), model: MODEL };
         if (report.trim()) store.cache.set(key, done);
         send({ type: "done", cached: false, truncated: stop === "max_tokens" || stop === "cost", ...done });
       } catch (e) {
         if (ac.signal.aborted) return finish();
         const authish = e instanceof Error && /authentication|api key|credential|x-api-key|oauth|refresh token|invalid_grant|expired/i.test(e.message);
-        const nocredit = e instanceof Error && /credit balance/i.test(e.message);
-        const kind = nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError || authish ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : e instanceof Anthropic.BadRequestError ? "bad_request" : "upstream";
-        send({ type: "error", error: kind, message: safeMessage(e) });
+        const nocredit = isNoCredit(e);
+        const kind = nocredit ? "no_credits" : e instanceof Anthropic.AuthenticationError || isAuthError(e) || authish ? "no_credentials" : e instanceof Anthropic.RateLimitError ? "rate" : e instanceof Anthropic.BadRequestError ? "bad_request" : "upstream";
+        send({ type: "error", error: kind, message: upstreamMessage(e, safeMessage) });
       } finally { store.running.delete(key); finish(); }
     },
     cancel() {},

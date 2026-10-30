@@ -8,6 +8,7 @@ import { useKeyed } from "@/lib/useKeyed";
 import { big, dash, dir, frac, intl, price, ratio, sessionState, signed } from "@/lib/markets/format";
 import type { Listing, Quote } from "@/lib/markets/types";
 import { Panel, ProviderBanner, Unavailable } from "./markets-ui";
+import { MarketSources } from "./MarketSources";
 import { MiniSpark, RangeBar } from "./market-charts";
 import { ScreenersView } from "./ScreenersView";
 
@@ -90,6 +91,7 @@ export function MarketsBoard() {
         {session && <div className="flex items-center gap-3 rounded-[8px] border border-line bg-bg1 px-4 py-2.5"><i className={`size-2.5 rounded-full ${session.open ? "bg-up" : "bg-t2"}`} /><div><div className="text-[13px] font-medium">{session.open ? t("mk_open") : t("mk_closed")}</div><div className="num text-[11px] text-t2">{ex === "QSE" ? (lang === "ar" ? "الأحد–الخميس 09:30–13:15 بتوقيت قطر (تداول مستمر حتى 13:00 ثم مزاد الإغلاق)" : "Sun–Thu 09:30–13:15 AST (continuous to 13:00, then the closing auction)") : t("mk_hours")}</div></div></div>}
       </header>
       <ProviderBanner synthetic={synthetic} />
+      <MarketSources />
       <div role="tablist" aria-label="View" className="flex w-fit rounded-[6px] bg-bg2 p-0.5">{(["table", "screener"] as const).map((v) => <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`rounded-[5px] px-4 py-1.5 text-[12.5px] font-medium ${view === v ? "bg-bg1 text-accent shadow-sm" : "text-t1 hover:text-t0"}`}>{v === "table" ? t("mk_table") : t("mk_screener")}</button>)}</div>
       {view === "screener" && <ScreenersView />}
       {failed && !failed.ok && failed.error !== "no_key" && <Unavailable error={failed.error} message={failed.message} onRetry={() => { qa.retry(); qd.retry(); }} />}

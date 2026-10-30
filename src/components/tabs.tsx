@@ -13,6 +13,8 @@ import { UaeTradeCard } from "./TradeIntel";
 import { OutlookCard, ExportDemand } from "./OutlookCard";
 import { BilateralCard } from "./tabs2";
 import { CrossCheck } from "./CrossCheck";
+import { MilSources } from "./MilSources";
+import { SocietyEvidence } from "./EvidenceCheck";
 import type { Country, CountryDetail, Headline, Series } from "@/lib/types";
 
 type D = { data: CountryDetail | null; loading: boolean; error: boolean; retry: () => void };
@@ -147,25 +149,27 @@ export function TradeTab({ c, detail }: { c: Country; detail: D }) {
   }}</Gate></>;
 }
 
-export function MilitaryTab({ detail }: { detail: D }) {
+export function MilitaryTab({ detail, iso }: { detail: D; iso: string }) {
   const { t, lang } = useT();
   return <Gate d={detail}>{({ indicators: i }) => (<>
     <div className="grid grid-cols-2 gap-2">
       <StatTile label={t("milSpend")} value={usd(last(i.milSpend)?.v, lang)} sub={last(i.milSpend)?.y} />
       <StatTile label={t("milGdp")} value={pct(last(i.milGdp)?.v, lang)} sub={last(i.milGdp)?.y} />
     </div>
+    <MilSources iso={iso} usdSeries={i.milSpend} gdpSeries={i.milGdp} />
     <Metric title={t("milSpend")} s={i.milSpend} fmt={(n) => usd(n, lang)} />
     <Metric title={t("milPers")} s={i.milPers} fmt={(n) => int(n, lang)} />
     <Source name={t("sipri")} url="https://www.sipri.org/databases/milex" />
   </>)}</Gate>;
 }
 
-export function SocietyTab({ detail }: { detail: D }) {
+export function SocietyTab({ iso, detail }: { iso: string; detail: D }) {
   const { t, lang } = useT();
   return <Gate d={detail}>{({ indicators: i }) => (<>
     <Metric title={t("lifeExp")} s={i.lifeExp} fmt={(n) => `${n.toFixed(1)} ${t("years")}`} />
     <Metric title={t("literacy")} s={i.literacy} fmt={(n) => pct(n, lang)} />
     <Metric title={t("internet")} s={i.internet} fmt={(n) => pct(n, lang)} />
+    <SocietyEvidence iso={iso} wb={{ le: last(i.lifeExp), lit: last(i.literacy), net: last(i.internet) }} />
     <Source name={t("wb")} url={WB} />
   </>)}</Gate>;
 }

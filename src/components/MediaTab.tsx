@@ -6,6 +6,7 @@ import { useMedia, useToneMap, type ToneMap } from "@/lib/media/client";
 import { STANCES, type Dir, type Item, type Stance, type StanceResult, type Verdict } from "@/lib/media/types";
 import { Card, Skeleton } from "./ui";
 import { useCountries } from "./SearchBox";
+import { ToneLimit } from "./SourceChecks";
 import type { Country } from "@/lib/types";
 
 const COLOR: Record<Stance | "mixed", string> = { hostile: "#ff5d73", critical: "#ff8a4c", neutral: "#9db0cf", friendly: "#3ddcff", supportive: "#2de39a", mixed: "#b693ff" };
@@ -76,6 +77,7 @@ function CountryMedia({ c, map, lang }: { c: Country; map: ToneMap | null | unde
       <p className="text-[12px] leading-snug text-t2">{u.intro}</p>
       <Card title={u.toneTitle} icon="📡">
         <div className="text-[12px] text-t1">{dir === "in" ? u.toneAbout : `${u.toneOut} ${name}, 30d`}</div>
+        <ToneLimit />
         {avg == null ? (m.tone.loading && dir === "out" ? <Skeleton h={50} className="mt-2" /> : <p className="mt-2 text-[12.5px] text-t2">{map === null || (dir === "in" && !nm) ? u.noMap : u.thin}</p>) : (
           <>
             <div className="num mt-1 flex items-baseline gap-3"><span className="text-[28px] font-semibold text-t0">{avg > 0 ? "+" : ""}{avg.toFixed(1)}</span>
@@ -180,6 +182,7 @@ function UaeRadar({ map, lang }: { map: ToneMap | null | undefined; lang: "en" |
   return (
     <div className="space-y-3">
       <p className="text-[12.5px] leading-relaxed text-t1">{u.radarIntro}</p>
+      <ToneLimit />
       <div className="num rounded-[10px] border border-line bg-bg2 p-3 text-[12.5px] text-t1">{u.world}: <b className="text-t0">{map.global.avg.toFixed(1)}</b> · {map.coverage ? `${map.coverage.measured} ${u.of} ${map.coverage.total}` : rows.length} {u.measured}</div>
       {list(u.cool, rows.slice(0, 10))}{list(u.warm, rows.slice(-10).reverse())}
       <p className="text-[11px] leading-snug text-t2">{map.source?.note} {u.asOf} {map.built.slice(0, 10)}. {u.src}: <a className="underline hover:text-accent" href={map.source?.url ?? "https://www.gdeltproject.org/"} target="_blank" rel="noreferrer noopener">GDELT</a>.</p>

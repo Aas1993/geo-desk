@@ -6,6 +6,7 @@ import { Card, EmptyState, Skeleton } from "./ui";
 import { safeHttp } from "@/lib/url";
 import { DossierWorkspace } from "./DossierWorkspace";
 import { CrossCheck } from "./CrossCheck";
+import { DealX, DealsXNote, useDealsX } from "./SourceChecks";
 import type { InvestPayload, Flag } from "@/lib/invest-data";
 import type { Country } from "@/lib/types";
 
@@ -45,7 +46,7 @@ function Trend({ out, inw, u }: { out: [number, number][]; inw: [number, number]
 
 export function InvestTab({ c }: { c: Country }) {
   const { lang } = useT(); const L = lang as Lang; const u = T[L]; const [d, setD] = useState<InvestPayload | null | "err">(null); const [n, setN] = useState(0); const [open, setOpen] = useState(false);
-  const [inv, setInv] = useState<string | null>(null); const [sec, setSec] = useState<string | null>(null); const [more, setMore] = useState(false);
+  const dx = useDealsX().value; const [inv, setInv] = useState<string | null>(null); const [sec, setSec] = useState<string | null>(null); const [more, setMore] = useState(false);
   useEffect(() => { let dead = false; fetch(`/api/invest/${c.iso3}`).then((r) => (r.ok ? r.json() : Promise.reject())).then((j: InvestPayload) => { if (!dead) setD(j); }).catch(() => { if (!dead) setD("err"); }); return () => { dead = true; }; }, [c.iso3, n]);
   const list = useMemo(() => (d && d !== "err" ? d.deals.items.filter((x) => (!inv || x.by.includes(inv)) && (!sec || (x.sector ?? "other") === sec)) : []), [d, inv, sec]);
   const flagText = (f: Flag) => (u.f as Record<string, string>)[f.id]?.replace("{v}", f.v ?? "") ?? f.id;
@@ -79,10 +80,11 @@ export function InvestTab({ c }: { c: Country }) {
           </div>
           {d.deals.byQuarter.length > 1 && <div className="mt-4" dir="ltr"><h4 className="label mb-1.5">{u.quarters}</h4><div className="flex h-16 items-end gap-1.5">{d.deals.byQuarter.map(([q, v]) => <div key={q} className="flex flex-1 flex-col items-center justify-end gap-0.5" title={`${q}: ${v}`}><span className="num text-[9.5px] text-t2">{v}</span><div className="w-full rounded-t bg-accent/80" style={{ height: `${Math.max(6, (v / topQ) * 100)}%` }} /><span className="num text-[8.5px] text-t2">{q.slice(2)}</span></div>)}</div></div>}
           <div className="mt-4 flex flex-wrap items-center gap-1.5"><button onClick={() => { setInv(null); setSec(null); }} className={`h-7 rounded-full px-2.5 text-[11.5px] ${!inv && !sec ? "bg-accent font-semibold text-[var(--accent-ink)]" : "bg-bg2 text-t1"}`}>{u.all} · {d.deals.total}</button>{inv && <span className="rounded-full bg-accent/15 px-2.5 py-1 text-[11.5px] text-accent">{inv}</span>}{sec && <span className="rounded-full bg-accent/15 px-2.5 py-1 text-[11.5px] text-accent">{sec}</span>}</div>
-          <ul className="mt-2 divide-y divide-line">{shown.map((x) => <li key={x.u} className="py-2"><a href={safeHttp(`https://www.wam.ae/en/article/${x.u}`)} target="_blank" rel="noreferrer noopener" className="text-[12.5px] leading-snug text-t0 hover:text-accent">{x.t}</a><div className="num mt-0.5 flex flex-wrap gap-x-2 text-[10.5px] text-t2"><span>{x.d}</span><span>{x.by.join(", ")}</span>{x.sector && <span>{x.sector}</span>}<span>{u.wam}</span></div></li>)}</ul>
+          <ul className="mt-2 divide-y divide-line">{shown.map((x) => <li key={x.u} className="py-2"><a href={safeHttp(`https://www.wam.ae/en/article/${x.u}`)} target="_blank" rel="noreferrer noopener" className="text-[12.5px] leading-snug text-t0 hover:text-accent">{x.t}</a><div className="num mt-0.5 flex flex-wrap gap-x-2 text-[10.5px] text-t2"><span>{x.d}</span><span>{x.by.join(", ")}</span>{x.sector && <span>{x.sector}</span>}<span>{u.wam}</span></div><DealX u={x.u} x={dx} /></li>)}</ul>
           {list.length > 10 && <button onClick={() => setMore(!more)} className="mt-1 text-[12px] text-accent">{more ? u.fewer : `${u.showAll} (${list.length})`}</button>}
         </>)}
         <p className="mt-2 text-[11px] leading-snug text-t2">{u.dealsHint}</p>
+        {d.deals.total > 0 && <DealsXNote ids={d.deals.items.map((x) => x.u)} x={dx} />}
       </Card>
       <Card title={u.prot} icon="🛡">
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">{[[u.bit, d.protection.investment], [u.tax, d.protection.tax], [u.air, d.protection.air], [u.committees, d.protection.committees ?? "—"]].map(([k, v]) => <div key={String(k)} className="rounded-[12px] bg-bg2 p-3"><div className="num display text-[20px] font-semibold text-t0">{String(v)}</div><div className="text-[11.5px] leading-snug text-t1">{k}</div></div>)}</div>

@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "@/lib/store";
 import { Card, EmptyState, Skeleton, StatTile } from "./ui";
 import { safeHttp } from "@/lib/url";
+import { GovernanceEvidence } from "./EvidenceCheck";
+import { LeadersCheck, DealX, DealsXNote, useDealsX } from "./SourceChecks";
 import { SCORE_DIMS, SCORE_GROUPS, SCORE_TIERS, rivalName, scorePartLabel, wgiLabel } from "@/lib/intel-labels";
 import type { IntelPayload } from "@/lib/intel-data";
 import type { Country } from "@/lib/types";
@@ -110,7 +112,7 @@ export function RivalsCard({ d, L }: { d: IntelPayload; L: Lang }) {
   );
 }
 export function IntelTab({ c }: { c: Country }) {
-  const { lang } = useT(); const L = lang as Lang; const u = T[L]; const [d, setD] = useState<IntelPayload | null | "err">(null); const [n, setN] = useState(0);
+  const { lang } = useT(); const L = lang as Lang; const u = T[L]; const [d, setD] = useState<IntelPayload | null | "err">(null); const [n, setN] = useState(0); const dx = useDealsX().value;
   useEffect(() => { let dead = false; fetch(`/api/intel/${c.iso3}`).then((r) => (r.ok ? r.json() : Promise.reject())).then((j: IntelPayload) => { if (!dead) setD(j); }).catch(() => { if (!dead) setD("err"); }); return () => { dead = true; }; }, [c.iso3, n]);
   const snapKey = `gd-intel-read:${c.iso3}`; const cfgKey = `gd-intel-triggers:${c.iso3}`;
   const [snap, setSnap] = useState<Snap | null | undefined>(undefined); const [cfg, setCfg] = useState<TCfg>({ on: {}, val: {} }); const [saved, setSaved] = useState(false);
@@ -172,18 +174,21 @@ export function IntelTab({ c }: { c: Country }) {
           <div className="relative mt-1 h-2 rounded-full bg-bg3"><div className="h-2 rounded-full bg-accent" style={{ width: `${Math.max(2, x.score ?? 0)}%` }} />{x.uae != null && <i className="absolute -top-1 h-4 w-0.5 bg-t0" style={{ left: `${x.uae}%` }} title={`UAE ${x.uae}`} />}</div></li>)}</ul>}
         <p className="mt-2 text-[11px] leading-snug text-t2">{u.govHint} {d.governance ? `(${d.governance.year})` : ""}</p>
       </Card>
+      <GovernanceEvidence iso={c.iso3} />
       <Card title={u.lead} icon="🕰">
         {!d.leaders ? <p className="text-[12.5px] text-t1">{u.noData}</p> : (<>
           <ul className="space-y-1.5">{d.leaders.people.map((p) => <li key={p.role} className="flex flex-wrap items-baseline justify-between gap-x-3 text-[12.5px]"><span><span className="text-t2">{u.head[p.role]}: </span><b className="text-t0">{p.name}</b></span><span className="num text-t1">{p.start ? `${u.inOffice} ${p.start.slice(0, 4)}${p.tenureYears != null ? ` (${fmt(p.tenureYears)} ${u.years})` : ""}` : ""}{p.age != null ? ` · ${u.age} ${p.age}` : ""}</span></li>)}</ul>
           <h4 className="label mb-1 mt-3">{u.elections}</h4>{d.leaders.elections.length ? <ul className="space-y-1 text-[12.5px]">{d.leaders.elections.map((e) => <li key={e.label + e.date} className="flex justify-between gap-3"><span className="text-t0" dir="auto">{e.label}</span><span className="num text-t1">{day(e.date)} · {e.approx ? "~" : ""}{e.daysAway} {u.days}</span></li>)}</ul> : <p className="text-[12px] text-t2">{u.noElect}</p>}</>)}
       </Card>
+      {d.leaders && <LeadersCheck iso={c.iso3} people={d.leaders.people.map((p) => ({ role: p.role, name: p.name }))} elections={d.leaders.elections} />}
       <Card title={u.inv} icon="💼">
         <div className="grid grid-cols-3 gap-2"><StatTile label={u.stock} value={usd(d.invest?.outwardUsd)} sub={d.invest?.outwardYear ? `${d.invest.outwardYear}${d.invest.outwardRank ? ` · #${d.invest.outwardRank}` : ""}` : undefined} /><StatTile label={u.ofGdp} value={d.invest?.pctOfTheirGdp != null ? `${fmt(d.invest.pctOfTheirGdp, 2)}%` : "—"} sub={d.invest?.shareOfUaeAbroad != null ? `${fmt(d.invest.shareOfUaeAbroad, 1)}% ${u.ofUae}` : undefined} /><StatTile label={u.inward} value={usd(d.invest?.inwardUsd)} /></div>
         {!d.invest?.outwardUsd && <p className="mt-2 text-[12px] text-t2">{u.noStock}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px]"><b className="num text-t0">{d.deals.total}</b><span className="text-t1">{u.deals}</span><span className="num text-t2">· {d.deals.last90} {u.last90} · {d.deals.last365} {u.last12}</span></div>
         {d.deals.byInvestor.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1.5">{d.deals.byInvestor.map(([k, v]) => <span key={k} className="rounded-full border border-line bg-bg2 px-2 py-0.5 text-[11px] text-t1">{k} <b className="num text-t0">{v}</b></span>)}{d.deals.bySector.filter(([k]) => k !== "other").slice(0, 3).map(([k, v]) => <span key={k} className="rounded-full border border-line2 px-2 py-0.5 text-[11px] text-t2">{k} {v}</span>)}</div>}
-        {d.deals.items.length === 0 ? <p className="mt-2 text-[12px] text-t2">{u.noDeals}</p> : <ul className="mt-2 space-y-2">{d.deals.items.map((x) => <li key={x.u} className="text-[12.5px] leading-snug"><a href={safeHttp(`https://www.wam.ae/en/article/${x.u}`)} target="_blank" rel="noreferrer noopener" className="text-t0 hover:text-accent" dir="auto">{x.t}</a><div className="num text-[11px] text-t2">{x.d} · {x.by.join(", ")}{x.sector ? ` · ${x.sector}` : ""}</div></li>)}</ul>}
+        {d.deals.items.length === 0 ? <p className="mt-2 text-[12px] text-t2">{u.noDeals}</p> : <ul className="mt-2 space-y-2">{d.deals.items.map((x) => <li key={x.u} className="text-[12.5px] leading-snug"><a href={safeHttp(`https://www.wam.ae/en/article/${x.u}`)} target="_blank" rel="noreferrer noopener" className="text-t0 hover:text-accent" dir="auto">{x.t}</a><div className="num text-[11px] text-t2">{x.d} · {x.by.join(", ")}{x.sector ? ` · ${x.sector}` : ""}</div><DealX u={x.u} x={dx} /></li>)}</ul>}
         <p className="mt-2 text-[11px] leading-snug text-t2">{u.dealsHint}</p>
+        <DealsXNote ids={d.deals.items.map((x) => x.u)} x={dx} />
       </Card>
       <Card title={u.aid} icon="🤝">
         {!d.aid ? <p className="text-[12.5px] text-t1">{u.aidNone}</p> : (<>

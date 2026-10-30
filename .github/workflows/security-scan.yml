@@ -1,0 +1,37 @@
+name: Security scan (Strix)
+# Manual only: an AI pentest agent spends LLM budget and takes a while. Scans this repo's code (quick mode) inside Strix's Docker sandbox and fails on high or critical findings. The runner checkout is throwaway, so Strix editing it does no harm.
+# Needs repo secrets STRIX_LLM (model id) and LLM_API_KEY. Only run it against code you own.
+on:
+  workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: Scan depth
+        type: choice
+        options: [quick, standard, deep]
+        default: quick
+permissions:
+  contents: read
+concurrency: { group: security-scan, cancel-in-progress: false }
+jobs:
+  strix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Install Strix
+        run: python -m pip install strix-agent
+      - name: Scan
+        env:
+          STRIX_LLM: ${{ secrets.STRIX_LLM }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: strix -n -t ./ --scan-mode "${{ inputs.scan_mode }}" --fail-on high --max-budget 10
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strix-runs
+          path: strix_runs/
+          if-no-files-found: ignore

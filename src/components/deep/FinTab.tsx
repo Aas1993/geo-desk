@@ -4,6 +4,8 @@ import { Block, Pill } from "../falcon/bits";
 import { Tbl } from "../machiavelli/parts";
 import { MultiLine } from "../charts";
 import { Loading, Note, sparkOf } from "./bits";
+import { FinSources } from "./FinSources";
+import type { WbDict } from "@/lib/finsources";
 import { fmtN, stateColor, tx, STATE_LABEL, type TabProps } from "./types";
 
 const T = {
@@ -25,6 +27,7 @@ export function FinTab(p: TabProps) {
       <Block title={u.title} hint={u.sub}><Tbl head={[u.name, u.latest, u.chg, u.rank, u.med, u.trend]} w={["26%", "15%", "13%", "13%", "13%", "20%"]} rows={ORDER.filter((k) => A[k]).map((k) => { const r = snap.fin.rank[k]; const g = gulf.find((x) => x.key === k); return [<span key="a"><b className="text-t0">{snap.fin.names[k] ?? k}</b><span className="block text-[11px] text-t2">{unit(k)}</span></span>, <span key="b" className="num text-t0">{show(k, A[k].v)} <span className="text-[10.5px] text-t2">({A[k].y})</span></span>, d3(k) != null ? `${d3(k)! >= 0 ? "+" : ""}${k === "res" ? (d3(k)! / 1e9).toFixed(0) : fmtN(d3(k))}` : u.na, r ? `${r.rank} ${u.of} ${r.n}` : u.na, g?.median != null ? fmtN(g.median) : u.na, <div key="t" className="w-28"><MultiLine lines={[{ label: k, color: "var(--accent)", data: sparkOf(A[k].s) }]} height={42} /></div>]; })} />
         {name && B && <div className="mt-4"><h4 className="label mb-1.5">{u.counter}: {name}</h4><Tbl head={[u.name, u.latest]} rows={ORDER.filter((k) => B[k]).map((k) => [snap.fin.names[k] ?? k, `${show(k, B[k].v)} ${unit(k)} (${B[k].y})`])} /></div>}
         <p className="mt-2 text-[11px] text-t2">{u.reserves} {u.cpiNote}</p></Block>
+      <FinSources L={L} aWb={A as WbDict} bWb={B as WbDict} iso={snap.iso3 ?? null} name={name} />
       <Block title={u.trans} hint={u.transH}><Tbl head={[u.chan, "", u.buffer]} w={["20%", "42%", "38%"]} rows={u.ch.map(([t, d], i) => [<b key="a" className="text-t0">{t}</b>, d, i === 0 ? `${cr ? `Private credit ${fmtN(cr.v)}% of GDP (${cr.y}); ` : ""}${r9 ? `non-performing loans ${fmtN(r9.v)}% (${r9.y})` : ""}` : i === 1 ? (A.fx ? `${A.fx.v.toFixed(2)} AED per US$ (${A.fx.y})` : u.na) : i === 2 ? `${rm ? `${fmtN(rm.v)} months of imports (${rm.y})` : ""}${snap.readings.find((r) => r.id === "I07") ? `; ${L === "ar" ? snap.readings.find((r) => r.id === "I07")!.displayAr : snap.readings.find((r) => r.id === "I07")!.display}` : ""}` : u.na])} />
         <div className="mt-2 flex flex-wrap gap-1.5">{snap.readings.filter((r) => ["I07", "I08", "I09", "I12"].includes(r.id)).map((r) => <Pill key={r.id} c={stateColor(r.state)}>{r.id} {tx(L, STATE_LABEL[r.state])}</Pill>)}</div></Block>
       <Block title={u.notc} hint={u.status}><ul className="space-y-2">{off.map((i) => <li key={i.id}><Note><b className="num text-t0">{i.id}</b> {tx(L, i)}: {i.missing ? tx(L, i.missing) : ""}</Note></li>)}<li><Note><b className="num text-t0">I12</b> {L === "ar" ? "السعر الفعلي الحقيقي" : "Real effective exchange rate"}: {L === "ar" ? "لا ينشره البنك الدولي للإمارات؛ والمسار المصرف المركزي." : "The World Bank publishes none for the UAE; the route is the CBUAE."}</Note></li><li><Note><b className="num text-t0">I07</b> {L === "ar" ? "الدين الخارجي" : "External debt"}: {L === "ar" ? "غير منشور للإمارات في بيانات البنك الدولي." : "Not published for the UAE in the World Bank's data."}</Note></li></ul>

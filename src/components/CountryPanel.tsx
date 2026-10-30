@@ -116,8 +116,8 @@ export function CountryPanel() {
         {tab === "media" && <MediaTab c={c} />}
         {tab === "trade" && <TradeTab c={c} detail={detail} />}
         {tab === "un" && <UNTab c={c} />}
-        {tab === "military" && <MilitaryTab detail={detail} />}
-        {tab === "society" && <SocietyTab detail={detail} />}
+        {tab === "military" && <MilitaryTab detail={detail} iso={c.iso3} />}
+        {tab === "society" && <SocietyTab iso={c.iso3} detail={detail} />}
         {tab === "news" && <NewsTab c={c} />}
       </div>
     </section>

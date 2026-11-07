@@ -24,6 +24,7 @@ jobs:
       - run: node scripts/build-trade.mjs
       - run: node scripts/build-rivals.mjs # reads trade.json
       - run: node scripts/build-outlook.mjs
+      - run: node scripts/build-leaders.mjs # office-holders and coming elections; the integrity test fails once a listed election is a month past, so this keeps the file current
       # the dated IMF vintage store and the World Bank financial-conditions file feed the Deep Intelligence desk
       - run: node scripts/snapshot-vintage.mjs
       - run: node scripts/build-finconditions.mjs
@@ -46,7 +47,7 @@ jobs:
           npm test # PRs opened with GITHUB_TOKEN do not trigger CI, so the tests run here, before anything is committed
           branch="data/refresh"
           git config user.name "geo-desk-bot"; git config user.email "geo-desk-bot@users.noreply.github.com"
-          git checkout -B "$branch"; git add public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json public/data/scorecard.json public/data/rivals.json public/data/leverage.json public/data/deals.json public/data/graph.json public/data/monitor/history.json public/data/vintages/weo.json public/data/finconditions.json public/data/trends.json public/data/vintages/capture.json
+          git checkout -B "$branch"; git add public/data/leaders.json public/data/agreements.json public/data/flights.json public/data/investment.json public/data/missions.json public/data/visits.json public/data/trade.json public/data/outlook.json public/data/partnership.json public/data/scorecard.json public/data/rivals.json public/data/leverage.json public/data/deals.json public/data/graph.json public/data/monitor/history.json public/data/vintages/weo.json public/data/finconditions.json public/data/trends.json public/data/vintages/capture.json
           git commit -m "Refresh UAE agreements, flights, investment, missions, visits, trade, outlook and partnership data ($(date -u +%F))"
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$branch" # one standing branch: a re-run or the next day updates the same PR instead of failing
           if [ "$(gh pr list --head "$branch" --state open --json number -q length)" = "0" ]; then

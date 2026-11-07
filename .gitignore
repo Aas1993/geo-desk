@@ -44,3 +44,9 @@ public/maplibre-gl-worker.mjs
 .env.local
 public/data/vendor-report.json
 strix_runs/
+
+# A/B outputs written by scripts/ab-sitting.ts
+/scratch-ab/
+
+# finished council products kept on disk (src/lib/dossier/diskcache.ts)
+/.cache/

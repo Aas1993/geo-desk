@@ -3,7 +3,9 @@ import { concurrentCap, hourlyCap, inBatchMode, withBatch } from "@/lib/dossier/
 import { renderFacts } from "@/lib/ask/facts";
 import { noteText, rejectCrossSite, safeMessage } from "@/lib/guard";
 import { maxRunUsd, outputRoom, runUsd } from "@/lib/dossier/cost";
-import { EFFORTS, runModelTask, type Effort, type Source, type Usage } from "@/lib/dossier/run";
+import { EFFORTS, type Effort, type Source, type Usage } from "@/lib/dossier/run";
+import { runRouted } from "@/lib/llm/route";
+import { diskGet, diskSet } from "@/lib/dossier/diskcache";
 import { refusalFor, REFUSAL_TEXT } from "@/lib/machiavelli/guard";
 import { manifestHash } from "@/lib/deep/consolidate";
 import { loadResearch } from "@/lib/deep/research";
@@ -46,7 +48,7 @@ export const POST = withBatch(async function POST(req: Request) {
         send({ type: "status", text: "Collecting the shared evidence base…" });
         const [c, snap, res] = await Promise.all([loadCase(iso3), loadSnapshot(iso3).catch(() => null), loadResearch(iso3).catch(() => null)]); if (!c) { send({ type: "error", error: "not_found", message: "Unknown country." }); return finish(); }
         const manifest = manifestHash(snap, null, iso3); key = deskKey(product, iso3, o, manifest, context);
-        const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit, agents: hit.agents.map((a: CallOut) => ({ ...a, text: "" })) }); return finish(); }
+        const hit = cache.get(key) ?? (refresh ? null : diskGet<Done>(key, TTL)); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit, agents: hit.agents.map((a: CallOut) => ({ ...a, text: "" })) }); return finish(); }
         if (pool.running.has(key)) { send({ type: "error", error: "busy", message: "This is already being written. Try again in a minute." }); return finish(); }
         pool.runs = pool.runs.filter((t) => Date.now() - t < 3600_000); const lim = directive ? MAX_DIRECTIVES_PER_HOUR : hourlyCap(MAX_PER_HOUR);
         if (pool.runs.length >= lim) { send({ type: "error", error: "limit", message: `Limit of ${lim} new ${directive ? "directives" : "detailed briefings"} per hour reached (${directive ? "DESK_MAX_DIRECTIVES_PER_HOUR" : "DOSSIER_MAX_PER_HOUR"}). Cached results are still free.` }); return finish(); }
@@ -67,7 +69,7 @@ export const POST = withBatch(async function POST(req: Request) {
         const run1 = async (x: Call, cap?: number, spentAt?: number) => {
           send({ type: "agent", id: x.id, status: "start" });
           try {
-            const r = await runModelTask({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: x.fetches ?? 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 2 ? CAP : x.stage === 1 ? CAP - revReserve : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * (plan.finalReserve ?? FINAL_RESERVE) : 0) - revReserve), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => (spentAt !== undefined ? spentAt : spent + siblings(x.id)), onSpend: spentAt === undefined ? (v) => inflight.set(x.id, v) : undefined, reserveUsd: x.stage === 0 ? 0.03 : x.stage === 1 ? 0.05 : 0.01 }); // each tier keeps back only what its own input and searches still need, so a share smaller than the default 0.15 does not shrink to the 1,500-token floor
+            const r = await runRouted({ client, model: MODEL, system: plan.system, firstText: base, roleText: x.role(out), budget: { maxTokens: x.maxTokens, searches: x.searches, fetches: x.fetches ?? 0, fetchTokens: 8000 }, effort: effort(x), maxUsd: cap ?? (x.stage === 2 ? CAP : x.stage === 1 ? CAP - revReserve : CAP - (fin ? worstOf(fin.maxTokens, fin.searches) * (plan.finalReserve ?? FINAL_RESERVE) : 0) - revReserve), signal: ac.signal, send: (e) => send({ ...e, agent: x.id }), label: `desk-${product}-${x.id}`, spentBefore: () => (spentAt !== undefined ? spentAt : spent + siblings(x.id)), onSpend: spentAt === undefined ? (v) => inflight.set(x.id, v) : undefined, reserveUsd: x.stage === 0 ? 0.03 : x.stage === 1 ? 0.05 : 0.01 }, x.stage === 0 ? "sitting" : x.stage === 1 ? "chief" : "audit"); // each tier keeps back only what its own input and searches still need, so a share smaller than the default 0.15 does not shrink to the 1,500-token floor
             const usd = r.usage.usd ?? runUsd(r.usage, MODEL); r.usage.usd = usd; inflight.delete(x.id); spent += usd; for (const k of ["input", "output", "cacheRead", "cacheWrite", "searches", "fetches"] as const) total[k] += r.usage[k]; total.usd = spent;
             for (const s of r.sources) if (!seen.has(s.url)) { seen.add(s.url); sources.push(s); }
             const start = r.report.search(/^#{1,3} /m); const text = (start > 0 && x.stage === 0 ? r.report.slice(start) : r.report).trim(); out[x.id] = text;
@@ -93,7 +95,7 @@ export const POST = withBatch(async function POST(req: Request) {
         const ordered = plan.calls.map((x) => results.find((r) => r.id === x.id)).filter((x): x is CallOut => !!x);
         const known = new Set(gathered.facts.map((f) => f.id)); const report = checkRefs(plan.compose(ordered.map((r) => ({ id: r.id, text: r.text }))), known); const cited = new Set(citedIds(report));
         const done: Done = { product, report, agents: ordered, sources, usage: total, at: new Date().toISOString(), model: MODEL, options: { ...o, kind: product, context: undefined }, name: gathered.name, manifest, facts: gathered.facts.filter((f) => cited.has(f.id)).map((f) => ({ id: f.id, kind: f.kind, text: f.text.slice(0, 1600), src: f.src, url: f.url })) };
-        if (ordered.some((a) => a.status === "done")) { cache.set(key, done); while (cache.size > 30) cache.delete(cache.keys().next().value as string); } else refund();
+        if (ordered.some((a) => a.status === "done")) { cache.set(key, done); diskSet(key, done); while (cache.size > 30) cache.delete(cache.keys().next().value as string); } else refund();
         send({ type: "done", cached: false, ...done, agents: ordered.map((a) => ({ ...a, text: "" })) });
       } catch (e) {
         if (req.signal.aborted) return finish();

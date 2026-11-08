@@ -1,0 +1,44 @@
+import { REVIEWS } from "./fixtures";
+
+// A synthetic, complete Ministry's Council product for the synthetic country NOR, English or Arabic (test data, labelled as such, never written anywhere by the app).
+type Lang = "en" | "ar";
+const T = (L: Lang) => (en: string, ar: string) => (L === "ar" ? ar : en);
+export const MOFA_JSON = (L: Lang = "en") => { const t = T(L); return {
+  stance: { posture: "staged", headline: t("TEST FIXTURE: deepen ties in stages, behind dated gates, and keep the exit.", "بيانات اختبار: تعميق العلاقات على مراحل خلف بوابات مؤرخة مع إبقاء المخرج."), rationale: t("The relationship is strong but the terms are unknown; staging limits liability while keeping options open.", "العلاقة قوية لكن الشروط مجهولة؛ والتدرج يحدّ من التبعة ويُبقي الخيارات مفتوحة.") },
+  priorities: [
+    { id: "P1", rank: 1, title: t("Secure the port and rail corridor", "تأمين ممر الموانئ والسكك"), interest: "economic", why: "The corridor is the UAE's largest exposure.", horizon: "12 months", owner: "Economic Affairs", evidence: ["F1", "F2"] },
+    { id: "P2", rank: 2, title: "Protect the existing sovereign holding", interest: "security", why: "Governance rights are thin.", horizon: "6 months", owner: "Legal Affairs", evidence: ["F3"] },
+    { id: "P3", rank: 3, title: "Win support at the regional bank board", interest: "diplomatic standing", why: "Votes decide the co-financing.", horizon: "18 months", owner: "Political Affairs", evidence: [] },
+    { id: "P4", rank: 4, title: "Look after the community", interest: "citizens", why: "Consular exposure.", horizon: "ongoing", owner: "Consular Affairs", evidence: [] },
+  ],
+  goals: [
+    { id: "G1", priority: "P1", goal: "A signed concession with an exit clause", measure: "Concession signed", baseline: "No concession", target: "Signed", by: "Q4 2027", owner: "Economic Affairs", source: "Tender notice" },
+    { id: "G2", priority: "P1", goal: "A gated rail co-financing term sheet", measure: "Term sheet", baseline: "not established", target: "Initialled", by: "Q2 2027", owner: "Finance", source: "" },
+    { id: "G3", priority: "P2", goal: "Information rights restored", measure: "Rights in the shareholder agreement", baseline: "None", target: "In force", by: "Q1 2027", owner: "Legal Affairs", source: "" },
+    { id: "G4", priority: "P3", goal: "Three board votes pledged", measure: "Pledges", baseline: "0", target: "3", by: "Q3 2027", owner: "Political Affairs", source: "" },
+    { id: "G5", priority: "P4", goal: "A registered community list", measure: "Registrations", baseline: "not established", target: "", by: "", owner: "Consular Affairs", source: "" },
+  ],
+  mission: [
+    { id: "T1", priority: "P1", task: "Request the tender pack", who: "Commercial attaché", when: "Day 30", measure: "Pack on file", deliverable: "Pack" }, { id: "T2", priority: "P2", task: "Review the shareholder agreement", who: "Legal counsel", when: "Day 45", measure: "Review done", deliverable: "Memo" },
+    { id: "T3", priority: "P3", task: "Brief three board members", who: "Ambassador", when: "Day 90", measure: "Briefings held", deliverable: "" }, { id: "T4", priority: "P4", task: "Open the registration", who: "Consul", when: "Day 60", measure: "", deliverable: "" },
+  ],
+  plans: [
+    { domain: "political", aim: "Keep the channel open at every level.", actions: [{ action: "Call on the foreign ministry", owner: "Ambassador", when: "Week 1", measure: "Held" }, { action: "Brief the board members", owner: "Ambassador", when: "Day 90", measure: "Three briefings" }], risks: ["A change of government"], dependsOn: ["economic"] },
+    { domain: "security", aim: "Policy-level maritime safety only.", actions: [{ action: "Offer a maritime safety seminar", owner: "Defence attaché", when: "Month 4", measure: "Held" }], risks: [], dependsOn: [] },
+    { domain: "economic", aim: "Gate every commitment.", actions: [{ action: "Open the finance channel", owner: "Finance", when: "Day 30", measure: "Channel open" }, { action: "Screen partners", owner: "Compliance", when: "Day 60", measure: "Report" }, { action: "Prepare the term sheet", owner: "Finance", when: "Month 6", measure: "Initialled" }], risks: ["Reserve cover falls", "Rival terms"], dependsOn: [] },
+    { domain: "trade", aim: "Open supply lines.", actions: [{ action: "Host a delegation", owner: "Commercial attaché", when: "Day 45", measure: "Orders" }], risks: ["Quality"], dependsOn: ["economic"] },
+    { domain: "social", aim: "Scholarships and culture.", actions: [{ action: "Launch scholarships", owner: "Cultural attaché", when: "Month 8", measure: "50 scholars" }], risks: [], dependsOn: [] },
+  ],
+  reporting: [{ cadence: "Monthly", from: "Embassy", to: "Ministry", content: "Progress against goals" }, { cadence: "Quarterly", from: "Ministry", to: "Embassy", content: "Updated priorities" }],
+  watch: [{ indicator: "Reserve cover", signal: "Falling", threshold: "Under 3 months", action: "Update the brief" }, { indicator: "Tender notice", signal: "Published", threshold: "Any", action: "Open the bid file" }],
+  assumptions: ["Reserves hold above three months"], gaps: ["The terms of the rail concession"], decisionsAsked: ["Approve the staged posture"],
+  negotiation: [{ track: "Rail co-financing", aim: "A gated term sheet", ask: "Gates and an exit", offer: "Co-financing", leverage: "Existing stake", fallback: "Hold", redLine: "No sovereign guarantee", lead: "Finance", when: "Q2 2027" }, { track: "Shareholder rights", aim: "Information rights", ask: "Rights", offer: "Support", leverage: "Vote", fallback: "Escalate", redLine: "Dilution", lead: "Legal", when: "Q1 2027" }],
+  visits: [{ when: "Month 2", what: "Ministerial visit", level: "Minister", lead: "Under-Secretary", deliverables: ["Joint statement"], prep: ["Terms note", "Briefing pack"] }, { when: "Month 8", what: "Joint committee", level: "Director", lead: "Ambassador", deliverables: [], prep: [] }],
+  talking: [{ topic: "The corridor", point: "The UAE supports open, rules-based access.", evidence: "F4", avoid: "Any mention of guarantees" }, { topic: "Scholarships", point: "A proposal for 50 places.", evidence: "", avoid: "" }],
+  legal: [{ instrument: "Bilateral investment treaty", status: "in force", aim: "Protect investors", steps: ["Check the text"], owner: "Legal", by: "Q1", risk: "" }, { instrument: "Double taxation agreement", status: "pending", aim: "Avoid double tax", steps: ["Ratify"], owner: "Finance", by: "Q3", risk: "Delay" }, { instrument: "Air services agreement", status: "missing", aim: "Open routes", steps: ["Open talks"], owner: "Transport", by: "2028", risk: "" }, { instrument: "Extradition treaty", status: "not held", aim: "Judicial cooperation", steps: [], owner: "", by: "", risk: "" }],
+}; };
+const STD_M = (L: Lang) => { const t = T(L); return { asOf: "2026-10-29", changed: ["No earlier report on file"], soWhat: t("TEST FIXTURE: staging keeps the UAE's corridor and holding options alive while the terms are unknown.", "بيانات اختبار: التدرج يُبقي خيارات الممر والحصة قائمة بينما الشروط مجهولة."), angles: [{ id: "political", status: "covered" }, { id: "standing", status: "covered", note: "Board votes" }, { id: "economic", status: "covered" }, { id: "legal", status: "thin" }, { id: "military", status: "thin" }, { id: "tech", status: "not_found" }, { id: "ledger", status: "covered" }], coalition: [{ who: "Saudi Arabia", kind: "country", offer: "Joint financing", ask: "Board support", seat: "Regional bank board", owner: "Political Affairs" }], influence: [{ lever: "investment", move: "Gated rail co-financing", owner: "Finance", when: "Q2 2027", measure: "Term sheet initialled" }], scenarios: [{ kind: "base", likelihood: "likely", summary: "Terms arrive late.", trigger: "No terms note by 31 January", indicator: "Terms note", response: "Hold" }] }; };
+export const mofaReport = (L: Lang = "en"): string => { const t = T(L); return `# Foreign Policy Brief\n\n${t("TEST FIXTURE. Deepen in stages behind gates. [F1]", "بيانات اختبار. التعميق على مراحل خلف بوابات. [F1]")}\n\n# Priorities and Goals\n\nText.\n\n# Structured data\n\nNote.\n<mofa>\n${JSON.stringify({ ...MOFA_JSON(L), ...STD_M(L) })}\n</mofa>${REVIEWS()}`; };
+const saved = (report: string, L: Lang) => ({ report, sources: [{ url: "https://www.imf.org/x", title: "IMF" }], usage: { searches: 20, usd: 0.6, input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }, at: new Date(Date.now() - 3 * 86_400_000).toISOString(), model: "test-fixture", name: "Norway", options: { lang: L }, cached: false, product: "mofa-council", facts: [{ id: "F1", kind: "TEST", text: "Test fact", src: "fixture" }] });
+export const STORE: Record<string, unknown> = { "gd-desk:mofa-council:NOR": saved(mofaReport("en"), "en") };
+export const STORE_AR: Record<string, unknown> = { "gd-desk:mofa-council:NOR": saved(mofaReport("ar"), "ar") };

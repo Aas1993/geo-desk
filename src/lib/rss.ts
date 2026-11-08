@@ -14,7 +14,7 @@ export function parseRss(xml: string, outlet: string, max: number): Headline[] {
   for (const it of items.slice(0, max)) {
     const title = it.match(/<title[^>]*>([\s\S]*?)<\/title>/)?.[1]; const link = it.match(/<link[^>]*>([\s\S]*?)<\/link>/)?.[1] ?? it.match(/<link[^>]*href="([^"]+)"/)?.[1];
     const date = it.match(/<(?:pubDate|dc:date)[^>]*>([\s\S]*?)<\/(?:pubDate|dc:date)>/)?.[1];
-    if (!title || !link) continue;
+    if (!title || !link || !/^https?:\/\//i.test(dec(link))) continue;
     const ts = date ? Date.parse(dec(date)) : NaN;
     out.push({ outlet, title: dec(title), link: dec(link), ts: isFinite(ts) ? ts : Date.now() });
   }

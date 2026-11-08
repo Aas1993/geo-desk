@@ -1,0 +1,123 @@
+# Platform audit, 29 October 2026
+
+Scope: every page and free API route, every paid agent and prompt, every score and index, every report template, duplication of features and of agents, and an audit of the auditor (this session's own work). Method and results below; what could not be verified is stated at the end and is not rounded up.
+
+## 1 Smoke test (live dev server)
+
+58 requests: 11 pages, 29 GET routes, 15 POST routes with an empty body, 3 guard probes.
+- **Pages**: 11 of 11 return 200; no console error on the World map, Case File, Falcon, Deep, Machiavellian, THE KING, The Ambassador or Influence. Markets shows five 503s because `TWELVEDATA_API_KEY` is not set (known; prices need a key).
+- **Case File**: all five views and every Detailed sub-tab render; all seven report templates render with no `NaN`, `undefined` or `[object` and the right headings.
+- **Free routes**: all answer; slowest `/api/case/board` (about 2.6 s for 200 countries, then cached) and `/api/deep/research` (about 2.2 s).
+- **Failures that are not bugs**: wrong parameters used by the probe (`/api/media/EGY` needs `part`, `/api/trade/EGY` a number, two invented layer ids), markets without a key.
+- **Guards**: cross-site POST 403, non-JSON POST 415, a request for covert action and a militia refused with 400 at no cost, bad bodies 400 on the desk, council and architect routes.
+- **Incident, disclosed**: the probe posted an empty body to every AI route. `/api/prep`, `/api/world-brief`, `/api/media/.../stance` accepted it and ran their small no-tool briefs (9 to 27 s each), and `/api/dossier` started a run that I cancelled by closing the stream. That is an unintended spend, I estimate under US$1 in all (not measured), and it is my error: a probe must never post to a paid route. The routes themselves behave as designed (click-started, same-origin, capped).
+
+## 2 Inventory and duplication
+
+Paid products that answer "what should the UAE do about this country": **seven**. Role families repeat across them.
+
+| Module | Agents | Role |
+|---|---|---|
+| Strategic Council (Case File) | 20 seats in 8 calls | Evidence-first judgment; the canonical start |
+| Statecraft Architect | 6 + auditor | Master strategy and roadmap |
+| THE KING | 10 + Chair + auditor | The head of state's decision |
+| Embassy council | 13 desks + Chief + inspector | Execution for the ambassador |
+| Falcon Council | 10 | Country or scope analysis |
+| Strategy Council (Machiavellian) | 19 seats in 7 calls | Influence-instrument strategy |
+| Deep analyst team | 6 | Economic and research evidence consolidation |
+
+Repeated role families (count of role or seat definitions across the products): red team or challenger 8, verifier 6, geopolitics 6, economy and finance 9, security 7, foresight 8. Four of the seven end in an independent verifier or red team by design.
+
+**Findings**
+1. *Functional duplication*: the Strategic Council, the Falcon Council, the Machiavellian council and THE KING all answer a country-level decision question with overlapping specialists. A user running all four would pay about US$2.7 for four overlapping answers.
+2. *Index duplication*: six indices measure parts of the same relationship (Partnership Index, Country Scorecard, Influence Scorecard and its new final score, the Case File posture rule, the Falcon radar score, the Deep exposure score). Measured rank agreement: final score vs Partnership Index 0.97, final vs Country Scorecard 0.94, Partnership vs Country Scorecard 0.92.
+3. *Two recommendations on one page*: THE KING shows the Council's call and the national-interest scorecard's recommendation. They can differ; the page says so, which is honest but is one decision shown twice.
+
+**Decisions taken (non-destructive; no feature removed)**
+- One decision path is now stated in the product: Strategic Council, then the Architect (strategy), then THE KING (decision), then the Embassy (execution). The Reports page lists it with costs. The Falcon and Machiavellian councils and the Deep team remain for scope-level and influence-instrument questions and as annexes.
+- THE KING and the Embassy read each other's saved work and the Strategic Council's digest instead of repeating it.
+- The Influence final score is documented as a multi-pillar summary that mostly tracks the Partnership Index (rho 0.97): both remain, with the finding recorded rather than hidden; the benchmark panel reports it as redundancy.
+
+**Recommended, needs the owner's decision** (not done, because the standing rule is to remove no feature unasked): fold the Falcon Council's country mode into the Strategic Council; fold the Machiavellian council's instrument analysis into the Architect as a lens; retire the separate Partnership Index display in favour of one relationship index.
+
+## 3 The bar for agents and prompts
+
+One bar, tested in `src/lib/audit.test.ts` (it runs in `npm test`): every system prompt must name the UAE's interest, require fact ids, name think tanks, wire and news sources, put official and primary sources first, name published intelligence-community assessments as public documents only (ODNI Annual Threat Assessment, the National Intelligence Council's Global Trends, the CIA World Factbook, UN panels), state that social media has no compliant access, use the UAE's own strategy and precedents, require likelihood bands with a separate confidence, assumptions, alternatives and dissent, indicators with thresholds, the boundary (no covert action, proxies or coercion), "not estimated" for unevidenced costs, and stated collection gaps.
+- **Before**: five of seven prompts failed three items (think tanks, intelligence-community assessments as public documents, the social-media limit). **After**: all seven pass; one shared source plan (`src/lib/sources.ts`) is appended to each, so no agent is briefed to a lower standard.
+- Every roster has unique, bilingual names; every THE KING specialist and every embassy desk has a mandate, at least four questions it must answer and starting sources.
+- Honest limit: the CIA and NSA publish few products; the platform has no classified or signals access and says so. "Like CIA and NSA" means the published tradecraft (ICD 203 as a method), not their sources.
+
+## 4 Checks and balances before a product is compiled
+
+| Product | Independent checker |
+|---|---|
+| Strategic Council | evidence audit and red team call, council debate |
+| Statecraft Architect | **new**: Strategy Auditor (Deliverable 7) |
+| THE KING | red-team specialist K7; **new**: Decision Auditor |
+| Embassy plan | **new**: Plan Inspector |
+| Embassy intelligence | no reviewer (cost: the sitting already runs near US$0.9); the quality gate and the compliance desk E13 stand in |
+| Falcon, Machiavellian, Deep | verifier and challenger |
+
+The new reviewers read the writer's finished product, do not search, do not rewrite, run last and return a verdict (approve, revise, reject), ranked issues with a fix, unsupported claims, boundary flags, contradictions and what is still missing. The **Quality check** (free, `src/lib/quality/gate.ts`) runs 15 to 20 rule checks on THE KING, the embassy intelligence and the plan: completeness of the structured data (cut-off output is detected and flagged), fact-id density, unverified references, the mix of official, think-tank and news sources, plan integrity (unique ids, resolvable dependencies, owners, KPIs, due diligence for any company, deal or agreement, uncited costs), the boundary, and language. It scores 0 to 100 and shows failures first.
+
+## 5 Scores and indexes benchmarked
+
+The Influence page gained a validation panel (`src/lib/machiavelli/benchmarks.ts`): eight rank-correlation checks and one anchor check, with bounds written before the results. Result: **8 of 9 held**. The one that did not: the final score against the Partnership Index (rho 0.97, above the 0.95 redundancy bound): a finding, not tuned away. One bound was revised after the first run (bilateral-trade pillar against trade volume, from 0.8 to 0.7) because three of its five criteria deliberately do not track size; the revision is stated on the panel. The anchor check (the UAE's 15 largest trading partners in the top 30 of 200) passes with 13 of 15; the two outside are Thailand (34) and Hong Kong (61), likely because their trade with the UAE runs through re-exports and finance (not tested). External composite indices (Brand Finance, Lowy, Soft Power 30, Nation Brands) are licensed and not held; the six Brand Finance ranks already on file remain the only external ranks. Ingesting any of them needs its licence checked first.
+
+## 6 New: non-friendly states
+
+A tab on the Influence page (`src/lib/machiavelli/hostility.ts`, `/api/machiavelli/hostility`, `public/data/tension-register.json`). Four core signals must agree (bilateral events with the UAE, UN voting divergence, sanctions exposure per GDP, trade without engagement); bilateral tone and conflict count as one signal because they share their source; a worsening trend is shown and not counted; one signal is never listed; countries with no relationship data are excluded because distance is not hostility. A short analyst-maintained register of documented disputes (two entries, both flagged "source to verify") can raise a state to adversarial only when a measured signal agrees. Today: 1 adversarial (Iran), 1 documented tension (Sudan, no measured signal), 3 on watch (Australia, Algeria, Yemen). It is a prompt for analysts and for protective planning, never a designation, and carries the boundary.
+
+## 7 Scorecard changes this week
+
+Bilateral trade pillar and four more pillars (investment and capital, political alignment, governance and stability, market size and growth) with evidence; a final score per country (mean of ten pillars) and the average over all 200 countries (1.77), the trade-weighted average (2.85) and the average by pillar; the Case File country scorecard gained a twelfth aspect (bilateral trade) and criteria (unemployment, reserves, non-performing loans). Data rebuilt on 28 October from live sources.
+
+## 8 Audit of the auditor (this session's own work)
+
+Bar applied to my own deliverables: does it run, is it tested, is it honest about limits, does it cost what it says, does it repeat something that exists.
+- An independent review of the desk engine found 25 defects; the high and medium ones were fixed and covered by tests (commit dfa0397).
+- Things I got wrong and corrected: a million-fold unit error in the UAE history panel and the investment-stock text; plan prompt and output limit (the Chief's JSON was cut off); the smoke-test spend above; a first hostility model that flagged micro-states and Australia (rebuilt around independent signals).
+- Open: the reviewers, the shared source plan and the trimmed budgets have not been run live since they were written (the account's spend limit was hit during the earlier review, and I did not start more paid runs); their cost is estimated, not measured. Arabic runs have not been run end to end. The tension register's two entries are unverified. Markets prices need a key. The embassy intelligence sitting has no independent reviewer.
+
+## 9 Addendum, 30 October 2026: the reviewer pair, the Ministry, the Ambassador's attachés and The Room
+
+Requested: two extra agents that review every multi-agent product from a geopolitical and statecraft auditor's background and red-flag whatever is not real or does not serve the UAE; a dynamic round-table dashboard; a separate tab for the Ministry of Foreign Affairs' organisation with role agents that think from the Ministry's perspective for each country; attaché agents for the ambassador.
+
+**Reviewer pair** (`src/lib/review/`): the single reviewers (Decision Auditor, Plan Inspector, Strategy Auditor) were replaced by the same two independent auditors everywhere. The Statecraft Auditor tests the product against the UAE's interests, master strategy, others' likely moves, leverage and realism, alternatives, exposure and the boundary, with a product-specific checklist; the Reality Auditor tests every consequential fact, figure, name and date for traceability, currency, invention, consistency, calibration, source quality and honest gaps, and may use two searches to verify what the facts do not settle. Both return a verdict, a standing, ranked issues and red flags (shown first; a critical one caps the quality grade at D). Coverage: THE KING, embassy intelligence (it had none), embassy plan, Architect, Strategic Council, Falcon, Machiavellian council, Deep team and the Ministry's council. Not audited, on purpose: directives, questions and updates (a third of the cost, not compiled products). The pair is written once (`pair.ts`) and run by one server step (`run.ts`) for the four older council routes, and as stage-2 calls in the desk engine; each pair reserves money first and skips honestly if the ceiling would not allow it.
+
+**The Ministry** (`/mofa`): thirteen role-agents, an Under-Secretary and the pair; ranked priorities, goals with measures, mission tasks, seven-domain plans, a progress tracker and updated briefs; a live org chart of 22 public functions. Limits stated on the page: the published chart is an image that could not be read, titles may differ, no named person is represented, goal bars match owners to roles by words (an approximation), statuses live in this browser.
+
+**The Ambassador**: 13 desks became 17 (Chief of Strategy, Chief Partnerships Officer, Trade Attaché, Education and Science Attaché added; FDI, Commercial and Consular desks named as the attaché roles they are; education taken out of the culture desk so it sits in one place). The embassy council now reads the Ministry's priorities when they are on file. Sections are shorter per desk because the token budget did not grow (the worst-case test caps a sitting under US$1.25).
+
+**The Room** (`/room` and the live table on each council page): seats drawn from the councils' own rosters; live while a run sits, per-country from saved products elsewhere.
+
+**Audit of the audit:** tests added (`src/lib/mofa.test.ts`; the desk, audit and architect suites extended: pair prompts for every product and both lenses, red-flag parsing, the grade cap, the roster of 17 desks with one owner for education, the MOFA parser, composer, digest and gate, the org map's integrity, the tracker, the seats and their layout, and the pair's no-spend paths). Found and fixed on the way: a duplicate Under-Secretary card, a hydration mismatch from floating-point seat positions, an org node with no agent, routing that sent education questions to the culture desk. **Found live and fixed:** the first Ministry run (US$0.77) wrote only the first role of each parallel sitting. Cause: a parallel sitting's share of the money was about US$0.13, and `outputRoom` subtracts a fixed US$0.15 reserve, so the output room fell to the 1,500-token floor and each sitting was cut off after one section. The reserve is now a per-call option (`reserveUsd`: 0.03 for sittings, 0.05 for the final writer, 0.01 for the auditors), the Ministry's sittings were resized to what they can really spend, and the second live run (US$0.80) wrote all thirteen roles, closed both auditors' JSON and scored grade C (the Reality Auditor red-flagged a premise resting on one unverified headline; no think-tank source was found, so the source-mix check failed, which is the honest result). The same reserve applied to THE KING and the embassy sittings, which now also get their full share, but they have not been re-run live since. The auditors also asserted once that "no web research was run"; their prompts now say they cannot see the sittings' searches. Open: Arabic end to end is still untested; the tension register entries are still unverified; the King, embassy and Architect runs with the pair have not been run live.
+
+## 10 Addendum, 30 October 2026, second round: expert standard, security triad, SME attaché, embassy gaps
+
+Requested: every agent a PhD-level subject-matter expert, effective, to the point, evidenced and working for the UAE's national interest; the embassy at a round table with two auditors; a National Security, an Energy Security and a Food Security agent on every council; an SME promotion agent; and embassies to recommend trade and investment gaps, UAE companies that can expand, sectors the UAE can support and companies that could set up in the UAE.
+
+**Done:** one `EXPERT_STANDARD` in every system prompt (enforced by test; the Falcon Council prompt was found to lack the shared source plan and now has it); the triad on nine councils from one definition (`src/lib/desk/triad.ts`), with the overlapping old seats narrowed so no topic has two owners; E18 SME Promotion Attaché and 21 embassy desks in five intelligence and four plan sittings; the new Trade and Investment Gaps section, structured data, quality check and tab; the round table on the Ambassador and THE KING.
+
+**Found live and fixed:** the first 21-desk embassy run cost US$0.86 but the Chief of Staff was cut off at the cost ceiling and both auditors were skipped, because ten web searches (every search a group is given is spent) and the cold-cache first sitting left too little. Searches were cut to five, the final writer's reserve raised from 0.9 to 1.15 of its worst case, and the King's and the Ministry's search budgets trimmed to match; the second run (US$0.94) completed all 21 desks, the Chief's structured data (6 gaps, 5 sectors, 5 inbound companies, 4 SME moves) and both auditors. One sitting (the last of the education attaché's) was still cut at its share; Education moved to a sitting with more room, which has not been re-run. The worst-case test bound was raised from 1.25 to 1.5 (the flat US$0.08 input per call is pessimistic; measured costs run at about 65 to 75% of it).
+
+**Open:** THE KING, the Ministry (16 roles) and the Case, Falcon, Machiavelli and Deep councils with the triad have not been run live; Arabic end to end; the embassy plan sitting with four groups and the new desks.
+
+## 11 Addendum, 30 October 2026, third round: PDF reports, the Archive and the Bird's Eye view
+
+Requested: a consolidated PDF brief after every agent product (the Ministry first, then every AI product on every tab, and each embassy research and strategy), all PDFs saved in an archive tab, a last "bird's eye" tab consolidating every tab, and (mid-round) that the bird's eye view run all the agents and tabs for a country when nothing is on file and fill in whatever is missing.
+
+**Done:** automatic and on-demand PDFs (real PDF files, Arabic right-to-left) with cover, red flags, consolidated brief, structured annex and sources; the Archive (IndexedDB) with search, filters, open, download, delete and zip; `/bird` built by rules from what is saved plus the free Case File data, with a readiness score; "Complete the picture" for nine councils with a list, an estimate, one explicit click, dependency order, hourly-cap waiting and an archived bird's-eye PDF at the end. Tests: `bird.test.ts` (consolidation, PDF text and annex, source reading by key, the plan, order, estimate and request bodies).
+
+**Found live and fixed:** the first archived PDFs of the embassy and Ministry products left out everything that lives only in the structured data (the power map, companies, gaps, plans), so the PDF layout is versioned and a stored PDF made by an older layout is made again. The hydration console errors seen on `/archive` were stale development-server output; a fresh tab and the server HTML are clean.
+
+**Honest limits:** the PDFs are pictures of the page (text is not selectable, as with the existing Case File PDF); the Archive is per browser and per device; "Complete the picture" covers the nine councils and not the dossier family (which needs a counterpart, a meeting and other choices from the person), the stock research notes or the world brief; at the hourly cap of four full sittings a blank country takes more than two hours; it has not been run end to end on a blank country (about US$5 to 8), only its list, estimate, requests and plan were tested.
+
+## 12 Addendum, 30 October 2026, fourth round: the audit of the Bird's Eye brief
+
+Requested: audit agents (two or three) to check the Bird's Eye brief before publishing and ensure the data is correct and in line. Built: a Consistency Auditor added to the Statecraft and Reality pair (`BIRD_AUDITORS`), a digest of the source products, a route that runs the three under the US$1.00 ceiling, a fingerprint so a changed brief is shown as not audited, an audit section (or a NOT AUDITED notice) in the PDF, a confirmation on the PDF button, and an automatic audit at the end of "Complete the picture".
+
+**The audit worked on its first live run (Egypt, US$0.44, estimate raised from 0.25 to 0.45) and caught defects in my own brief:** the UAE's share of Egypt's trade printed as 370% (a percentage multiplied by a hundred), fact ids copied from different products that point to different facts in each, and "the tabs agree" and a 63% readiness that overstated a base of two of nine products. All three were fixed and covered by tests (agreement needs all three decision readings, ids are stripped from quoted text). The auditors also found weaknesses in the underlying products (a top priority resting on headline-only reports, an IMF date with no primary source), which stay flagged in the PDF rather than edited out. Open: the audit has run once, on a brief built from two products; the automatic audit after a full "Complete the picture" has not been run.
+
+
+**Round 5 quality audit (batch versus streamed, Egypt, paid runs):** the batch Case council cost the same as the streamed one in the log (US$0.835 against 0.83) only because the price factor was not applied (see the correction in PLATFORM-GUIDE.md); the batch embassy run skipped its chief and auditors for the same reason. Both are fixed and tested. Streamed after the fixes: Case council 136 s, US$0.81, 30.4k output tokens, debate still skipped by the cost planner (as before), both auditors ran; embassy intelligence 154 s, US$0.91, 45.7k output tokens, 105.8k characters (113.1k before), all five sittings finished, chief and both auditors ran (the reality auditor was stopped at the cost limit near its end). Not measured: a completed batch run after the fix (15 to 40 minutes), Arabic.

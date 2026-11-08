@@ -1,0 +1,37 @@
+"use client";
+import { useStore, useT } from "@/lib/store";
+import { LAYERS, isData } from "@/lib/layers/registry";
+import { useLayerStats } from "@/lib/layers/stats";
+import { allowedKeys } from "./DataLayers";
+import { useYesterday, yesterdayNow } from "./RasterLayers";
+
+/** Bottom-right key for every switched-on data layer: colour dot, name and live count. */
+export function Legend() {
+  const { t, lang } = useT(); const on = useStore((s) => s.layers); const filters = useStore((s) => s.filters); const win = useStore((s) => s.timeWindow); const stats = useLayerStats((s) => s.layers);
+  const active = LAYERS.filter((l) => isData(l) && on[l.id] && l.sub); const members = LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "members"); const choro = LAYERS.filter((l) => isData(l) && on[l.id] && l.kind === "choropleth"); const date = useStore((s) => s.imageryDate); const setDate = useStore((s) => s.setImageryDate);
+  const imagery = !!on.imagery; const latest = useYesterday(); const day = date ?? latest ?? "";
+  const shift = (n: number) => { if (!day) return; const d = new Date(day + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); const v = d.toISOString().slice(0, 10); if (v <= yesterdayNow() && v >= "2012-01-19") setDate(v); };
+  if (!active.length && !imagery && !choro.length && !members.length) return null;
+  return (
+    <aside aria-label={t("legend")} className="glass anim-rise absolute bottom-16 end-[76px] z-20 hidden max-h-[46vh] w-[230px] overflow-y-auto rounded-[14px] p-3 sm:block scroll-thin">
+      <div className="label mb-2 flex items-center justify-between"><span>{t("legend")}</span>{win !== "all" && <span className="num rounded bg-bg3 px-1.5 text-t1">{win}</span>}</div>
+      {imagery && <div className="mb-2"><div className="mb-1 text-[11.5px] font-semibold text-t1">{lang === "ar" ? "صور ناسا VIIRS بالألوان الحقيقية" : "NASA VIIRS true colour"}</div><div className="flex items-center gap-1"><button onClick={() => shift(-1)} aria-label={lang === "ar" ? "اليوم السابق" : "Previous day"} className="grid size-7 place-items-center rounded-md bg-bg3 text-t1 hover:text-t0">‹</button><input type="date" value={day} min="2012-01-19" max={latest ?? undefined} onChange={(e) => e.target.value && setDate(e.target.value)} className="num h-7 flex-1 rounded-md border border-line bg-bg2 px-2 text-[12px] text-t0 outline-none" /><button onClick={() => shift(1)} aria-label={lang === "ar" ? "اليوم التالي" : "Next day"} className="grid size-7 place-items-center rounded-md bg-bg3 text-t1 hover:text-t0">›</button></div></div>}
+      {choro.map((l) => (
+        <div key={l.id} className="mb-2">
+          <div className="mb-1 text-[11.5px] font-semibold text-t1">{lang === "ar" ? l.ar : l.en}</div>
+          {l.legend ? <ul className="space-y-1">{l.legend.map((x) => <li key={x.label} className="flex items-center gap-2 text-[12px] text-t0"><i className="size-2.5 rounded-sm" style={{ background: x.color, opacity: 0.85 }} /><span className="flex-1 truncate">{lang === "ar" ? x.ar : x.label}</span></li>)}</ul> : <>
+            <div className="h-2 rounded-full" style={{ background: `linear-gradient(90deg, ${l.color}0f, ${l.color}a0)` }} />
+            <div className="num mt-1 flex justify-between text-[11px] text-t2"><span>1</span><span>{stats[l.id]?.byKey.max != null ? new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(stats[l.id].byKey.max) : "…"}</span></div></>}
+        </div>))}
+      {!!members.length && <div className="mb-2"><ul className="space-y-1">{members.map((l) => (
+        <li key={l.id} className="flex items-center gap-2 text-[12px] text-t0"><i className="size-2.5 rounded-sm" style={{ background: l.color, opacity: 0.8 }} /><span className="flex-1 truncate">{lang === "ar" ? l.ar : l.en}</span>{stats[l.id]?.total ? <span className="num text-[11px] text-t2">{stats[l.id].total}</span> : null}{stats[l.id]?.byKey.wd ? <span title={lang === "ar" ? "قائمة من ويكي بيانات؛ وقد يغيب عضو أو اثنان" : "List from Wikidata; may be missing a member or two"} className="text-[11px] text-t2">*</span> : null}</li>))}</ul>
+        {members.some((l) => stats[l.id]?.byKey.wd) && <p className="mt-1 text-[10.5px] leading-snug text-t2">{lang === "ar" ? "* من ويكي بيانات، وقد يغيب عضو أو اثنان" : "* from Wikidata, may miss a member or two"}</p>}</div>}
+      {active.map((l) => { const keys = allowedKeys(l, filters[l.id]); return (
+        <div key={l.id} className="mb-2 last:mb-0">
+          <div className="mb-1 text-[11.5px] font-semibold text-t1">{lang === "ar" ? l.ar : l.en}</div>
+          <ul className="space-y-1">{l.sub!.filter((s) => keys.includes(s.key) || s.children?.some((c) => keys.includes(`${s.key}:${c.key}`))).map((s) => (
+            <li key={s.key} className="flex items-center gap-2 text-[12px] text-t0"><i className="size-2.5 rounded-full" style={{ background: s.color, boxShadow: `0 0 6px ${s.color}` }} /><span className="flex-1 truncate">{lang === "ar" ? s.ar : s.en}</span>{stats[l.id]?.byKey[s.key] != null && <span className="num text-[11px] text-t2">{stats[l.id].byKey[s.key]}</span>}</li>))}</ul>
+        </div>); })}
+    </aside>
+  );
+}

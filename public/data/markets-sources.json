@@ -1,0 +1,89 @@
+{
+ "built": "2026-10-30T15:10:48.300Z",
+ "primary": {
+  "id": "twelvedata",
+  "name": "Twelve Data",
+  "url": "https://twelvedata.com",
+  "role": "the only price, chart and fundamentals source on this page",
+  "basis": "licensed market-data vendor (an aggregator, not the exchange)",
+  "plan": {
+   "ADX": "Pro",
+   "DFM": "Ultra"
+  },
+  "note": "Prices are as the vendor delivers them; the page does not check them against the exchange."
+ },
+ "independentCheck": false,
+ "checks": [
+  {
+   "id": "adx",
+   "name": "Abu Dhabi Securities Exchange public site",
+   "url": "https://www.adx.ae/",
+   "status": "unavailable",
+   "checked": "2026-10-30",
+   "evidence": [
+    "GET adx.ae → HTTP 403",
+    "robots.txt → HTTP 200"
+   ],
+   "reason": "The site refuses non-browser clients (HTTP 403), and its Terms of Use prohibit systematic retrieval (read 16 August 2026 in the Pulse project). Programmatic access needs a commercial agreement with ADX, so no script reads it."
+  },
+  {
+   "id": "dfm-marketwatch",
+   "name": "Dubai Financial Market: Market Watch",
+   "url": "https://marketwatch.dfm.ae/",
+   "status": "unavailable",
+   "checked": "2026-10-30",
+   "evidence": [
+    "config.js → HTTP 200",
+    "feed gateway https://rfeed.dfm.ae/",
+    "single-sign-on login configured"
+   ],
+   "reason": "Market Watch is a streaming application: its prices arrive through a feed gateway (rfeed.dfm.ae) with a single-sign-on login for real-time data, and DFM publishes no API or reuse licence for it. DFM's site points data users to its list of licensed Market Data Providers, so it is not read by script."
+  },
+  {
+   "id": "dfm-historical",
+   "name": "Dubai Financial Market: Historical Data page",
+   "url": "https://www.dfm.ae/the-exchange/statistics-reports/historical-data",
+   "status": "unavailable",
+   "checked": "2026-10-30",
+   "evidence": [
+    "page → HTTP 200",
+    "0 downloadable CSV or Excel links in the served page"
+   ],
+   "reason": "The page is drawn in the browser from DFM's site backend. It offers no download link or published API, so there is no stable, documented way to read it by script."
+  },
+  {
+   "id": "dfm-disclosures",
+   "name": "Dubai Financial Market: disclosures feed (efsah)",
+   "url": "https://www.dfm.ae/the-exchange/news-disclosures/disclosures",
+   "status": "unavailable",
+   "checked": "2026-10-30",
+   "evidence": [
+    "feed → HTTP 200"
+   ],
+   "reason": "The feed is open but carries company disclosures only (filings, announcements, dividends), not prices, so it cannot check a quote. It could check dividend and corporate-action figures, which this page does not yet do."
+  },
+  {
+   "id": "cma",
+   "name": "Capital Market Authority (SCA) open data",
+   "url": "https://www.sca.gov.ae/en/open-data",
+   "status": "unavailable",
+   "checked": "2026-10-30",
+   "evidence": [
+    "Graphs and Statistics → HTTP 200",
+    "price or trading terms on the page: none"
+   ],
+   "reason": "The regulator's open data covers licensed companies, legal actions and violations. It holds no prices or trading statistics, and its Bayanat portal listing is the same set."
+  },
+  {
+   "id": "cbuae",
+   "name": "Central Bank of the UAE",
+   "url": "https://www.centralbank.ae/en/",
+   "status": "unavailable",
+   "checked": "2026-10-30",
+   "evidence": [
+    "site → HTTP 403"
+   ],
+   "reason": "The site refuses scripted requests (HTTP 403), and a central bank publishes monetary and banking statistics, not security prices, so it cannot check a quote in any case."
+  }
+ ]
+}

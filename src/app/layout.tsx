@@ -1,17 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Sans, Fraunces, IBM_Plex_Mono, IBM_Plex_Sans_Arabic } from "next/font/google";
+import { Inter_Tight, Space_Grotesk, JetBrains_Mono, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 
-const ui = Instrument_Sans({ variable: "--font-ui", subsets: ["latin"] });
-const serif = Fraunces({ variable: "--font-serif", subsets: ["latin"], axes: ["opsz"] });
-const mono = IBM_Plex_Mono({ variable: "--font-mono-ui", subsets: ["latin"], weight: ["400", "500", "600"] });
+const ui = Inter_Tight({ variable: "--font-ui", subsets: ["latin"] });
+const serif = Space_Grotesk({ variable: "--font-serif", subsets: ["latin"] }); // display face (class .display)
+const mono = JetBrains_Mono({ variable: "--font-mono-ui", subsets: ["latin"] });
 const arabic = IBM_Plex_Sans_Arabic({ variable: "--font-arabic", subsets: ["arabic"], weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
   title: "Geo Desk",
   description: "A live world map with a country dossier for every state — economy, trade, military, society and news.",
 };
-export const viewport: Viewport = { themeColor: "#0a0b0d", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#04070d", width: "device-width", initialScale: 1 };
 
 // Applies saved theme/language before paint so there is no flash.
 const boot = `try{var s=JSON.parse(localStorage.getItem('gd-prefs')||'{}');var d=document.documentElement;

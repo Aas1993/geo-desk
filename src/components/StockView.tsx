@@ -8,6 +8,7 @@ import { loadProvider, useApi } from "@/lib/markets/client";
 import { dash, dateShort, dir, price, sessionState, signed } from "@/lib/markets/format";
 import type { Bar, Fundamentals, Listing, Quote } from "@/lib/markets/types";
 import { Panel, Pending, ProviderBanner, Unavailable } from "./markets-ui";
+import { MarketSources } from "./MarketSources";
 import { PriceChart } from "./market-charts";
 import { ResearchTab } from "./ResearchTab";
 import { TvNote, TvWidget, tvSymbol } from "./TradingView";
@@ -45,7 +46,7 @@ export function StockView({ exchange, symbol }: { exchange: string; symbol: stri
   const synthetic = [quote, daily, head].some((x) => x.result?.ok && x.result.synthetic);
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { const t0 = setTimeout(() => setNow(new Date()), 0); return () => clearTimeout(t0); }, []);
-  const open = q?.marketOpen ?? (now ? sessionState(now).open : null);
+  const open = q?.marketOpen ?? (now ? sessionState(now, listing?.exchange === "QSE" ? "QSE" : "UAE").open : null);
 
   const chart = useMemo(() => {
     if (SEPARATE.includes(range)) { const a = alt.result?.ok ? alt.result.data : null; return a ? { full: a.bars, from: 0, interval: a.interval } : null; }
@@ -75,6 +76,7 @@ export function StockView({ exchange, symbol }: { exchange: string; symbol: stri
         </div>
       </header>
       <ProviderBanner synthetic={synthetic} />
+      <MarketSources />
       {err && err.error !== "no_key" && <Unavailable error={err.error} message={err.message} onRetry={quote.retry} />}
 
       <nav role="tablist" aria-label="Sections" className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto border-b border-line px-1">

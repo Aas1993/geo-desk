@@ -1,0 +1,66 @@
+// Builds public/data/graph.json: the Falcon Eye knowledge graph of the UAE and the world, assembled from the datasets the other builders write.
+// Nodes: countries, organisations, UAE entities, sectors, chokepoints, pipelines, sanctions lists and public office-holders. Edges are typed, weighted 0 to 1, carry a source, and state how far they can be trusted:
+//   verified: read directly from a dataset record (a trade total, an investment position, a membership list, a border, a sanctions entry, a WAM-announced deal);
+//   inferred: derived by a stated rule or analytical judgment (shared blocs, a chokepoint's adjacent countries from its description, the UAE's route exposure).
+// Hypothetical edges are never stored: they exist only inside a scenario lab output, which labels them. Public roles only; no private persons.
+// Usage: node scripts/build-graph.mjs   (run after the other builders)
+import { readFileSync, writeFileSync } from "node:fs";
+const D = (f) => JSON.parse(readFileSync(new URL(`../public/data/${f}`, import.meta.url), "utf8"));
+const countries = D("countries.json"); const regions = D("regions.json").countries; const orgs = D("orgs.json"); const trade = D("trade.json"); const inv = D("investment.json"); const deals = D("deals.json").items; const ag = D("agreements.json").countries;
+const miss = D("missions.json").countries; const fl = D("flights.json").countries; const visits = D("visits.json").items; const rivals = D("rivals.json"); const sanc = D("sanctions.json").countries; const leaders = D("leaders.json").countries;
+const straits = D("layers/straits.geojson").features.map((f) => f.properties); const pipes = D("layers/pipelines.geojson").features.map((f) => f.properties);
+const byIso = new Map(countries.map((c) => [c.iso3, c])); const valid = new Set(byIso.keys());
+const now = Date.now(); const cut = (d) => new Date(now - d * 86400e3).toISOString().slice(0, 10);
+const SRC = [
+  { id: "imts", name: "IMF International Trade in Goods (IMTS), UAE customs data", url: "https://data.imf.org" }, { id: "cdis", name: "IMF Direct Investment Positions (mirror data)", url: "https://data.imf.org" }, { id: "wam", name: "WAM headlines, rule-classified by Geo Desk", url: "https://www.wam.ae" },
+  { id: "mofa", name: "MOFA treaties and missions directory; Ministry of Foreign Trade cooperation map", url: "https://www.mofa.gov.ae" }, { id: "flights", name: "UAE airports' destination lists", url: "" }, { id: "orgs", name: "Wikidata and each organisation's own member list", url: "https://www.wikidata.org" },
+  { id: "countries", name: "Geo Desk country dataset (Wikidata, World Bank, UN M49)", url: "https://www.wikidata.org" }, { id: "rivals", name: "IMF IMTS mirror data over World Bank trade totals", url: "https://data.imf.org" }, { id: "sanctions", name: "OFAC SDN list and UN consolidated list", url: "https://sanctionssearch.ofac.treas.gov" },
+  { id: "leaders", name: "Wikidata office-holders (public roles)", url: "https://www.wikidata.org" }, { id: "layers", name: "Wikipedia and Wikidata chokepoint and pipeline reference layers", url: "https://www.wikidata.org" }, { id: "rule", name: "Geo Desk rule or analytical judgment (stated in the note)", url: "" },
+]; const S = Object.fromEntries(SRC.map((s, i) => [s.id, i]));
+const nodes = new Map(); const edges = [];
+const node = (id, t, n, extra = {}) => { if (!nodes.has(id)) nodes.set(id, { id, t, n, ...extra }); return id; };
+const edge = (a, b, r, p, w, s, v, x) => { if (!nodes.has(a) || !nodes.has(b)) return; edges.push({ a, b, r, p, w: Math.round(Math.min(1, Math.max(0.02, w)) * 100) / 100, s: S[s], ...(v ? { v } : {}), ...(x ? { x } : {}) }); };
+const ORG = { unga: "UN General Assembly", who: "WHO", itu: "ITU", wto: "WTO", opcw: "OPCW", au: "African Union", arableague: "Arab League", caricom: "CARICOM", cis: "CIS", coe: "Council of Europe", ecowas: "ECOWAS", oic: "OIC", oas: "OAS", osce: "OSCE", commonwealth: "Commonwealth", g7: "G7", fiveeyes: "Five Eyes", aukus: "AUKUS", quad: "Quad", gcc: "GCC", opec: "OPEC", opecplus: "OPEC+", brics: "BRICS", g20: "G20", eurozone: "Eurozone", eaeu: "EAEU", csto: "CSTO", ots: "Organization of Turkic States", arctic: "Arctic Council", schengen: "Schengen", eu: "EU", nato: "NATO", sco: "SCO", asean: "ASEAN", oecd: "OECD", mercosur: "Mercosur", unsc: "UN Security Council", icj: "ICJ", icc: "ICC", unesco: "UNESCO", fao: "FAO", ilo: "ILO", imo: "IMO", icao: "ICAO", wipo: "WIPO", imf: "IMF", isa: "ISA", itlos: "ITLOS", wbg: "World Bank Group", npt: "NPT", iaea: "IAEA", ecosoc: "ECOSOC" };
+const UNIVERSAL = new Set(["unga", "who", "itu", "wto", "opcw", "unesco", "fao", "ilo", "imo", "icao", "wipo", "imf", "wbg", "npt", "iaea", "ecosoc", "icj", "icc", "isa", "itlos"]); // near-universal bodies say nothing about alignment
+
+for (const c of countries) node(`C:${c.iso3}`, "country", c.name, { ar: c.nameAr ?? undefined, r: regions[c.iso3]?.region, sr: regions[c.iso3]?.subregion ?? undefined, p: c.population?.v ?? undefined });
+for (const [k, n] of Object.entries(ORG)) if (orgs.orgs[k]) node(`O:${k}`, "org", n);
+const members = (k) => new Set(orgs.orgs[k] ?? []);
+for (const [k, list] of Object.entries(orgs.orgs)) for (const iso of list) if (valid.has(iso) && nodes.has(`O:${k}`)) edge(`C:${iso}`, `O:${k}`, "member_of", "verified", UNIVERSAL.has(k) ? 0.15 : 0.5, "orgs");
+// UAE links
+const maxTrade = Math.max(...Object.entries(trade.countries).filter(([k]) => valid.has(k)).map(([, v]) => { const a = v.a.at(-1); return a ? a[1] + a[2] : 0; }));
+for (const [iso, v] of Object.entries(trade.countries)) { const a = v.a.at(-1); if (!valid.has(iso) || iso === "ARE" || !a) continue; const t = a[1] + a[2]; edge("C:ARE", `C:${iso}`, "trades_with", "verified", Math.sqrt(t / maxTrade), "imts", `US$${(t / 1000).toFixed(1)}bn in ${a[0]}`); }
+const maxInv = Math.max(...Object.values(inv.countries).map((v) => v.outward?.usd ?? 0));
+for (const [iso, v] of Object.entries(inv.countries)) if (valid.has(iso) && iso !== "ARE" && v.outward?.usd) edge("C:ARE", `C:${iso}`, "invests_in", "verified", Math.sqrt(v.outward.usd / maxInv), "cdis", `US$${(v.outward.usd / 1e9).toFixed(1)}bn stock (${v.outward.year})`);
+for (const [iso, v] of Object.entries(ag)) { const n = v.mofa.length + v.moft.length; if (valid.has(iso) && n) edge("C:ARE", `C:${iso}`, "has_agreements", "verified", Math.min(1, n / 25), "mofa", `${n} agreements and MoUs${v.cepa ? `; CEPA ${v.cepa.status}` : ""}`); }
+for (const [iso, v] of Object.entries(miss)) if (valid.has(iso) && v.length) edge("C:ARE", `C:${iso}`, "has_mission", "verified", Math.min(1, v.length / 3), "mofa", `${v.length} UAE mission(s)`);
+for (const [iso, v] of Object.entries(fl)) { const n = (v.counts?.active ?? 0) + (v.counts?.seasonal ?? 0); if (valid.has(iso) && n) edge("C:ARE", `C:${iso}`, "flies_to", "verified", Math.min(1, n / 15), "flights", `${n} direct destinations`); }
+const sen = {}; for (const x of visits) if (x.l >= 2 && x.d >= cut(365)) for (const c of x.c) sen[c] = (sen[c] ?? 0) + 1; for (const [iso, n] of Object.entries(sen)) if (valid.has(iso)) edge("C:ARE", `C:${iso}`, "senior_engagement", "verified", Math.min(1, n / 20), "wam", `${n} minister-level contacts in 12 months (headlines)`);
+for (const [k, list] of Object.entries(orgs.orgs)) if (list.includes("ARE") && nodes.has(`O:${k}`)) edge("C:ARE", `O:${k}`, "member_of", "verified", UNIVERSAL.has(k) ? 0.15 : 0.5, "orgs");
+// UAE entities, sectors and the countries they announce deals in
+const norm = (b) => (/^Abu Dhabi Fund for Development$/i.test(b) ? "ADFD" : b); const ent = {};
+for (const x of deals) for (const b0 of x.by) { const b = norm(b0); for (const c of x.c) if (valid.has(c)) { const e = ((ent[b] ??= {})[c] ??= { n: 0, last: "", sec: {} }); e.n++; if (x.d > e.last) e.last = x.d; if (x.sector) e.sec[x.sector] = (e.sec[x.sector] ?? 0) + 1; } }
+for (const [b, cs] of Object.entries(ent)) { node(`E:${b}`, "entity", b); edge(`E:${b}`, "C:ARE", "uae_entity", "verified", 0.9, "wam"); const secs = {}; for (const [c, e] of Object.entries(cs)) { edge(`E:${b}`, `C:${c}`, "announced_deals_in", "verified", Math.min(1, e.n / 8), "wam", `${e.n} deal headline(s), latest ${e.last}`, Object.keys(e.sec).sort((a, z) => e.sec[z] - e.sec[a])[0]); for (const [s, n] of Object.entries(e.sec)) secs[s] = (secs[s] ?? 0) + n; }
+  for (const [s, n] of Object.entries(secs)) { node(`S:${s}`, "sector", s); edge(`E:${b}`, `S:${s}`, "operates_in", "verified", Math.min(1, n / 12), "wam", `${n} headline(s)`); } }
+// competing powers' trade weight in each country
+const POW = rivals.countries; for (const [iso, v] of Object.entries(POW)) { if (!valid.has(iso)) continue; for (const x of v.list ?? []) if (x.c !== "ARE" && valid.has(x.c) && x.c !== iso) edge(`C:${x.c}`, `C:${iso}`, "trade_weight_in", "verified", Math.min(1, x.share / 30), "rivals", `${x.share}% of ${byIso.get(iso)?.name}'s trade (${rivals.year})`); }
+for (const c of countries) for (const b of c.borders ?? []) if (valid.has(b) && c.iso3 < b) edge(`C:${c.iso3}`, `C:${b}`, "borders", "verified", 0.6, "countries");
+node("L:OFAC", "list", "OFAC SDN list"); node("L:UN", "list", "UN consolidated sanctions list");
+for (const [iso, v] of Object.entries(sanc)) { if (!valid.has(iso)) continue; if (v.ofac) edge(`C:${iso}`, "L:OFAC", "listed_entries", "verified", Math.min(1, v.ofac / 200), "sanctions", `${v.ofac} entries with an address there`); if (v.un) edge(`C:${iso}`, "L:UN", "listed_entries", "verified", Math.min(1, v.un / 60), "sanctions", `${v.un} entries with an address there`); }
+for (const [iso, v] of Object.entries(leaders)) { if (!valid.has(iso)) continue; for (const role of ["state", "gov"]) { const p = v[role]; if (p?.qid) { node(`H:${p.qid}`, "person", p.name, { x: role === "state" ? "Head of state" : "Head of government" }); edge(`H:${p.qid}`, `C:${iso}`, "holds_public_role", "verified", 0.8, "leaders", `${role === "state" ? "Head of state" : "Head of government"}${p.start ? ` since ${p.start.slice(0, 4)}` : ""}`); } } }
+// chokepoints and pipelines: countries named in the recorded description (inferred from text), and the UAE's route exposure (analytical judgment)
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); const names = countries.map((c) => c.name).filter((n) => n.length > 3);
+const named = (desc) => countries.filter((c) => c.iso3 !== "ARE" && new RegExp(`\\b${esc(c.name)}\\b`).test(desc));
+for (const s of straits) { node(`X:${s.id}`, "chokepoint", s.title, { x: s.desc }); for (const c of named(s.desc)) edge(`X:${s.id}`, `C:${c.iso3}`, "adjoins", "inferred", 0.6, "layers", "country named in the chokepoint's recorded description"); }
+const ROUTE = { "strait-hormuz": [1, "Most UAE crude and LNG exports and the Jebel Ali approaches pass the Strait; the ADCOP pipeline to Fujairah is the partial bypass"], "strait-bab-el-mandeb": [0.8, "The southern entrance to the Red Sea and Suez route between the UAE and Europe"], "strait-suez": [0.8, "The main sea route between the UAE and Europe and the Mediterranean"], "strait-malacca": [0.6, "The sea route to East Asia, the largest block of UAE energy buyers"], "strait-good-hope": [0.5, "The alternative route to Europe when the Red Sea is closed"], "strait-gibraltar": [0.35, "The Mediterranean exit for UAE trade to the Atlantic"], "strait-taiwan": [0.3, "Shipping and semiconductor supply on which UAE technology plans depend"] };
+for (const [id, [w, why]] of Object.entries(ROUTE)) if (nodes.has(`X:${id}`)) edge(`X:${id}`, "C:ARE", "route_exposure", "inferred", w, "rule", why);
+for (const p of pipes) { node(`P:${p.id}`, "pipeline", p.title, { x: p.desc }); for (const c of named(p.desc)) edge(`P:${p.id}`, `C:${c.iso3}`, "runs_through", "inferred", 0.6, "layers", "country named in the pipeline's recorded description (schematic layer)"); if (/\bUAE\b/.test(p.desc)) edge(`P:${p.id}`, "C:ARE", "runs_through", "inferred", 0.7, "layers", "UAE named in the pipeline's recorded description"); }
+// coalition overlap with the UAE: the non-universal blocs they share
+const uaeOrgs = Object.entries(orgs.orgs).filter(([k, l]) => !UNIVERSAL.has(k) && l.includes("ARE")).map(([k]) => k);
+for (const c of countries) { if (c.iso3 === "ARE") continue; const shared = uaeOrgs.filter((k) => members(k).has(c.iso3)); if (shared.length >= 2) edge("C:ARE", `C:${c.iso3}`, "coalition_overlap", "inferred", Math.min(1, shared.length / 6), "rule", `shares ${shared.length} blocs with the UAE: ${shared.map((k) => ORG[k] ?? k).join(", ")}`); }
+void names;
+const out = { built: new Date().toISOString(), note: "Typed, weighted, sourced relationships. 'verified' = read from a dataset record; 'inferred' = a stated rule or analytical judgment; hypothetical edges are never stored.", sources: SRC, nodes: [...nodes.values()], edges };
+const counts = {}; for (const e of edges) counts[`${e.r}:${e.p}`] = (counts[`${e.r}:${e.p}`] ?? 0) + 1; console.log(`${out.nodes.length} nodes, ${edges.length} edges`, counts);
+if (out.nodes.length < 500 || edges.length < 3000) { console.error("graph looks thin: not writing"); process.exit(1); }
+writeFileSync(new URL("../public/data/graph.json", import.meta.url), JSON.stringify(out));
+console.log("wrote public/data/graph.json", `${Math.round(JSON.stringify(out).length / 1024)} KB`);

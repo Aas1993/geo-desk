@@ -1,0 +1,8 @@
+{
+  "note": "Members that Wikidata's list for the organisation lacks. Verified against each organisation's own member list; keep this table short and sourced.",
+  "commonwealth": ["GBR"],
+  "coe": ["SVK"],
+  "itu": ["KOR", "LAO", "COG", "COM"],
+  "opcw": ["GEO"],
+  "wto": ["AFG", "KAZ", "TJK", "LAO", "YEM", "SYC", "COM", "HKG", "MAC"]
+}

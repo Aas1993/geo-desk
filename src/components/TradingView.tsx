@@ -8,7 +8,7 @@ import type { Listing } from "@/lib/markets/types";
  * Terms (tradingview.com/policies): display-only, TradingView attribution must stay visible as designed, personal/non-commercial use
  * unless you have an agreement. The widgets run in the visitor's browser; their data can't be read by, or processed in, our code.
  */
-export type TvKind = "advanced-chart" | "symbol-info" | "technical-analysis" | "financials" | "symbol-profile" | "ticker-tape" | "screener" | "mini-symbol-overview" | "events";
+export type TvKind = "advanced-chart" | "symbol-info" | "technical-analysis" | "financials" | "symbol-profile" | "ticker-tape" | "screener" | "mini-symbol-overview" | "events" | "market-overview";
 
 /** TradingView uses the exchanges' official tickers; for DFM that is the disclosure-feed ticker (e.g. EMIRATESNBD, not the vendor's ENBD). */
 export const tvSymbol = (l: Pick<Listing, "exchange" | "symbol" | "feedSymbol">) => `${l.exchange}:${l.feedSymbol ?? l.symbol}`;
@@ -20,9 +20,9 @@ export function TvWidget({ kind, config, height, title }: { kind: TvKind; config
     const host = ref.current; if (!host) return; host.innerHTML = "";
     const inner = document.createElement("div"); inner.className = "tradingview-widget-container__widget"; inner.style.height = "calc(100% - 22px)";
     const s = document.createElement("script"); s.src = `https://s3.tradingview.com/external-embedding/embed-widget-${kind}.js`; s.async = true;
-    s.text = JSON.stringify({ autosize: true, colorTheme: theme, isTransparent: false, backgroundColor: theme === "dark" ? "#121417" : "#faf8f3", locale: lang === "ar" ? "ar_AE" : "en", ...config });
+    s.text = JSON.stringify({ autosize: true, colorTheme: theme, isTransparent: false, backgroundColor: theme === "dark" ? "#0a111e" : "#f6f9fd", locale: lang === "ar" ? "ar_AE" : "en", ...config });
     const credit = document.createElement("div"); credit.className = "tradingview-widget-copyright"; credit.style.cssText = "font-size:11px;padding-top:4px;color:var(--t2)";
-    credit.innerHTML = `<a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank" style="color:var(--accent)">${title} · Track all markets on TradingView</a>`;
+    const a = document.createElement("a"); a.href = "https://www.tradingview.com/"; a.rel = "noopener nofollow"; a.target = "_blank"; a.style.color = "var(--accent)"; a.textContent = `${title} · Track all markets on TradingView`; credit.append(a);
     host.append(inner, credit, s);
     return () => { host.innerHTML = ""; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,0 +1,35 @@
+name: Refresh reference data
+# Slow-moving datasets (heritage sites, bases, exchanges, think tanks, outlets, channels, ports, power plants, aid, regions, member lists). Monthly; each builder runs on its own,
+# so one source being down does not block the others, and a builder refuses to overwrite its file on a thin result. A PR is opened only if something changed.
+on:
+  schedule: [{ cron: "23 4 1 * *" }]
+  workflow_dispatch:
+permissions: { contents: write, pull-requests: write }
+concurrency: { group: refresh-reference, cancel-in-progress: false }
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false } # the token is only attached to the one push below
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Rebuild each dataset (failures are reported, not fatal)
+        run: |
+          for s in ports power infra-supplements heritage bases exchanges thinktanks outlets channels aid regions members-extra orgs governance leaders uae-aid; do
+            echo "::group::build-$s"; node "scripts/build-$s.mjs" || echo "::warning::build-$s failed; keeping the committed file"; echo "::endgroup::"
+          done
+      - name: Run the tests, then open or update a PR if anything changed
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          git add -A public/data
+          git diff --cached --quiet && { echo "No data changes"; exit 0; }
+          npm test # PRs opened with GITHUB_TOKEN do not trigger CI, so the tests run here, before anything is committed
+          branch="data/reference"; git config user.name "geo-desk-bot"; git config user.email "geo-desk-bot@users.noreply.github.com"
+          git checkout -B "$branch"; git commit -m "Refresh reference data ($(date -u +%F))"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$branch" # one standing branch: a re-run updates the same PR
+          if [ "$(gh pr list --head "$branch" --state open --json number -q length)" = "0" ]; then
+            gh pr create --base main --head "$branch" --title "Refresh reference data" --body "Automated monthly rebuild of the slow-moving datasets (heritage, bases, exchanges, think tanks, ports, power, aid, regions, member lists, governance scores, leaders and elections, UAE humanitarian funding). Tests passed in the job. Review the numbers in the app rather than the single-line JSON diff; this branch is reused."
+          fi

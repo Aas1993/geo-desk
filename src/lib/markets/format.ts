@@ -14,9 +14,11 @@ export function dateShort(s: string | null | undefined, l: Lang) { if (!s) retur
 export const dir = (n: number | null | undefined) => (n == null || n === 0 ? "" : n > 0 ? "up" : "down");
 
 /** UAE equity sessions: Mon–Fri, 10:00–15:00 Asia/Dubai. Holidays are not modelled; the vendor's own flag wins when present. */
-export function sessionState(now: Date): { open: boolean; label: "open" | "closed"; nextChange: string } {
-  const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dubai", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+/** Trading session of the UAE markets (Mon-Fri 10:00-15:00 GST) or, with "QSE", Qatar's (Sun-Thu 09:30-13:15 AST: continuous trading to 13:00, then the closing auction). Approximate: holidays are not modelled. */
+export function sessionState(now: Date, market: "UAE" | "QSE" = "UAE"): { open: boolean; label: "open" | "closed"; nextChange: string } {
+  const q = market === "QSE";
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: q ? "Asia/Qatar" : "Asia/Dubai", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
   const wd = p.find((x) => x.type === "weekday")!.value; const mins = +p.find((x) => x.type === "hour")!.value * 60 + +p.find((x) => x.type === "minute")!.value;
-  const weekday = !["Sat", "Sun"].includes(wd); const open = weekday && mins >= 600 && mins < 900;
-  return { open, label: open ? "open" : "closed", nextChange: open ? "15:00 GST" : "10:00 GST" };
+  const weekday = !(q ? ["Fri", "Sat"] : ["Sat", "Sun"]).includes(wd); const from = q ? 570 : 600, to = q ? 795 : 900; const open = weekday && mins >= from && mins < to;
+  return { open, label: open ? "open" : "closed", nextChange: q ? (open ? "13:15 AST" : "09:30 AST") : open ? "15:00 GST" : "10:00 GST" };
 }

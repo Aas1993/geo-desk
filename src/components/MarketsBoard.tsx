@@ -8,6 +8,7 @@ import { useKeyed } from "@/lib/useKeyed";
 import { big, dash, dir, frac, intl, price, ratio, sessionState, signed } from "@/lib/markets/format";
 import type { Listing, Quote } from "@/lib/markets/types";
 import { Panel, ProviderBanner, Unavailable } from "./markets-ui";
+import { MarketSources } from "./MarketSources";
 import { MiniSpark, RangeBar } from "./market-charts";
 import { ScreenersView } from "./ScreenersView";
 
@@ -23,23 +24,26 @@ async function loadUniverse(): Promise<Listing[]> { return (await (await fetch("
 export function MarketsBoard() {
   const { t, lang } = useT();
   const uni = useKeyed("u", loadUniverse).value;
-  const [ex, setEx] = useState<"ALL" | "ADX" | "DFM">("ALL");
+  const [ex, setEx] = useState<"ALL" | "ADX" | "DFM" | "QSE">("ALL");
   const [view, setView] = useState<"table" | "screener">("table");
   const [q, setQ] = useState(""); const [sort, setSort] = useState<{ id: string; desc: boolean }>({ id: "symbol", desc: false });
-  const qa = useApi<{ quotes: QMap }>("/api/markets/board/ADX"), qd = useApi<{ quotes: QMap }>("/api/markets/board/DFM");
-  const haveQuotes = !!(qa.result?.ok || qd.result?.ok);
+  const qa = useApi<{ quotes: QMap }>("/api/markets/board/ADX"), qd = useApi<{ quotes: QMap }>("/api/markets/board/DFM"), qq = useApi<{ quotes: QMap }>("/api/markets/board/QSE");
+  const haveQuotes = !!(qa.result?.ok || qd.result?.ok || qq.result?.ok);
   const ma = useApi<{ metrics: Record<string, Metrics> }>(qa.result?.ok ? "/api/markets/board/ADX?enrich=1" : null);
   const md = useApi<{ metrics: Record<string, Metrics> }>(qd.result?.ok ? "/api/markets/board/DFM?enrich=1" : null);
+  const mq = useApi<{ metrics: Record<string, Metrics> }>(qq.result?.ok ? "/api/markets/board/QSE?enrich=1" : null);
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { const tick = () => setNow(new Date()); const t0 = setTimeout(tick, 0); const i = setInterval(tick, 30000); return () => { clearTimeout(t0); clearInterval(i); }; }, []);
-  const session = now ? sessionState(now) : null;
+  const session = now ? sessionState(now, ex === "QSE" ? "QSE" : "UAE") : null;
 
-  const quotes: QMap = useMemo(() => ({ ...(qa.result?.ok ? qa.result.data.quotes : {}), ...(qd.result?.ok ? qd.result.data.quotes : {}) }), [qa.result, qd.result]);
-  const metrics = useMemo(() => ({ ...(ma.result?.ok ? ma.result.data.metrics : {}), ...(md.result?.ok ? md.result.data.metrics : {}) }), [ma.result, md.result]);
-  const synthetic = !!((qa.result?.ok && qa.result.synthetic) || (qd.result?.ok && qd.result.synthetic));
-  const failed = !haveQuotes && !qa.loading && !qd.loading ? (qa.result && !qa.result.ok ? qa.result : qd.result && !qd.result.ok ? qd.result : null) : null;
+  // keyed by exchange and symbol: GFH is listed on ADX and DFM and ORDS on ADX and QSE, so a bare symbol would mix their prices
+  const pre = <T,>(x: Record<string, T> | undefined, e: string) => Object.fromEntries(Object.entries(x ?? {}).map(([k, v]) => [`${e}:${k}`, v]));
+  const quotes: QMap = useMemo(() => ({ ...pre(qa.result?.ok ? qa.result.data.quotes : undefined, "ADX"), ...pre(qd.result?.ok ? qd.result.data.quotes : undefined, "DFM"), ...pre(qq.result?.ok ? qq.result.data.quotes : undefined, "QSE") }), [qa.result, qd.result, qq.result]);
+  const metrics = useMemo(() => ({ ...pre(ma.result?.ok ? ma.result.data.metrics : undefined, "ADX"), ...pre(md.result?.ok ? md.result.data.metrics : undefined, "DFM"), ...pre(mq.result?.ok ? mq.result.data.metrics : undefined, "QSE") }), [ma.result, md.result, mq.result]);
+  const synthetic = !!((qa.result?.ok && qa.result.synthetic) || (qd.result?.ok && qd.result.synthetic) || (qq.result?.ok && qq.result.synthetic));
+  const failed = !haveQuotes && !qa.loading && !qd.loading && !qq.loading ? (qa.result && !qa.result.ok ? qa.result : qd.result && !qd.result.ok ? qd.result : qq.result && !qq.result.ok ? qq.result : null) : null;
 
-  const rows: Row[] = useMemo(() => (uni ?? []).map((l) => ({ l, q: isQuote(quotes[l.symbol]) ? (quotes[l.symbol] as Quote) : null, m: metrics[l.symbol] ?? null })), [uni, quotes, metrics]);
+  const rows: Row[] = useMemo(() => (uni ?? []).map((l) => ({ l, q: isQuote(quotes[`${l.exchange}:${l.symbol}`]) ? (quotes[`${l.exchange}:${l.symbol}`] as Quote) : null, m: metrics[`${l.exchange}:${l.symbol}`] ?? null })), [uni, quotes, metrics]);
   const pctCell = (v: number | null | undefined) => <span className={`num ${dir(v)}`}>{frac(v, lang, 1, true)}</span>;
   const cols: Col[] = [
     { id: "symbol", label: t("mk_symbol"), get: (r) => r.l.symbol, w: "min-w-[210px]", csv: (r) => r.l.symbol, cell: (r) => (
@@ -84,9 +88,10 @@ export function MarketsBoard() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-[720px]"><div className="rule-gold mb-3" /><h1 className="display text-[34px] leading-[1.05] font-semibold sm:text-[42px]">{t("mk_title")}</h1><p className="mt-2 text-[14px] text-t1">{t("mk_sub")}</p></div>
-        {session && <div className="flex items-center gap-3 rounded-[8px] border border-line bg-bg1 px-4 py-2.5"><i className={`size-2.5 rounded-full ${session.open ? "bg-up" : "bg-t2"}`} /><div><div className="text-[13px] font-medium">{session.open ? t("mk_open") : t("mk_closed")}</div><div className="num text-[11px] text-t2">{t("mk_hours")}</div></div></div>}
+        {session && <div className="flex items-center gap-3 rounded-[8px] border border-line bg-bg1 px-4 py-2.5"><i className={`size-2.5 rounded-full ${session.open ? "bg-up" : "bg-t2"}`} /><div><div className="text-[13px] font-medium">{session.open ? t("mk_open") : t("mk_closed")}</div><div className="num text-[11px] text-t2">{ex === "QSE" ? (lang === "ar" ? "الأحد–الخميس 09:30–13:15 بتوقيت قطر (تداول مستمر حتى 13:00 ثم مزاد الإغلاق)" : "Sun–Thu 09:30–13:15 AST (continuous to 13:00, then the closing auction)") : t("mk_hours")}</div></div></div>}
       </header>
       <ProviderBanner synthetic={synthetic} />
+      <MarketSources />
       <div role="tablist" aria-label="View" className="flex w-fit rounded-[6px] bg-bg2 p-0.5">{(["table", "screener"] as const).map((v) => <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`rounded-[5px] px-4 py-1.5 text-[12.5px] font-medium ${view === v ? "bg-bg1 text-accent shadow-sm" : "text-t1 hover:text-t0"}`}>{v === "table" ? t("mk_table") : t("mk_screener")}</button>)}</div>
       {view === "screener" && <ScreenersView />}
       {failed && !failed.ok && failed.error !== "no_key" && <Unavailable error={failed.error} message={failed.message} onRetry={() => { qa.retry(); qd.retry(); }} />}
@@ -105,7 +110,7 @@ export function MarketsBoard() {
       {view === "table" && <section className="rounded-[8px] border border-line bg-bg1">
         <div className="flex flex-wrap items-center gap-3 border-b border-line p-3">
           <div role="tablist" aria-label="Exchange" className="flex rounded-[6px] bg-bg2 p-0.5">
-            {(["ALL", "ADX", "DFM"] as const).map((e) => <button key={e} role="tab" aria-selected={ex === e} onClick={() => setEx(e)} className={`rounded-[5px] px-3.5 py-1.5 text-[12.5px] font-medium ${ex === e ? "bg-bg1 text-accent shadow-sm" : "text-t1 hover:text-t0"}`}>{e === "ALL" ? t("mk_all") : e}{uni && <span className="num ms-1.5 text-[10.5px] text-t2">{e === "ALL" ? uni.length : uni.filter((l) => l.exchange === e).length}</span>}</button>)}
+            {(["ALL", "ADX", "DFM", "QSE"] as const).map((e) => <button key={e} role="tab" aria-selected={ex === e} onClick={() => setEx(e)} className={`rounded-[5px] px-3.5 py-1.5 text-[12.5px] font-medium ${ex === e ? "bg-bg1 text-accent shadow-sm" : "text-t1 hover:text-t0"}`}>{e === "ALL" ? t("mk_all") : e}{uni && <span className="num ms-1.5 text-[10.5px] text-t2">{e === "ALL" ? uni.length : uni.filter((l) => l.exchange === e).length}</span>}</button>)}
           </div>
           <label className="flex h-9 min-w-[200px] flex-1 items-center gap-2 rounded-[6px] border border-line bg-bg2 px-3 focus-within:border-accent sm:max-w-[320px]"><Search size={15} className="text-t2" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("mk_search")} className="w-full bg-transparent text-[13px] outline-none placeholder:text-t2" /></label>
           {enriching && <span className="text-[11.5px] text-t2">{t("mk_enriching")}</span>}

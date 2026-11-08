@@ -1,4 +1,4 @@
-// Verifies a Twelve Data key against the real ADX/DFM universe and fixes vendor-ticker mismatches.
+// Verifies a Twelve Data key against the real ADX/DFM/QSE universe and fixes vendor-ticker mismatches.
 //   node scripts/verify-markets.mjs                 # probe plan + endpoints, then check every listing
 //   node scripts/verify-markets.mjs --only=DFM      # one exchange
 //   node scripts/verify-markets.mjs --limit=16      # first N listings per exchange (quick smoke test)
@@ -34,8 +34,8 @@ async function td(path, params, cost = 1) {
 const err = (j) => (j && (j.status === "error" || typeof j.code === "number") ? `${j.code ?? ""} ${String(j.message ?? "").slice(0, 140)}`.trim() : null);
 const rows = JSON.parse(readFileSync(new URL("../public/data/markets.json", import.meta.url), "utf8")).rows;
 const only = arg("only"); const limit = Number(arg("limit")) || Infinity;
-const list = ["ADX", "DFM"].filter((e) => !only || e === only.toUpperCase()).flatMap((e) => rows.filter((r) => r.exchange === e).slice(0, limit));
-const MIC = { ADX: "XADS", DFM: "XDFM" };
+const list = ["ADX", "DFM", "QSE"].filter((e) => !only || e === only.toUpperCase()).flatMap((e) => rows.filter((r) => r.exchange === e).slice(0, limit));
+const MIC = { ADX: "XADS", DFM: "XDFM", QSE: "DSMD" };
 
 console.log("== 1. Plan and credits");
 const usage = await fetch(`${BASE}/api_usage?apikey=${KEY}`).then((r) => r.json()).catch(() => null);
@@ -46,7 +46,7 @@ if (usage && !err(usage)) {
 console.log(`   ${list.length} listings to check ≈ ${Math.ceil(list.length / RPM)} min at ${RPM} credits/min`);
 
 console.log("\n== 2. Is each exchange covered, and which datasets does your plan include?");
-const probes = [{ ex: "ADX", sym: "ADCB" }, { ex: "DFM", sym: "EMAAR" }].filter((p) => list.some((l) => l.exchange === p.ex));
+const probes = [{ ex: "ADX", sym: "ADCB" }, { ex: "DFM", sym: "EMAAR" }, { ex: "QSE", sym: "QNBK" }].filter((p) => list.some((l) => l.exchange === p.ex));
 const endpoints = [["quote", {}], ["time_series", { interval: "1day", outputsize: 5 }], ...(flag("skip-fundamentals") ? [] : [["statistics", {}], ["profile", {}], ["income_statement", { period: "annual" }], ["balance_sheet", { period: "annual" }], ["cash_flow", { period: "annual" }], ["dividends", { range: "5y" }], ["earnings", { outputsize: 4 }]])];
 const coverage = {};
 for (const p of probes) for (const [ep, extra] of endpoints) {
@@ -59,7 +59,7 @@ const covFail = Object.values(coverage).filter((v) => v !== "ok").length;
 console.log("\n== 3. Quote check for every listing (alias retry on failure)");
 const found = {}; const bad = []; const stale = []; const today = Date.now();
 const check = (l, sym, q) => { const price = Number(q.close); if (!(price > 0)) return "no price"; const age = (today - Date.parse(q.datetime)) / 864e5; if (age > 10) stale.push(`${l.exchange}:${sym} (${q.datetime})`); if (q.currency && q.currency !== "AED") return `currency ${q.currency}`; return null; };
-for (const ex of ["ADX", "DFM"]) {
+for (const ex of ["ADX", "DFM", "QSE"]) {
   const ls = list.filter((l) => l.exchange === ex); const failed = [];
   for (let i = 0; i < ls.length; i += RPM) {
     const chunk = ls.slice(i, i + RPM);

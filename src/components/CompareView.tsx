@@ -58,7 +58,7 @@ export function CompareView() {
   const ia = a && ideal?.[a.iso3] ? last(ideal[a.iso3]) : null, ib = b && ideal?.[b.iso3] ? last(ideal[b.iso3]) : null;
   const loading = (a && da.loading) || (b && db.loading);
   return (
-    <section aria-label={t("compare")} className="glass anim-slide fixed inset-x-0 bottom-14 top-14 z-30 flex flex-col rounded-t-[10px] sm:absolute sm:inset-x-auto sm:bottom-9 sm:start-14 sm:top-14 sm:w-[560px] sm:rounded-none sm:border-y-0 sm:border-s-0">
+    <section aria-label={t("compare")} className="glass anim-slide fixed inset-x-2 bottom-[72px] top-[72px] z-30 flex flex-col rounded-t-[10px] sm:absolute sm:inset-x-auto sm:bottom-16 sm:start-3 sm:top-[76px] sm:w-[560px] sm:rounded-[16px]">
       <header className="flex items-center gap-2 border-b border-line px-4 py-3">
         <ArrowLeftRight size={16} className="text-accent" aria-hidden /><h2 className="display flex-1 text-[18px] font-semibold">{t("compare")}</h2>
         <IconBtn label={t("closeCompare")} onClick={closeCompare}><X size={18} /></IconBtn>

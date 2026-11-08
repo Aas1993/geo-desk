@@ -6,6 +6,7 @@ import { fixturesOn, getDaily, getFundamentals, getQuote, keyConfigured } from "
 import { atr, lastOf, maxDrawdown, periodReturn, technicalReadings, volatility, ytdReturn } from "@/lib/markets/indicators";
 import { parseRss } from "@/lib/rss";
 import type { Filing, Listing } from "@/lib/markets/types";
+import { oneLine } from "@/lib/guard";
 
 export type Facts = {
   asOf: string; listing: Listing;
@@ -28,6 +29,7 @@ export async function gather(l: Listing): Promise<Facts> {
       f.filings = { total: a.total, items, priority: items.filter((x) => KEY_FILING.test(x.headline) || x.docs.some((d) => /financial|report/i.test(`${d.type} ${d.category}`))).slice(0, 14) };
     } catch (e) { f.notes.push(`DFM disclosure feed unavailable: ${(e as Error).message}`); }
   } else if (l.exchange === "ADX") f.notes.push("ADX publishes no machine-readable disclosure feed and forbids automated retrieval, so ADX filings were not pre-loaded; rely on the issuer's investor-relations site, results releases in the press, and other public sources.");
+  else if (l.exchange === "QSE") f.notes.push("The Qatar Stock Exchange (qe.com.qa) asks robots not to read its documents and has no machine-readable disclosure feed in this app, so Qatar filings were not pre-loaded; rely on the issuer's investor-relations site, results releases in the press, QNA and other public sources.");
   else f.notes.push("No DFM disclosure-feed match for this ticker.");
 
   // 2. Recent headlines (title/outlet/link only).
@@ -61,13 +63,13 @@ export async function gather(l: Listing): Promise<Facts> {
 /** Renders facts as tagged text. Third-party strings (headlines, filing titles) are data, never instructions. */
 export function renderFacts(f: Facts): string {
   const L = f.listing; const out: string[] = [];
-  out.push(`<company>\nName: ${L.name}${L.nameAr ? ` (${L.nameAr})` : ""}\nExchange: ${L.exchange === "ADX" ? "Abu Dhabi Securities Exchange (ADX)" : "Dubai Financial Market (DFM)"}\nTicker: ${L.symbol}${L.feedSymbol && L.feedSymbol !== L.symbol ? ` (DFM feed ticker ${L.feedSymbol})` : ""}\nCurrency: ${L.currency}\nInstrument type: ${L.type}\n</company>`);
+  out.push(`<company>\nName: ${L.name}${L.nameAr ? ` (${L.nameAr})` : ""}\nExchange: ${L.exchange === "ADX" ? "Abu Dhabi Securities Exchange (ADX)" : L.exchange === "QSE" ? "Qatar Stock Exchange (Boursa Qatar, QSE)" : "Dubai Financial Market (DFM)"}\nTicker: ${L.symbol}${L.feedSymbol && L.feedSymbol !== L.symbol ? ` (DFM feed ticker ${L.feedSymbol})` : ""}\nCurrency: ${L.currency}\nInstrument type: ${L.type}\n</company>`);
   if (f.filings) {
     out.push(`<dfm_disclosures total_on_record="${f.filings.total}">\nMost recent filings (newest first). docs are fetchable PDFs on DFM's document server:\n` +
-      f.filings.items.slice(0, 20).map((x) => `- ${x.date.slice(0, 10)} | ${x.type ?? ""} | ${x.headline}${x.period ? ` | period ${x.period}` : ""}${x.dividendsPaymentDate ? ` | dividend payment ${x.dividendsPaymentDate}` : ""}${x.docs.length ? ` | docs: ${x.docs.map((d) => d.url).join(" ")}` : ""}`).join("\n") + `\n</dfm_disclosures>`);
-    if (f.filings.priority.length) out.push(`<priority_documents>\nFetch and read these first — they are most likely the latest results / dividend / rating / governance filings:\n${f.filings.priority.map((x) => `- ${x.date.slice(0, 10)} ${x.headline}\n  ${x.docs.map((d) => d.url).join("\n  ") || "(no document attached)"}`).join("\n")}\n</priority_documents>`);
+      f.filings.items.slice(0, 20).map((x) => `- ${x.date.slice(0, 10)} | ${x.type ?? ""} | ${oneLine(x.headline, 300)}${x.period ? ` | period ${x.period}` : ""}${x.dividendsPaymentDate ? ` | dividend payment ${x.dividendsPaymentDate}` : ""}${x.docs.length ? ` | docs: ${x.docs.map((d) => d.url).join(" ")}` : ""}`).join("\n") + `\n</dfm_disclosures>`);
+    if (f.filings.priority.length) out.push(`<priority_documents>\nFetch and read these first — they are most likely the latest results / dividend / rating / governance filings:\n${f.filings.priority.map((x) => `- ${x.date.slice(0, 10)} ${oneLine(x.headline, 300)}\n  ${x.docs.map((d) => d.url).join("\n  ") || "(no document attached)"}`).join("\n")}\n</priority_documents>`);
   }
-  if (f.news.length) out.push(`<recent_headlines source="Google News RSS, last 60 days; titles only — open the links to read them">\n${f.news.map((n) => `- ${n.date} | ${n.outlet} | ${n.title} | ${n.link}`).join("\n")}\n</recent_headlines>`);
+  if (f.news.length) out.push(`<recent_headlines source="Google News RSS, last 60 days; titles only — open the links to read them">\n${f.news.map((n) => `- ${n.date} | ${oneLine(n.outlet, 80)} | ${oneLine(n.title, 300)} | ${n.link}`).join("\n")}\n</recent_headlines>`);
   if (f.market) out.push(`<licensed_market_data>\n${JSON.stringify(f.market, null, 1)}\n</licensed_market_data>`);
   if (f.notes.length) out.push(`<collection_notes>\n${f.notes.map((n) => `- ${n}`).join("\n")}\n</collection_notes>`);
   return out.join("\n\n");

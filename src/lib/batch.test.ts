@@ -1,4 +1,5 @@
 // Tests for the batch transport: the header switch, the half-price accounting, the limits, the scheduler and the bundle's waves.
+process.env.GD_NO_LEDGER = "1"; // this test runs the real engine against a mock client priced at 1M tokens: it must not write to the spend ledger
 import assert from "node:assert/strict";
 import { BATCH_FACTOR, batchTiming, concurrentCap, hourlyCap, inBatchMode, submitBatch, withBatch } from "./dossier/batch";
 import { runUsd } from "./dossier/cost";

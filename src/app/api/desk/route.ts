@@ -6,13 +6,14 @@ import { maxRunUsd, outputRoom, runUsd } from "@/lib/dossier/cost";
 import { EFFORTS, type Effort, type Source, type Usage } from "@/lib/dossier/run";
 import { runRouted } from "@/lib/llm/route";
 import { diskGet, diskSet } from "@/lib/dossier/diskcache";
+import { BudgetError, assertBudget } from "@/lib/spend";
 import { refusalFor, REFUSAL_TEXT } from "@/lib/machiavelli/guard";
 import { manifestHash } from "@/lib/deep/consolidate";
 import { loadResearch } from "@/lib/deep/research";
 import { loadSnapshot } from "@/lib/deep/snapshot";
 import { caseFacts } from "@/lib/case/facts";
 import { loadCase } from "@/lib/case/load";
-import { DEFAULT_CHALLENGE_FOCUS, DEFAULT_COUNTRY_FOCUS, DEFAULT_EMB_FOCUS, DEFAULT_PRESIDENT_FOCUS, DEFAULT_KING_FOCUS, DEFAULT_MOFA_FOCUS, PRODUCTS, checkRefs, citedIds, cleanDeskOptions, deskBase, deskKey, worstOf, type Product } from "@/lib/desk/core";
+import { DEFAULT_CHALLENGE_FOCUS, DEFAULT_COUNTRY_FOCUS, DEFAULT_EMB_FOCUS, DEFAULT_PRESIDENT_FOCUS, DEFAULT_KING_FOCUS, DEFAULT_MOFA_FOCUS, PRODUCTS, PRODUCT_USD, checkRefs, citedIds, cleanDeskOptions, deskBase, deskKey, worstOf, type Product } from "@/lib/desk/core";
 import { deskExtraFacts } from "@/lib/desk/context";
 import { planFor, type Call } from "@/lib/desk/plan";
 
@@ -49,6 +50,7 @@ export const POST = withBatch(async function POST(req: Request) {
         const [c, snap, res] = await Promise.all([loadCase(iso3), loadSnapshot(iso3).catch(() => null), loadResearch(iso3).catch(() => null)]); if (!c) { send({ type: "error", error: "not_found", message: "Unknown country." }); return finish(); }
         const manifest = manifestHash(snap, null, iso3); key = deskKey(product, iso3, o, manifest, context);
         const hit = cache.get(key) ?? (refresh ? null : diskGet<Done>(key, TTL)); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit, agents: hit.agents.map((a: CallOut) => ({ ...a, text: "" })) }); return finish(); }
+        try { assertBudget(PRODUCT_USD[product]); } catch (e) { if (!(e instanceof BudgetError)) throw e; send({ type: "error", error: "budget", message: e.message }); return finish(); } // before any money is spent on a product the limit cannot cover
         if (pool.running.has(key)) { send({ type: "error", error: "busy", message: "This is already being written. Try again in a minute." }); return finish(); }
         pool.runs = pool.runs.filter((t) => Date.now() - t < 3600_000); const lim = directive ? MAX_DIRECTIVES_PER_HOUR : hourlyCap(MAX_PER_HOUR);
         if (pool.runs.length >= lim) { send({ type: "error", error: "limit", message: `Limit of ${lim} new ${directive ? "directives" : "detailed briefings"} per hour reached (${directive ? "DESK_MAX_DIRECTIVES_PER_HOUR" : "DOSSIER_MAX_PER_HOUR"}). Cached results are still free.` }); return finish(); }

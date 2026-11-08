@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { runModelTaskOA } from "./llm/oa";
 import { runRouted } from "./llm/route";
+import { BudgetError, readSpend } from "./spend";
 
 // routing: Claude unless a role is switched to a known model whose key is set
 const M = OA_MODELS["hf-deepseek-flash"];
@@ -91,6 +92,13 @@ const r3 = await runModelTaskOA({ ...base, maxUsd: 0.001 }, M); assert.equal(r3.
 // a free model costs nothing and its output room is not NaN
 process.env.OPENROUTER_API_KEY = "k"; calls = 0; script = (n) => sse(n === 1 ? toolTurn : finalTurn);
 const rf = await runModelTaskOA(base, OA_MODELS["or-gemma"]); assert.equal(rf.usage.usd, 0); assert.equal(rf.report, "Final answer [F1]."); assert.ok(Number.isFinite(bodies[bodies.length - 1].max_tokens as number) || bodies[bodies.length - 1].max_tokens === undefined);
+
+// a paid call through the router is written to the spend ledger, and a spent limit stops the next one (run in a temporary folder so the real ledger is untouched)
+{ const t = mkdtempSync(path.join(tmpdir(), "gd-led-")); const c0 = process.cwd(); process.chdir(t);
+  process.env.HF_TOKEN = "k"; process.env.LLM_SITTING = "hf-deepseek-flash"; calls = 0; script = (n) => sse(n === 1 ? toolTurn : finalTurn);
+  const paid = await runRouted({ ...base, label: "desk-test-C1" }, "sitting"); assert.equal(paid.report, "Final answer [F1]."); const rows = readSpend(1e12); assert.equal(rows.length, 1); assert.equal(rows[0].label, "desk-test-C1"); assert.equal(rows[0].model, "hf-deepseek-flash"); assert.ok(rows[0].usd > 0 && Math.abs(rows[0].usd - paid.usage.usd!) < 1e-6);
+  process.env.SPEND_DAILY_USD = String(rows[0].usd / 2); await assert.rejects(runRouted(base, "sitting"), BudgetError, "a call is refused once the daily limit is used up"); assert.equal(calls, 2, "and no request was sent to the provider");
+  delete process.env.SPEND_DAILY_USD; process.chdir(c0); }
 
 // a provider error surfaces (the router then falls back to Claude), and an empty answer counts as an error
 script = () => new Response('{"error":"no credits"}', { status: 402 });

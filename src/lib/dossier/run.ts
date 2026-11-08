@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
 import { BATCH_FACTOR, PRICE, outputRoom, runUsd } from "./cost";
 import { inBatchMode, submitBatch } from "./batch";
+import { assertBudget, recordSpend } from "../spend";
 
 // The model-run core shared by the dossier route (one analyst, streamed to the browser) and the Falcon council (several analysts, run in parallel and in sequence).
 // One run: a cached system prompt, a cached first block of facts, optional role instructions after the cache point, the web-search tool driven by code the model writes, continuation after pauses,
@@ -40,8 +41,9 @@ const WARM = ((globalThis as { __gdWarm?: Map<string, Promise<void>> }).__gdWarm
 const WARM_WAIT_MS = 60_000; const WARM_KEEP_MS = 4 * 60_000;
 
 export async function runModelTask(o: RunOptions): Promise<RunResult> {
+  assertBudget(0.05); // with a spending limit set (SPEND_DAILY_USD / SPEND_MONTHLY_USD), a call that cannot be paid for is not started
   const hold = { release: () => {} }; // a call that fails before it answers must still let its waiting siblings go
-  try { return await runTask(o, hold); } finally { hold.release(); }
+  try { const r = await runTask(o, hold); recordSpend({ label: o.label ?? "run", model: o.model, usd: r.usage.usd ?? runUsd(r.usage, o.model, inBatchMode() ? BATCH_FACTOR : 1), searches: r.usage.searches }); return r; } finally { hold.release(); }
 }
 async function runTask(o: RunOptions, hold: { release: () => void }): Promise<RunResult> {
   const { client, model, signal, send, budget: bud } = o; const tag = o.label ?? "dossier";

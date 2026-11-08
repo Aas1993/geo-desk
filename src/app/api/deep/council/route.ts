@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { diskGet, diskSet } from "@/lib/dossier/diskcache";
 import { concurrentCap, hourlyCap, withBatch, inBatchMode } from "@/lib/dossier/batch";
 import { AUDITORS, SUBJECTS, reviewTail } from "@/lib/review/pair";
 import { pairReserve, runAuditors } from "@/lib/review/run";
@@ -44,7 +45,7 @@ export const POST = withBatch(async function POST(req: Request) {
         const flags = { macro: snap.readings.some((r) => ["I01", "I03", "I05", "I06"].includes(r.id) && r.state !== "ok" && r.state !== "na"), financial: snap.readings.some((r) => ["I07", "I08", "I09", "I12"].includes(r.id) && r.state !== "ok" && r.state !== "na"), trade: !!iso3 };
         const o0 = cleanDOptions(body, []); const picked = selectRoles({ question: o0.question, iso3, horizonYears: o0.horizonYears, hasResearch: pubs.length > 0, flags, consequential: body.consequential !== false });
         const o = cleanDOptions(body, picked.roles); key = dCouncilKey(iso3, o, manifestHash(snap, res ? { pubs, status: res.status, fetchedAt: res.fetchedAt } : null, iso3));
-        const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
+        const hit = cache.get(key) ?? (refresh ? null : diskGet("deep:" + key, TTL)); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
         if (store.running.has(key)) { send({ type: "error", error: "busy", message: "This team is already sitting. Try again in a minute." }); return finish(); }
         store.runs = store.runs.filter((t) => Date.now() - t < 3600_000);
         if (store.runs.length >= hourlyCap(MAX_PER_HOUR)) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
@@ -80,7 +81,7 @@ export const POST = withBatch(async function POST(req: Request) {
         const aud = await runAuditors({ client, model: MODEL, system: DCOUNCIL_SYSTEM, firstText: base, subject: SUBJECTS["deep"], product: ordered0.some((x) => x.status === "done") ? dComposeReport(ordered0 as never, o.mode) : "", lang: o.lang, cap: CAP, spent, signal: ac.signal, send, label: "deep-council", effort: ENV_EFFORT ?? "low", sources, total }); spent = aud.spent; const ordered: AgentOut[] = [...ordered0, ...(aud.outs as AgentOut[])];
         const known = new Set(gathered.facts.map((f) => f.id)); const report = dComposeReport(ordered0 as never, o.mode) + (reviewTail(ordered) ? `\n\n${reviewTail(ordered)}` : "").replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => ((ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`));
         const done: Done = { report, agents: ordered, sources, usage: total, at: new Date().toISOString(), model: MODEL, options: { ...o, kind: "deepcouncil" }, name, roles: picked.why, manifest: run.manifestId };
-        if (ordered.some((a) => a.status === "done")) { cache.set(key, done); while (cache.size > 20) cache.delete(cache.keys().next().value as string); }
+        if (ordered.some((a) => a.status === "done")) { cache.set(key, done); diskSet("deep:" + key, done); while (cache.size > 20) cache.delete(cache.keys().next().value as string); }
         send({ type: "done", cached: false, ...done });
       } catch (e) {
         if (req.signal.aborted) return finish();

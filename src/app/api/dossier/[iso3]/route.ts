@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { diskGet, diskSet } from "@/lib/dossier/diskcache";
 import { type Tile } from "@/lib/dossier/facts";
 import { BUDGET } from "@/lib/dossier/options";
 import { resolveProduct } from "@/lib/dossier/products";
@@ -37,7 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
     async start(controller) {
       const send = (o: Record<string, unknown>) => { try { controller.enqueue(enc.encode(`data: ${JSON.stringify(o)}\n\n`)); } catch {} };
       const finish = () => { try { controller.close(); } catch {} };
-      const hit = store.cache.get(key);
+      const hit = store.cache.get(key) ?? (refresh ? null : diskGet("dossier:" + key, TTL));
       if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
       if (store.running.has(key)) { send({ type: "error", error: "busy", message: "This briefing is already being written. Try again in a minute." }); return finish(); }
       store.runs = store.runs.filter((t) => Date.now() - t < 3600_000);
@@ -58,7 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ iso3: s
         const firstHeading = report.search(/^# /m); const clean = firstHeading > 0 ? report.slice(firstHeading) : report; // drop any stray lead-in before the document title
         const known = new Set(gathered.facts.map((f) => f.id)); const checked = clean.replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => (ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`);
         const done: Done = { report: checked, sources, tiles: gathered.tiles, usage: u, at: new Date().toISOString(), model: MODEL, options: rp.options, name: gathered.name };
-        if (report.trim()) { store.cache.set(key, done); prune(); }
+        if (report.trim()) { store.cache.set(key, done); diskSet("dossier:" + key, done); prune(); }
         send({ type: "done", cached: false, truncated: stop === "max_tokens" || stop === "cost", costStopped, ...done });
       } catch (e) {
         if (ac.signal.aborted) return finish();

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { diskGet, diskSet } from "@/lib/dossier/diskcache";
 import { concurrentCap, hourlyCap, withBatch, inBatchMode } from "@/lib/dossier/batch";
 import { AUDITORS, SUBJECTS, reviewTail } from "@/lib/review/pair";
 import { pairReserve, runAuditors } from "@/lib/review/run";
@@ -41,7 +42,7 @@ export const POST = withBatch(async function POST(req: Request) {
         send({ type: "status", text: "Stage 1 and 2: tasking the council and collecting the shared evidence base…" });
         const [c, snap, res] = await Promise.all([loadCase(iso3), loadSnapshot(iso3).catch(() => null), loadResearch(iso3).catch(() => null)]); if (!c) { send({ type: "error", error: "not_found", message: "Unknown country." }); return finish(); }
         const o = cleanCaseOptions(body, c.power.find((p) => p.id === "hard")?.v ?? null); const manifest = manifestHash(snap, null, iso3); key = caseKey(iso3, o, manifest);
-        const hit = cache.get(key); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
+        const hit = cache.get(key) ?? (refresh ? null : diskGet("case:" + key, TTL)); if (hit && !refresh && Date.now() - Date.parse(hit.at) < TTL) { send({ type: "done", cached: true, ...hit }); return finish(); }
         if (store.running.has(key)) { send({ type: "error", error: "busy", message: "This council is already sitting. Try again in a minute." }); return finish(); }
         store.runs = store.runs.filter((t) => Date.now() - t < 3600_000);
         if (store.runs.length >= hourlyCap(MAX_PER_HOUR)) { send({ type: "error", error: "limit", message: `Limit of ${MAX_PER_HOUR} new detailed briefings per hour reached (DOSSIER_MAX_PER_HOUR). Cached results are still free.` }); return finish(); }
@@ -77,7 +78,7 @@ export const POST = withBatch(async function POST(req: Request) {
         const aud = await runAuditors({ client, model: MODEL, system: CASE_SYSTEM, firstText: base, subject: SUBJECTS["case-council"], product: ordered0.some((x) => x.status === "done") ? composeReport(ordered0 as never) : "", lang: lang, cap: CAP, spent, signal: ac.signal, send, label: "case-council", effort: ENV_EFFORT ?? "low", sources, total }); spent = aud.spent; const ordered: AgentOut[] = [...ordered0, ...(aud.outs as AgentOut[])];
         const known = new Set(gathered.facts.map((f) => f.id)); const report = composeReport(ordered0 as never) + (reviewTail(ordered) ? `\n\n${reviewTail(ordered)}` : "").replace(/\[(F\d+(?:\s*[,–-]\s*F?\d+)*)\]/g, (m, ids: string) => ((ids.match(/\d+/g) ?? []).every((n) => known.has(`F${n}`)) ? m : `[unverified reference ${ids}]`));
         const done: Done = { report, agents: ordered, sources, usage: total, at: new Date().toISOString(), model: MODEL, options: { ...o, kind: "casecouncil" }, name: gathered.name, seats: o.seats, manifest };
-        if (ordered.some((a) => a.status === "done")) { cache.set(key, done); while (cache.size > 20) cache.delete(cache.keys().next().value as string); }
+        if (ordered.some((a) => a.status === "done")) { cache.set(key, done); diskSet("case:" + key, done); while (cache.size > 20) cache.delete(cache.keys().next().value as string); }
         send({ type: "done", cached: false, ...done });
       } catch (e) {
         if (req.signal.aborted) return finish();
